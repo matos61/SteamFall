@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(pip install:*)",
+      "Bash(pip3 install:*)",
+      "Bash(python3 -m pip install pygame --quiet)",
+      "Bash(python3 -c \"import pygame; print\\(pygame.__version__\\)\")",
+      "Bash(sudo apt-get:*)",
+      "Bash(python3:*)",
+      "Bash(ls *.py)"
+    ]
+  }
+}
