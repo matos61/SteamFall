@@ -64,6 +64,8 @@ FLESHFORGED_JUMP_CUT     = 0.72   # Aggressive variable-height cut — commits t
 
 # --- Player ---
 PLAYER_SPEED      = 5      # Horizontal run speed
+ENEMY_IFRAMES     = 10     # Enemy invincibility frames after a hit (shorter than
+                           # player iframes so combo attacks feel responsive)
 PLAYER_JUMP_FORCE = -12    # was -13 — slightly lower peak, snappier arc
 PLAYER_MAX_HEALTH = 100
 PLAYER_MAX_SOUL   = 100    # Marked resource (arcane energy)
@@ -116,3 +118,27 @@ CRAWLER_COLOR  = (40, 120, 80)   # Dark green
 # --- Soul Fragment collectible ---
 SOUL_FRAGMENT_COLOR = (130, 80, 220)   # Soft purple orb
 SOUL_FRAGMENT_SIZE  = 12               # Pixels square
+
+# --- Boss ---
+BOSS_MAX_HEALTH    = 400
+BOSS_PHASE2_THRESH = 0.50   # Health fraction when phase 2 starts
+BOSS_PHASE3_THRESH = 0.25   # Health fraction when phase 3 starts
+BOSS_BAR_HEIGHT    = 18
+BOSS_BAR_Y         = SCREEN_HEIGHT - 38
+BOSS_BAR_MARGIN    = 80
+
+# --- Save ---
+SAVE_FILE = "steamfall_save.json"
+
+# --- Level transitions ---
+TRANSITION_FADE_FRAMES = 40
+TRANSITION_HOLD_FRAMES = 20
+TRANSITION_IN_FRAMES   = 30
+
+# --- Minimap ---
+MAP_TILE_SIZE = 4
+MAP_ALPHA     = 210
+
+# --- Ability slots ---
+ABILITY_SLOTS_DEFAULT = 0
+ABILITY_SLOTS_MAX     = 1
