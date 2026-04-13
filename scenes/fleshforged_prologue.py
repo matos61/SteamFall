@@ -1,127 +1,120 @@
 # =============================================================================
 # scenes/fleshforged_prologue.py — Story beats for the Fleshforged path.
 #
-# Beat format mirrors marked_prologue.py — see that file for documentation.
-# "__tutorial__" beats pause the narrative for an inline control tutorial.
+# Revised direction:
+# - Sera's self-sacrifice is the only path to the protagonist's survival.
+# - The writing is darker, more tragic, and more intimate.
+# - The scene aims for high-stakes, grief-driven momentum without mimicking any
+#   specific copyrighted prose style.
 # =============================================================================
 
 import pygame
 from settings import *
-from scenes.base_scene         import BaseScene
-from systems.dialogue          import DialogueBox
+from scenes.base_scene import BaseScene
+from systems.dialogue import DialogueBox
 from systems.tutorial_minigame import TutorialMinigame
-from systems.voice_player      import VoicePlayer
+from systems.voice_player import VoicePlayer
 
 
 FLESHFORGED_BEATS = [
-    # ==========================================================================
-    # DUSKHOLM — THE MINE
-    # ==========================================================================
-    ((18, 10,  5), "",
-        "Duskholm sat at the end of the rail line like a boot sole — worn, forgotten, but still holding something up."),
+    ((18, 10, 5), "",
+        "Duskholm crouched at the end of the rail line like something that had survived too long to die cleanly."),
 
-    ((18, 10,  5), "",
-        "You and Sera worked the east shaft. Six days on, one off. The off day you spent sleeping until your hands stopped shaking."),
+    ((18, 10, 5), "",
+        "You and Sera worked the east shaft because east-shaft crews came back with enough ore to eat, and sometimes enough to pretend tomorrow had shape."),
 
-    ((18, 10,  5), "",
-        "Her mod: reinforced shoulder joint, salvage-grade, left side. Yours: a pressure valve in the right lung, fitted three years back over a badly healed cave-in injury. Both second-hand. Both hurt in the cold."),
+    ((18, 10, 5), "",
+        "Her shoulder was plated in salvage steel. Your right lung hissed through an old pressure valve every winter morning. Love, in Duskholm, meant learning the sounds of each other's damage."),
 
-    ((18, 10,  5), "Sera",
-        "Good news. Found a bonus canister in the foreman's lockbox. Technically, I just found it. It was in a locked box. Details."),
+    ((18, 10, 5), "Sera",
+        "Good news. I stole a heat canister from the foreman's lockbox. Bad news: if he notices, we may have to become different people by dawn."),
 
-    # TUTORIAL: learn to move
-    ((18, 10,  5), "__tutorial__",
-        {"type": "move", "prompt": "Pick it up."}),
+    ((18, 10, 5), "__tutorial__",
+        {"type": "move", "prompt": "Take the canister."}),
 
-    ((18, 10,  5), "Sera",
-        "Tonight we eat like people who have things to celebrate."),
+    ((18, 10, 5), "Sera",
+        "There. Look at that. For one entire minute, we're rich."),
 
-    ((18, 10,  5), "",
-        "You laughed. It felt strange in your chest — like a rusty hinge finally moving. But real."),
+    ((18, 10, 5), "",
+        "You laughed, and the sound startled both of you. In Duskholm, joy was always suspicious when it arrived on time."),
 
-    # ==========================================================================
-    # THE COLLAPSE
-    # ==========================================================================
-    ((10,  5,  2), "",
-        "The east shaft collapsed at eleven past midday. No alarm. The main pulley just gave — one second of silence, then the noise."),
+    ((10, 5, 2), "",
+        "The shaft gave way at eleven past midday. No siren. No shouted warning. Just one clean instant where the world forgot it was supposed to hold."),
 
-    ((10,  5,  2), "",
-        "Then the weight."),
+    ((10, 5, 2), "",
+        "Then the dark came down with all its weight."),
 
-    (( 8,  4,  1), "",
-        "You came back to yourself with the ceiling across your spine and no feeling below the hips. Dust everywhere. The lamps had all gone out."),
+    ((8, 4, 1), "",
+        "When you woke, the stone had your legs. Dust packed your mouth. Something sharp had gone into your side and stayed there, moving when you breathed."),
 
-    (( 8,  4,  1), "Sera",
-        "Stay with me. Don't sleep. I've got you — just keep breathing."),
+    ((8, 4, 1), "Sera",
+        "Stay with me. Look at me. If you close your eyes now, I swear I'll drag you back just so I can kill you myself."),
 
-    # TUTORIAL: learn to jump (escape the collapsing shaft)
-    ((10,  5,  2), "__tutorial__",
-        {"type": "jump", "prompt": "Get clear — the shaft is coming down."}),
+    ((10, 5, 2), "__tutorial__",
+        {"type": "jump", "prompt": "Move before the shaft buries you both."}),
 
-    (( 8,  4,  1), "Sera",
-        "I've got you. You're still breathing. That's enough for now. That's everything."),
+    ((8, 4, 1), "Sera",
+        "Good. Again. Breathe ugly if you have to. Just breathe."),
 
-    # ==========================================================================
-    # DR. ORVEN
-    # ==========================================================================
-    ((14,  7,  3), "",
-        "Dr. Orven worked out of a converted pump station two levels up from the mine floor. He didn't ask questions. He asked for payment first."),
+    ((14, 7, 3), "",
+        "Dr. Orven kept his surgery above the mine pumps, where the heat from the engines made the blood smell sweet and rotten at the same time."),
 
-    ((14,  7,  3), "Dr. Orven",
-        "Spine is shattered at L2 and L3. Three ribs have punctured the left lung. You need a full lower rebuild and complete respiratory overhaul."),
+    ((14, 7, 3), "Dr. Orven",
+        "Spine shattered. Lung punctured. Lower frame ruined. Without intervention, death is imminent."),
 
-    ((14,  7,  3), "Dr. Orven",
-        "Option one: forty-year military debt contract. Surgery is fronted; you work it off in service."),
+    ((12, 6, 2), "Dr. Orven",
+        "You do not have the credit for a rebuild. He dies tonight unless I strip her implants, graft the usable metal, and cannibalize the rest for the cost of the operation."),
 
-    ((12,  6,  2), "Dr. Orven",
-        "Option two: she donates her existing mods toward the cost. She walks out on her own feet. You get pieced back together."),
+    ((12, 6, 2), "",
+        "The room went still. Even the pumps seemed to listen."),
 
-    ((12,  6,  2), "",
-        "Sera was already shaking her head before he finished the sentence."),
+    ((10, 5, 2), "",
+        "You tried to speak. What came out was blood."),
 
-    # ==========================================================================
-    # SERA'S CHOICE
-    # ==========================================================================
-    ((10,  5,  2), "Sera",
-        "Don't you dare. If you so much as look at option two I will walk out of here right now and you will never find another surgeon willing to touch you."),
+    ((10, 5, 2), "Sera",
+        "No. Don't waste breath trying to save me from this."),
 
-    ((10,  5,  2), "Sera",
-        "You take the debt. You go up. You climb until you're the kind of person this was worth something for. For both of us."),
+    ((10, 5, 2), "Sera",
+        "Listen to me. You live. That is the whole of it. There is no second choice here. There is you, or there is a body for me to hold until it gets cold."),
 
-    ((12,  6,  3), "",
-        "You watched her convince Orven to front the surgery on a military bond. She pressed her thumb to the contract seal and didn't flinch once."),
+    ((10, 5, 2), "",
+        "She knelt beside the table and pressed her forehead to yours. The metal in her shoulder clicked softly as she shook."),
 
-    (( 8,  4,  1), "",
-        "The anesthesia took hold. The last thing you felt was her hand letting go."),
+    ((10, 5, 2), "Sera",
+        "You always thought survival was something ugly people did. So do it ugly. Do it bleeding. Do it without me. But do it."),
 
-    # ==========================================================================
-    # AWAKENING — REBUILT
-    # ==========================================================================
-    ((22, 12,  5), "",
-        "You woke in a military clinic. Your spine moved. Your lungs drew a full breath — clean, deep, mechanical. Completely yours."),
+    ((10, 5, 2), "Sera",
+        "Take what I bought you and climb so high this world chokes trying to name what you became."),
 
-    # TUTORIAL: learn to attack (testing the rebuilt frame)
-    ((22, 12,  5), "__tutorial__",
-        {"type": "attack", "prompt": "Test the new frame."}),
+    ((8, 4, 1), "",
+        "Orven's assistants held her down because she would not let herself tremble while you watched."),
 
-    ((22, 12,  5), "",
-        "Sera's chair was empty. The orderly wouldn't meet your eyes. You didn't ask."),
+    ((8, 4, 1), "",
+        "The last thing you saw before the sedative took you was Sera turning her face toward you and smiling like she had already made peace with the theft of herself."),
 
-    ((22, 12,  5), "",
-        "A man in a military coat stood at the foot of your bed. He had been waiting a while, by the look of it."),
+    ((22, 12, 5), "",
+        "You woke in a military clinic stitched together with her metal, her sacrifice bolted into your spine, your lungs, your gait. Every step belonged partly to the dead."),
 
-    ((22, 12,  5), "Recruiter",
-        "The contract has been honored. The surgery was performed, the mods installed. What you owe now is service."),
+    ((22, 12, 5), "__tutorial__",
+        {"type": "attack", "prompt": "Test the frame she died to give you."}),
 
-    ((22, 12,  5), "Recruiter",
-        "You leave at dawn. What you make of what you've been given — that's entirely your affair."),
+    ((22, 12, 5), "",
+        "Her chair was gone. Her clothes were gone. Even her name had been cleared from the intake slate. The state had already begun the work of pretending she had always been material."),
 
-    # TUTORIAL: learn the faction ability (overdrive ignition)
-    ((22, 12,  5), "__tutorial__",
-        {"type": "ability_fleshforged", "prompt": "Ignite the overdrive. Show us what it bought."}),
+    ((22, 12, 5), "",
+        "A recruiter in ash-gray uniform waited beside your bed with the patience of a creditor."),
 
-    ((22, 12,  5), "",
-        "You said nothing. You stood. The floor was cold beneath your new feet. You were not."),
+    ((22, 12, 5), "Recruiter",
+        "Your reconstruction is complete. The military has assumed your outstanding debt, your maintenance, and your deployment rights."),
+
+    ((22, 12, 5), "Recruiter",
+        "At dawn, you will report for induction. The nation has invested heavily in your continued heartbeat."),
+
+    ((22, 12, 5), "__tutorial__",
+        {"type": "ability_fleshforged", "prompt": "Ignite the overdrive. Make her death cost the world something."}),
+
+    ((22, 12, 5), "",
+        "You stood on legs she purchased with her own body and felt the machinery answer. Grief did not leave you. It hardened. That would have to be enough."),
 ]
 
 
@@ -129,24 +122,22 @@ class FleshforgedPrologueScene(BaseScene):
     def __init__(self, game):
         super().__init__(game)
         self._beat_index = 0
-        self._dialogue   = DialogueBox(faction=FACTION_FLESHFORGED)
-        self._tutorial   = None
-        self._voice      = VoicePlayer()
-        self._font_skip  = pygame.font.SysFont("monospace", 13)
+        self._dialogue = DialogueBox(faction=FACTION_FLESHFORGED)
+        self._tutorial = None
+        self._voice = VoicePlayer()
+        self._font_skip = pygame.font.SysFont("monospace", 13)
         self._fade_alpha = 255
-        self._fade_surf  = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT))
+        self._fade_surf = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT))
         self._fade_surf.fill(BLACK)
         r, g, b = FLESHFORGED_BEATS[0][0]
         self._bg = [float(r), float(g), float(b)]
 
-    # ------------------------------------------------------------------
-
     def on_enter(self, **kwargs):
         self._beat_index = 0
         r, g, b = FLESHFORGED_BEATS[0][0]
-        self._bg         = [float(r), float(g), float(b)]
+        self._bg = [float(r), float(g), float(b)]
         self._fade_alpha = 255
-        self._tutorial   = None
+        self._tutorial = None
         self._load_beat(0)
 
     def _load_beat(self, index: int):
@@ -166,8 +157,6 @@ class FleshforgedPrologueScene(BaseScene):
 
     def _bg_target(self):
         return FLESHFORGED_BEATS[self._beat_index][0]
-
-    # ------------------------------------------------------------------
 
     def handle_event(self, event):
         if event.type == pygame.KEYDOWN:
@@ -196,8 +185,6 @@ class FleshforgedPrologueScene(BaseScene):
         else:
             self._load_beat(self._beat_index)
 
-    # ------------------------------------------------------------------
-
     def update(self, dt):
         if self._tutorial is not None:
             self._tutorial.update()
@@ -216,8 +203,6 @@ class FleshforgedPrologueScene(BaseScene):
         self._bg[1] += (tg - self._bg[1]) * spd
         self._bg[2] += (tb - self._bg[2]) * spd
 
-    # ------------------------------------------------------------------
-
     def draw(self, surface):
         surface.fill((int(self._bg[0]), int(self._bg[1]), int(self._bg[2])))
 
@@ -225,12 +210,10 @@ class FleshforgedPrologueScene(BaseScene):
             self._fade_surf.set_alpha(self._fade_alpha)
             surface.blit(self._fade_surf, (0, 0))
 
-        # Progress bar
         progress = (self._beat_index + 1) / len(FLESHFORGED_BEATS)
-        bar_w    = int(SCREEN_WIDTH * progress)
+        bar_w = int(SCREEN_WIDTH * progress)
         pygame.draw.rect(surface, FLESHFORGED_COLOR, (0, 0, bar_w, 3))
 
-        # Skip hint
         skip = self._font_skip.render("ESC — skip prologue", True, (65, 42, 22))
         surface.blit(skip, (SCREEN_WIDTH - skip.get_width() - 16, 10))
 
