@@ -52,7 +52,9 @@ class Checkpoint:
         game.save_data["checkpoint_health_frac"]  = (player.health /
                                                       player.max_health)
         game.save_data["checkpoint_level"]        = self.level
+        game.save_data["faction"]                 = game.player_faction
         game.save_data["respawn"]                 = False
+        game.save_to_disk()
 
     # ------------------------------------------------------------------
 

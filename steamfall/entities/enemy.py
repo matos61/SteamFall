@@ -15,7 +15,8 @@ from entities.entity   import Entity
 from systems.combat    import AttackHitbox
 from settings          import (ENEMY_PATROL_SPEED, ENEMY_CHASE_SPEED,
                                 ENEMY_SIGHT_RANGE, ENEMY_ATTACK_RANGE,
-                                ENEMY_ATTACK_DAMAGE, FLESHFORGED_COLOR, RED)
+                                ENEMY_ATTACK_DAMAGE, FLESHFORGED_COLOR, RED,
+                                ENEMY_IFRAMES)
 
 # AI states
 _PATROL = "patrol"
@@ -33,9 +34,10 @@ class Enemy(Entity):
         self.left_limit  = x - patrol_range
         self.right_limit = x + patrol_range
 
-        self._state          = _PATROL
-        self._patrol_dir     = 1          # +1 right, -1 left
+        self._state           = _PATROL
+        self._patrol_dir      = 1          # +1 right, -1 left
         self._attack_cooldown = 0
+        self._iframes_on_hit  = ENEMY_IFRAMES   # Shorter than player iframes → combos work
 
         # Hitboxes spawned this frame (cleared after checking)
         self.hitboxes: list[AttackHitbox] = []
@@ -129,8 +131,3 @@ class Enemy(Entity):
 
     def draw(self, surface: pygame.Surface, camera) -> None:
         super().draw(surface, camera)
-
-        # Draw hitbox outlines for debugging (comment out when not needed)
-        for hb in self.hitboxes:
-            debug_rect = camera.apply_rect(hb.rect)
-            pygame.draw.rect(surface, RED, debug_rect, 1)

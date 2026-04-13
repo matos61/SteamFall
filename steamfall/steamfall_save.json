@@ -1,0 +1,13 @@
+{
+  "faction": "marked",
+  "visited_levels": [
+    "level_1"
+  ],
+  "checkpoint_pos": [
+    1104,
+    272
+  ],
+  "checkpoint_health_frac": 0.25,
+  "checkpoint_level": "level_1",
+  "respawn": false
+}
