@@ -214,11 +214,14 @@ class TutorialMinigame:
                 self._flash      = 50
 
         elif self.goal_type == 'attack' and self._atk_done and self._atk_timer > 0 and not self._target_hit:
-            # Hitbox extends from player's right edge (always facing right here)
-            atk_rect = pygame.Rect(pr.right, pr.top + 6, _ATK_REACH, self.PH - 12)
+            if self._facing == 1:
+                atk_rect = pygame.Rect(pr.right, pr.top + 6, _ATK_REACH, self.PH - 12)
+            else:
+                atk_rect = pygame.Rect(pr.left - _ATK_REACH, pr.top + 6, _ATK_REACH, self.PH - 12)
+
             if atk_rect.colliderect(self._target):
                 self._target_hit = True
-                self._flash      = 50
+                self._flash = 50
 
         elif self.goal_type in ('ability_marked', 'ability_fleshforged') and self._abi_used and self._abi_flash == 0 and self._flash == 0:
             self._flash = 50
@@ -266,9 +269,13 @@ class TutorialMinigame:
 
         # Attack arc visual
         if self._atk_timer > 0:
-            arc_rect = pygame.Rect(pr.right, pr.top + 6, _ATK_REACH, self.PH - 12)
-            arc_s    = pygame.Surface((arc_rect.width, arc_rect.height), pygame.SRCALPHA)
-            alpha    = int(200 * self._atk_timer / 14)
+            if self._facing == 1:
+                arc_rect = pygame.Rect(pr.right, pr.top + 6, _ATK_REACH, self.PH - 12)
+            else:
+                arc_rect = pygame.Rect(pr.left - _ATK_REACH, pr.top + 6, _ATK_REACH, self.PH - 12)
+
+            arc_s = pygame.Surface((arc_rect.width, arc_rect.height), pygame.SRCALPHA)
+            alpha = int(200 * self._atk_timer / 14)
             arc_s.fill((*GOLD, alpha))
             surface.blit(arc_s, arc_rect.topleft)
 
