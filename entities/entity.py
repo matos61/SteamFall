@@ -7,7 +7,7 @@
 # =============================================================================
 
 import pygame
-from settings import PLAYER_IFRAMES, TOUCH_KNOCKBACK_VX, TOUCH_KNOCKBACK_VY
+from settings import PLAYER_IFRAMES, TOUCH_KNOCKBACK_VX, TOUCH_KNOCKBACK_VY, ENEMY_IFRAMES
 
 
 class Entity:
@@ -37,7 +37,10 @@ class Entity:
         self.gravity_mult = 1.0   # Override in subclasses for faction-specific weight
 
         # Invincibility frames (counted down each frame)
-        self.iframes    = 0
+        self.iframes       = 0
+        # How many iframes to grant on being hit — players use PLAYER_IFRAMES,
+        # enemies use ENEMY_IFRAMES (shorter, so combos feel responsive).
+        self._iframes_on_hit = PLAYER_IFRAMES
 
         # Which direction the entity is facing: +1 = right, -1 = left
         self.facing     = 1
@@ -54,10 +57,10 @@ class Entity:
         if self.iframes > 0:
             return
         self.health -= amount
-        self.iframes = PLAYER_IFRAMES
         if knockback_dir != 0:
             self.vx = knockback_dir * TOUCH_KNOCKBACK_VX
             self.vy = TOUCH_KNOCKBACK_VY
+        self.iframes = self._iframes_on_hit
         if self.health <= 0:
             self.health = 0
             self.die()
