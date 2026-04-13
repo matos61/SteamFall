@@ -11,8 +11,10 @@
 # This keeps dependencies clean and avoids circular imports.
 # =============================================================================
 
+import json
+import pathlib
 import pygame
-from settings import SCREEN_WIDTH, SCREEN_HEIGHT, FPS, TITLE, BLACK, SCENE_MAIN_MENU
+from settings import SCREEN_WIDTH, SCREEN_HEIGHT, FPS, TITLE, BLACK, SCENE_MAIN_MENU, SAVE_FILE
 
 
 class Game:
@@ -25,6 +27,7 @@ class Game:
         # --- Shared game state (read by any scene) ---
         self.player_faction = None   # Set in FactionSelectScene
         self.save_data      = {}     # Will hold checkpoints, inventory, etc.
+        self.load_from_disk()        # Restore previous run's save if present
 
         # Build all scenes now so they're ready to receive on_enter() calls.
         # We do the imports inside the method to prevent circular-import issues
@@ -57,6 +60,23 @@ class Game:
             SCENE_FLESHFORGED_PROLOGUE: FleshforgedPrologueScene(self),
             SCENE_GAMEPLAY:             GameplayScene(self),
         }
+
+    # ------------------------------------------------------------------
+
+    def save_to_disk(self) -> None:
+        pathlib.Path(SAVE_FILE).write_text(json.dumps(self.save_data, indent=2))
+
+    def load_from_disk(self) -> None:
+        p = pathlib.Path(SAVE_FILE)
+        if p.exists():
+            try:
+                self.save_data = json.loads(p.read_text())
+            except (json.JSONDecodeError, OSError):
+                self.save_data = {}
+
+    def clear_save(self) -> None:
+        self.save_data = {}
+        self.save_to_disk()
 
     # ------------------------------------------------------------------
 

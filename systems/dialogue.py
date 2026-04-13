@@ -5,13 +5,17 @@
 #   box = DialogueBox()
 #   box.queue([
 #       ("Kael",   "You'll be something great. I see it."),
-#       ("",       "He pressed the blade into your hand."),
+#       ("",       "He pressed the blade into your hand."),  # "" = narrator
 #   ])
 #   # Each frame:
 #   box.update()
 #   box.draw(screen)
 #   # Check box.is_done() to know when all lines are finished.
 #   # Call box.advance() on SPACE/ENTER keypress.
+#
+# Visual conventions:
+#   • Named speaker  → WHITE text, faction-colored name badge
+#   • "" (narrator)  → muted lavender-white, no badge, text starts at box top
 # =============================================================================
 
 import pygame
@@ -19,72 +23,76 @@ from settings import (SCREEN_WIDTH, SCREEN_HEIGHT, BLACK, WHITE, GRAY, GOLD,
                        MARKED_COLOR, FLESHFORGED_COLOR, TEXT_SCROLL_SPEED,
                        DIALOGUE_FONT_SIZE)
 
+# Frames after text fully reveals before showing the advance prompt
+_HINT_DELAY  = 22
+# Frames per blink half-cycle for the advance cursor
+_BLINK_CYCLE = 28
+# Color for narrator lines (no speaker) — slightly muted, cooler white
+_NARRATOR_COLOR = (195, 188, 215)
+
 
 class DialogueBox:
     BOX_HEIGHT  = 160
     BOX_PADDING = 24
-    BOX_MARGIN  = 30           # Gap from bottom of screen
-    BOX_ALPHA   = 210          # 0=transparent, 255=solid
+    BOX_MARGIN  = 30
+    BOX_ALPHA   = 215
 
     def __init__(self, faction: str = ""):
         self.faction     = faction
         self._queue: list[tuple[str, str]] = []
-        self._index      = 0           # Which line we're on
-        self._char_pos   = 0.0         # How many characters are revealed (float)
+        self._index      = 0
+        self._char_pos   = 0.0
         self._done       = True
+        self._reveal_timer = 0   # Counts up once text is fully shown
+        self._blink_timer  = 0   # Drives the blinking advance cursor
 
-        # Fonts
         pygame.font.init()
-        self.font_body    = pygame.font.SysFont("georgia",    DIALOGUE_FONT_SIZE)
-        self.font_speaker = pygame.font.SysFont("georgia",    DIALOGUE_FONT_SIZE - 2, bold=True)
-        self.font_hint    = pygame.font.SysFont("monospace",  14)
+        self.font_body    = pygame.font.SysFont("georgia",   DIALOGUE_FONT_SIZE)
+        self.font_speaker = pygame.font.SysFont("georgia",   DIALOGUE_FONT_SIZE - 2,
+                                                bold=True)
+        self.font_hint    = pygame.font.SysFont("monospace", 13)
 
-        # Accent color based on faction
-        self._accent = (MARKED_COLOR if faction == "marked"
-                        else FLESHFORGED_COLOR if faction == "fleshforged"
-                        else GOLD)
+        self._accent = (MARKED_COLOR     if faction == "marked"   else
+                        FLESHFORGED_COLOR if faction == "fleshforged" else
+                        GOLD)
 
     # ------------------------------------------------------------------
     # Public API
     # ------------------------------------------------------------------
 
     def queue(self, lines: list[tuple[str, str]]) -> None:
-        """
-        Load a list of (speaker_name, text) tuples.
-        Pass "" as speaker_name for narration with no label.
-        """
-        self._queue  = lines
-        self._index  = 0
-        self._char_pos = 0.0
-        self._done   = False
+        self._queue        = lines
+        self._index        = 0
+        self._char_pos     = 0.0
+        self._done         = False
+        self._reveal_timer = 0
+        self._blink_timer  = 0
 
     def advance(self) -> None:
-        """
-        Called on SPACE or ENTER press.
-        If text is still scrolling → jump to full reveal.
-        If text is fully shown → move to next line.
-        """
         current_text = self._current_text()
         if self._char_pos < len(current_text):
-            # Snap to end of current line
-            self._char_pos = len(current_text)
+            self._char_pos = len(current_text)   # Snap to full reveal
         else:
             self._next_line()
 
     def update(self) -> None:
-        """Call every frame to advance the scroll animation."""
         if self._done:
             return
         current_text = self._current_text()
         if self._char_pos < len(current_text):
             self._char_pos = min(self._char_pos + TEXT_SCROLL_SPEED,
                                  len(current_text))
+            self._reveal_timer = 0
+        else:
+            # Text is fully revealed — tick hint delay and blink
+            self._reveal_timer += 1
+            if self._reveal_timer >= _HINT_DELAY:
+                self._blink_timer += 1
 
     def is_done(self) -> bool:
         return self._done
 
     def is_fully_revealed(self) -> bool:
-        """True when the current line is fully visible (no longer scrolling)."""
         return self._char_pos >= len(self._current_text())
 
     # ------------------------------------------------------------------
@@ -95,45 +103,56 @@ class DialogueBox:
         if self._done:
             return
 
-        box_x = DialogueBox.BOX_MARGIN
-        box_y = SCREEN_HEIGHT - DialogueBox.BOX_HEIGHT - DialogueBox.BOX_MARGIN
-        box_w = SCREEN_WIDTH  - DialogueBox.BOX_MARGIN * 2
-        box_h = DialogueBox.BOX_HEIGHT
+        box_x = self.BOX_MARGIN
+        box_y = SCREEN_HEIGHT - self.BOX_HEIGHT - self.BOX_MARGIN
+        box_w = SCREEN_WIDTH  - self.BOX_MARGIN * 2
+        box_h = self.BOX_HEIGHT
 
         # --- Background ---
         bg = pygame.Surface((box_w, box_h), pygame.SRCALPHA)
-        bg.fill((8, 5, 18, DialogueBox.BOX_ALPHA))
+        bg.fill((8, 5, 18, self.BOX_ALPHA))
         surface.blit(bg, (box_x, box_y))
 
-        # --- Border ---
-        pygame.draw.rect(surface, self._accent, (box_x, box_y, box_w, box_h), 2)
+        # --- Border — pulses brighter once text is fully revealed ---
+        if self._reveal_timer >= _HINT_DELAY:
+            pulse = abs((_BLINK_CYCLE - (self._blink_timer % (_BLINK_CYCLE * 2)))
+                        / _BLINK_CYCLE)   # 0.0 → 1.0 → 0.0
+            r = int(self._accent[0] * (0.65 + 0.35 * pulse))
+            g = int(self._accent[1] * (0.65 + 0.35 * pulse))
+            b = int(self._accent[2] * (0.65 + 0.35 * pulse))
+            border_color = (r, g, b)
+        else:
+            border_color = self._accent
+        pygame.draw.rect(surface, border_color, (box_x, box_y, box_w, box_h), 2)
 
-        p = DialogueBox.BOX_PADDING
-        speaker, _ = self._queue[self._index]
+        p        = self.BOX_PADDING
+        speaker  = self._queue[self._index][0]
+        is_narr  = (speaker == "")
 
-        # --- Speaker label (if any) ---
-        if speaker:
+        # --- Speaker badge (characters only) ---
+        if not is_narr:
             label = self.font_speaker.render(speaker.upper(), True, self._accent)
             surface.blit(label, (box_x + p, box_y + p - 4))
 
-        text_y_offset = (p + 28) if speaker else p
+        text_y_offset = p if is_narr else (p + 28)
+        text_color    = _NARRATOR_COLOR if is_narr else WHITE
 
         # --- Body text (only revealed characters) ---
-        visible_text = self._current_text()[:int(self._char_pos)]
-        wrapped      = self._wrap_text(visible_text, box_w - p * 2)
+        visible = self._current_text()[:int(self._char_pos)]
+        wrapped = self._wrap_text(visible, box_w - p * 2)
         for i, line in enumerate(wrapped):
-            rendered = self.font_body.render(line, True, WHITE)
+            rendered = self.font_body.render(line, True, text_color)
             surface.blit(rendered, (box_x + p, box_y + text_y_offset + i * 30))
 
-        # --- "Press SPACE" hint when fully revealed ---
-        if self.is_fully_revealed():
-            hint_text = ("SPACE — continue"
-                         if self._index < len(self._queue) - 1
-                         else "SPACE — dismiss")
-            hint = self.font_hint.render(hint_text, True, GRAY)
-            surface.blit(hint,
-                (box_x + box_w - hint.get_width() - p,
-                 box_y + box_h - hint.get_height() - 10))
+        # --- Advance cursor — appears after hint delay, blinks ---
+        if self._reveal_timer >= _HINT_DELAY:
+            # Blink: visible for half the cycle
+            visible_cursor = (self._blink_timer % (_BLINK_CYCLE * 2)) < _BLINK_CYCLE
+            if visible_cursor:
+                cursor = self.font_hint.render("▶", True, self._accent)
+                surface.blit(cursor,
+                    (box_x + box_w - cursor.get_width() - p,
+                     box_y + box_h - cursor.get_height() - 10))
 
     # ------------------------------------------------------------------
     # Internal helpers
@@ -145,15 +164,16 @@ class DialogueBox:
         return self._queue[self._index][1]
 
     def _next_line(self) -> None:
-        self._index += 1
-        self._char_pos = 0.0
+        self._index       += 1
+        self._char_pos     = 0.0
+        self._reveal_timer = 0
+        self._blink_timer  = 0
         if self._index >= len(self._queue):
             self._done = True
 
     def _wrap_text(self, text: str, max_width: int) -> list[str]:
-        """Break text into lines that fit within max_width pixels."""
-        words  = text.split(" ")
-        lines  = []
+        words   = text.split(" ")
+        lines   = []
         current = ""
         for word in words:
             test = (current + " " + word).strip()

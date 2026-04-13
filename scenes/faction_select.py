@@ -56,10 +56,15 @@ class FactionSelectScene(BaseScene):
 
     def _confirm(self):
         if self.selected == 0:
-            self.game.player_faction = FACTION_MARKED
+            self.game.player_faction          = FACTION_MARKED
+            self.game.save_data["faction"]    = FACTION_MARKED
+        else:
+            self.game.player_faction          = FACTION_FLESHFORGED
+            self.game.save_data["faction"]    = FACTION_FLESHFORGED
+        self.game.save_to_disk()
+        if self.selected == 0:
             self.game.change_scene(SCENE_MARKED_PROLOGUE)
         else:
-            self.game.player_faction = FACTION_FLESHFORGED
             self.game.change_scene(SCENE_FLESHFORGED_PROLOGUE)
 
     # ------------------------------------------------------------------

@@ -93,14 +93,61 @@ LEVEL_2 = [
 ]
 
 
+LEVEL_3 = [
+    "                                                                 ",
+    "                                                                 ",
+    "        ###              ###                     ###             ",
+    "                E                   E                     c      ",
+    "  ###                          #########                         ",
+    "                                                                 ",
+    "     E               ###                  E                      ",
+    "###########                                         ######       ",
+    "                 C               ###                             ",
+    "#################                           E              P     ",
+    "#################################################################",
+    "#################################################################",
+]
+
+LEVEL_4 = [
+    "                     #                              ",
+    "                                                    ",
+    "              ###           ###                     ",
+    "    c                                    c          ",
+    "         ###                   ###                  ",
+    "  E                  c                        E     ",
+    "      #######              #######                  ",
+    "                                                    ",
+    "         E         C                 E              ",
+    "  ################   ################               ",
+    "                                          P         ",
+    "####################################################",
+    "####################################################",
+]
+
+LEVEL_5 = [
+    "                                                     ",
+    "                                                     ",
+    "  ###                                          ###   ",
+    "                                                     ",
+    "                                                     ",
+    "           C                                         ",
+    "   P    ########                      ########       ",
+    "                                                     ",
+    "                        B                            ",
+    "#####################################################",
+    "#####################################################",
+]
+
+
 class TileMap:
     def __init__(self, level_data: list, level_name: str = "level_1"):
         self.level_name  = level_name
         self.tiles: list[pygame.Rect] = []   # Solid collision rects
         self.player_spawn = (100, 100)        # Default; overwritten if 'P' found
-        self.enemy_spawns: list[tuple]  = []
+        self.enemy_spawns: list[tuple]   = []
         self.crawler_spawns: list[tuple] = []
         self.checkpoints: list           = []  # Checkpoint objects
+        self.boss_spawn: tuple | None    = None
 
         self._parse(level_data)
 
@@ -135,6 +182,10 @@ class TileMap:
                 elif char == 'C':
                     self.checkpoints.append(
                         Checkpoint(x, y, level=self.level_name))
+
+                elif char == 'B':
+                    # Boss spawn (feet at tile bottom)
+                    self.boss_spawn = (x + TILE_SIZE // 2, y - 72)
 
     # ------------------------------------------------------------------
 

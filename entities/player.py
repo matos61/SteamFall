@@ -85,6 +85,9 @@ class Player(Entity):
         # Death state — holds us in a death pose before switching scenes
         self.death_timer = 0
 
+        # Landing dust: set > 0 on the frame the player lands
+        self._land_timer = 0
+
         # Animation state machine
         self._anim = AnimationController(color, width=30, height=54)
 
@@ -158,6 +161,12 @@ class Player(Entity):
         apply_gravity(self)
         if solid_rects:
             move_and_collide(self, solid_rects)
+
+        # Landing detection — set dust timer on the frame we first touch ground
+        if not was_on_ground and self.on_ground:
+            self._land_timer = 10
+        if self._land_timer > 0:
+            self._land_timer -= 1
 
         # Coyote time: count down after leaving ground (walked off ledge)
         if was_on_ground and not self.on_ground:
@@ -389,6 +398,21 @@ class Player(Entity):
             alpha = int(200 * self._attack_timer / PLAYER_ATTACK_DURATION)
             arc_surf.fill((*GOLD, alpha))
             surface.blit(arc_surf, arc_rect.topleft)
+
+        # Landing dust puff — two small fading marks at ground level
+        if self._land_timer > 0:
+            alpha    = int(160 * self._land_timer / 10)
+            dust_w   = screen_rect.width + 14
+            dust_h   = 3
+            dust_y   = screen_rect.bottom - 1
+            dust_x   = screen_rect.left - 7
+            dust_s   = pygame.Surface((dust_w, dust_h), pygame.SRCALPHA)
+            dust_col = (180, 175, 200, alpha)
+            # Two short marks spread outward from the center
+            hw = dust_w // 3
+            pygame.draw.rect(dust_s, dust_col, (0,        0, hw, dust_h))
+            pygame.draw.rect(dust_s, dust_col, (dust_w - hw, 0, hw, dust_h))
+            surface.blit(dust_s, (dust_x, dust_y))
 
         # Soul surge rings
         for hb in self._surge_hitboxes:
