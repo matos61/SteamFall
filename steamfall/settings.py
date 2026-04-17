@@ -69,6 +69,7 @@ PLAYER_MAX_HEALTH = 100
 PLAYER_MAX_SOUL   = 100    # Marked resource (arcane energy)
 PLAYER_MAX_HEAT   = 100    # Fleshforged resource (heat/overdrive)
 PLAYER_IFRAMES    = 45     # Invincibility frames after taking a hit
+ENEMY_IFRAMES     = 6      # Short iframes so enemies can be hit-staggered quickly
 PLAYER_ATTACK_DURATION = 12   # Frames the attack hitbox stays active
 PLAYER_ATTACK_COOLDOWN = 25   # Frames between attacks
 

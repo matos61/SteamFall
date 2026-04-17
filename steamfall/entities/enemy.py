@@ -15,7 +15,8 @@ from entities.entity   import Entity
 from systems.combat    import AttackHitbox
 from settings          import (ENEMY_PATROL_SPEED, ENEMY_CHASE_SPEED,
                                 ENEMY_SIGHT_RANGE, ENEMY_ATTACK_RANGE,
-                                ENEMY_ATTACK_DAMAGE, FLESHFORGED_COLOR, RED)
+                                ENEMY_ATTACK_DAMAGE, ENEMY_IFRAMES,
+                                FLESHFORGED_COLOR, RED)
 
 # AI states
 _PATROL = "patrol"
@@ -28,6 +29,7 @@ class Enemy(Entity):
                  patrol_range: int = 160,
                  color: tuple = (160, 45, 45)):
         super().__init__(x, y, width=36, height=52, color=color, max_health=60)
+        self._hit_iframes = ENEMY_IFRAMES
 
         # Patrol boundaries
         self.left_limit  = x - patrol_range
