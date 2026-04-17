@@ -142,3 +142,27 @@ MAP_ALPHA     = 210
 # --- Ability slots ---
 ABILITY_SLOTS_DEFAULT = 0
 ABILITY_SLOTS_MAX     = 1
+
+# --- ShieldGuard enemy ---
+SHIELD_GUARD_HP        = 80
+SHIELD_GUARD_SPEED     = 1.2
+SHIELD_GUARD_DAMAGE    = 20
+SHIELD_GUARD_DEFENSE   = 0.35   # Fraction of damage received from front (65% reduction)
+SHIELD_GUARD_COLOR     = (50, 80, 140)   # Steel blue
+
+# --- Ranged enemy ---
+RANGED_HP              = 40
+RANGED_SPEED           = 1.0
+RANGED_DAMAGE          = 12
+RANGED_PROJ_SPEED      = 5
+RANGED_ATTACK_COOLDOWN = 90    # Frames between shots
+RANGED_SIGHT_RANGE     = 380   # Wider than melee enemies
+RANGED_COLOR           = (100, 60, 30)   # Rust brown
+
+# --- Jumper enemy ---
+JUMPER_HP              = 35
+JUMPER_SPEED           = 2.0
+JUMPER_DAMAGE          = 12
+JUMPER_JUMP_FORCE      = -11
+JUMPER_JUMP_COOLDOWN   = 55    # Frames between jumps
+JUMPER_COLOR           = (50, 140, 80)   # Sickly green

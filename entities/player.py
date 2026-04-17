@@ -188,6 +188,11 @@ class Player(Entity):
     # ------------------------------------------------------------------
 
     def _handle_movement(self, keys) -> None:
+        # Windup locks movement — the fighter plants their feet to swing
+        if self._windup_timer > 0:
+            self.vx = 0
+            return
+
         speed = PLAYER_SPEED * (1.6 if self._overdrive else 1.0)
 
         # Air control: Fleshforged have reduced steering in the air (momentum).

@@ -130,4 +130,15 @@ class Enemy(Entity):
         return [SoulFragment(self.rect.centerx, self.rect.centery)]
 
     def draw(self, surface: pygame.Surface, camera) -> None:
-        super().draw(surface, camera)
+        screen_rect = camera.apply(self)
+        # 2-frame red hit-flash instead of the white player flash
+        color = RED if (self.iframes > 0 and self.iframes % 4 < 2) else self.color
+        pygame.draw.rect(surface, color, screen_rect)
+        if self.health < self.max_health and self.max_health > 0:
+            bw = self.rect.width
+            bh = 5
+            bx = screen_rect.x
+            by = screen_rect.y - 10
+            filled = int(bw * self.health / self.max_health)
+            pygame.draw.rect(surface, (60, 10, 10),  (bx, by, bw, bh))
+            pygame.draw.rect(surface, (200, 40, 40), (bx, by, filled, bh))

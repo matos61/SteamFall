@@ -20,10 +20,13 @@ from scenes.base_scene  import BaseScene
 from core.camera        import Camera
 from core.hitstop       import hitstop
 from world.tilemap      import TileMap, LEVEL_1, LEVEL_2, LEVEL_3, LEVEL_4, LEVEL_5
-from entities.player    import Player
-from entities.enemy     import Enemy
-from entities.crawler   import Crawler
-from entities.boss      import Boss
+from entities.player       import Player
+from entities.enemy        import Enemy
+from entities.crawler      import Crawler
+from entities.boss         import Boss
+from entities.shield_guard import ShieldGuard
+from entities.ranged       import Ranged
+from entities.jumper       import Jumper
 from systems.checkpoint import Checkpoint
 from systems.collectible import SoulFragment
 from systems.minimap    import MiniMap
@@ -90,6 +93,14 @@ class GameplayScene(BaseScene):
         # Spawn crawlers
         for (cx2, cy2) in self.tilemap.crawler_spawns:
             self.enemies.append(Crawler(cx2, cy2))
+
+        # Spawn P2-1 enemy types
+        for (gx, gy) in self.tilemap.shield_guard_spawns:
+            self.enemies.append(ShieldGuard(gx, gy))
+        for (rx, ry) in self.tilemap.ranged_spawns:
+            self.enemies.append(Ranged(rx, ry))
+        for (jx, jy) in self.tilemap.jumper_spawns:
+            self.enemies.append(Jumper(jx, jy))
 
         # Spawn boss
         self._boss = None
@@ -236,6 +247,24 @@ class GameplayScene(BaseScene):
             for hb in enemy.hitboxes:
                 hb.check_hits([self.player])
                 hb.update()
+
+        # --- Ranged projectile collisions ---
+        for enemy in living_enemies:
+            if isinstance(enemy, Ranged):
+                for proj in enemy.projectiles:
+                    if proj.alive and proj.rect.colliderect(self.player.rect):
+                        kdir = 1 if proj.vx > 0 else -1
+                        self.player.take_damage(proj.damage, knockback_dir=kdir)
+                        proj.alive = False
+
+        # --- Touch damage: player body overlaps enemy body ---
+        if self.player.iframes == 0:
+            for enemy in living_enemies:
+                if self.player.rect.colliderect(enemy.rect):
+                    kdir = 1 if self.player.rect.centerx > enemy.rect.centerx else -1
+                    self.player.take_damage(ENEMY_ATTACK_DAMAGE // 2,
+                                            knockback_dir=kdir)
+                    break
 
         # --- Collect soul fragments ---
         remaining = []

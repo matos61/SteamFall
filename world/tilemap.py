@@ -8,6 +8,10 @@
 #   'E' = standard enemy spawn point
 #   'c' = crawler enemy spawn point
 #   'C' = checkpoint (glowing pillar save point)
+#   'B' = boss spawn point
+#   'G' = ShieldGuard spawn point
+#   'R' = Ranged enemy spawn point
+#   'J' = Jumper enemy spawn point
 #
 # When you have real tile sprites, replace the pygame.draw calls in
 # draw_tile() with surface.blit(tile_image, screen_rect).
@@ -144,10 +148,13 @@ class TileMap:
         self.level_name  = level_name
         self.tiles: list[pygame.Rect] = []   # Solid collision rects
         self.player_spawn = (100, 100)        # Default; overwritten if 'P' found
-        self.enemy_spawns: list[tuple]   = []
-        self.crawler_spawns: list[tuple] = []
-        self.checkpoints: list           = []  # Checkpoint objects
-        self.boss_spawn: tuple | None    = None
+        self.enemy_spawns: list[tuple]        = []
+        self.crawler_spawns: list[tuple]      = []
+        self.checkpoints: list                = []
+        self.boss_spawn: tuple | None         = None
+        self.shield_guard_spawns: list[tuple] = []
+        self.ranged_spawns: list[tuple]       = []
+        self.jumper_spawns: list[tuple]       = []
 
         self._parse(level_data)
 
@@ -184,8 +191,16 @@ class TileMap:
                         Checkpoint(x, y, level=self.level_name))
 
                 elif char == 'B':
-                    # Boss spawn (feet at tile bottom)
                     self.boss_spawn = (x + TILE_SIZE // 2, y - 72)
+
+                elif char == 'G':
+                    self.shield_guard_spawns.append((x + TILE_SIZE // 2, y - 64))
+
+                elif char == 'R':
+                    self.ranged_spawns.append((x + TILE_SIZE // 2, y - 64))
+
+                elif char == 'J':
+                    self.jumper_spawns.append((x + TILE_SIZE // 2, y - 64))
 
     # ------------------------------------------------------------------
 
