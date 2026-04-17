@@ -50,13 +50,13 @@ The player is an orphan/miner survivor whose closest companion (Kael for Marked,
 
 ---
 
-## Phase 1 — Core Loop Complete
+## Phase 1 — Core Loop Complete ✅
 
-The following ordered tasks make the game fully playable from start through at least two levels with save/load, a boss, a map, and proper UI.
+All Phase 1 tasks are complete as of 2026-04-17. The game launches without ImportError and has a playable loop through five levels with save/load, a boss, a map, and proper UI.
 
 ---
 
-### Task P1-1: Fix Missing Imports — Crawler, Checkpoint, SoulFragment, LEVEL_2, CHECKPOINT_GLOW_COLOR
+### Task P1-1: Fix Missing Imports — Crawler, Checkpoint, SoulFragment, LEVEL_2, CHECKPOINT_GLOW_COLOR ✅ DONE
 
 **Files to touch:**
 - `entities/crawler.py` (create)
@@ -90,7 +90,7 @@ The following ordered tasks make the game fully playable from start through at l
 
 ---
 
-### Task P1-2: Boss Fight Framework
+### Task P1-2: Boss Fight Framework ✅ DONE
 
 **Files to touch:**
 - `entities/boss.py` (create)
@@ -138,7 +138,7 @@ BOSS_BAR_MARGIN     = 80
 
 ---
 
-### Task P1-3: Save / Load to Disk
+### Task P1-3: Save / Load to Disk ✅ DONE
 
 **Files to touch:**
 - `core/game.py` (add `save_to_disk()` and `load_from_disk()`)
@@ -184,7 +184,7 @@ BOSS_BAR_MARGIN     = 80
 
 ---
 
-### Task P1-4: Levels 2 Through 5 (Level Data)
+### Task P1-4: Levels 2 Through 5 (Level Data) ✅ DONE
 
 **Files to touch:**
 - `world/tilemap.py` (add LEVEL_2 through LEVEL_5)
@@ -284,7 +284,7 @@ LEVEL_5 = [
 
 ---
 
-### Task P1-5: Pause Menu with Navigation
+### Task P1-5: Pause Menu with Navigation ✅ DONE
 
 **Files to touch:**
 - `scenes/gameplay.py` (replace `_draw_pause` with a full menu)
@@ -322,7 +322,7 @@ self._pause_sel     = 0
 
 ---
 
-### Task P1-6: Transition Screen Between Rooms
+### Task P1-6: Transition Screen Between Rooms ✅ DONE
 
 **Files to touch:**
 - `scenes/gameplay.py` (add transition state and drawing)
@@ -416,7 +416,7 @@ def _draw_transition_overlay(self, surface):
 
 ---
 
-### Task P1-7: In-Game Map System
+### Task P1-7: In-Game Map System ✅ DONE
 
 **Files to touch:**
 - `systems/minimap.py` (create)
@@ -459,7 +459,7 @@ MAP_ALPHA      = 210
 
 ---
 
-### Task P1-8: Ability Unlock Gates
+### Task P1-8: Ability Unlock Gates ✅ DONE
 
 **Files to touch:**
 - `entities/player.py` (add ability slot count, lock ability if slots = 0)
@@ -506,15 +506,38 @@ ABILITY_SLOTS_MAX     = 1   # Only one ability in v0.1
 
 ---
 
+## HK Feel Improvements (applied alongside Phase 1)
+
+_Applied by hk-agent 2026-04-12; see `REVIEW_HK.md` for full analysis._
+
+| Improvement | Status | Files Changed |
+|---|---|---|
+| Attack recoil (`ATTACK_RECOIL_VX = 1.5`) | ✅ Done | `entities/player.py`, `settings.py` |
+| Windup frames (`WINDUP_FRAMES = 4`) | ✅ Done | `entities/player.py`, `settings.py` |
+| Windup visual (dim gold glow) | ✅ Done | `entities/player.py` |
+| Damage vignette (red border on hit) | ✅ Done | `scenes/gameplay.py`, `settings.py` |
+| Touch knockback API (`take_damage(knockback_dir)`) | ✅ Done | `entities/entity.py` |
+| Heavier gravity / tighter arc (GRAVITY 0.6→0.85, JUMP_FORCE -13→-12) | ⏳ Pending | Assign to build-agent |
+| Air control reduction (speed × 0.7 when airborne) | ⏳ Pending | `entities/player.py` — assign to build-agent |
+| Movement lock during windup (`vx = 0` when `_windup_timer > 0`) | ⏳ Pending | `entities/player.py` — assign to build-agent |
+| Enemy-specific 2-frame hit flash color | ⏳ Pending | `entities/enemy.py` — assign to build-agent |
+| Caller-side `knockback_dir` in enemy touch damage | ⏳ Pending | `entities/enemy.py`, `entities/crawler.py` |
+| Particle system (landing dust, nail sparks, camera pan) | ⏳ Phase 4 | New `systems/particles.py` |
+
+---
+
 ## Phase 2 — Content Expansion
 
-- **Enemy variety**: Add `ShieldGuard` (Enemy subclass, higher defense, blocks from front), `Ranged` (fires projectile in line of sight), `Jumper` (erratic vertical movement pattern).
-- **Level count**: Levels 6–10 using tile data; introduce branching (Marked path vs Fleshforged path levels 6–8 differ, converge at level 9).
-- **Boss fight – The Warden (level 5)**: Fully scripted boss intro dialogue, phase transition visual effects, unique attack patterns per phase. Phase 3 arena shrinks via spawning platform tiles.
-- **Boss fight – The Architect (level 10)**: Final boss with four phases, one per faction weakness, unique defeat dialogue per faction choice.
-- **Upgrade system**: After boss kill, player is awarded a permanent stat upgrade (choose from 3 options — more health, faster attack cooldown, larger resource pool). Stored in `save_data["upgrades"]`.
-- **Enemy drops**: Enemies drop different collectible types — `HeatCore` (Fleshforged heals) and `SoulShard` (Marked heals) — based on enemy faction.
-- **Environmental hazards**: Spike tiles (`'s'`), acid pools, crumbling platforms (tile `'~'` that disappears after standing on it for 30 frames).
+**Priority order for build-agent** (tackle in this order):
+
+1. **P2-0 (tech debt unblock):** Fix Tech Debt #4 (`Enemy.get_drop_fragments()`) and Tech Debt #5 (enemy iframes) in `entities/enemy.py` + `entities/entity.py`. These will crash any playtest with enemies present.
+2. **P2-1 (enemy variety):** Add `ShieldGuard` (Enemy subclass, higher defense, blocks from front), `Ranged` (fires projectile in line of sight), `Jumper` (erratic vertical movement pattern). Each new class goes in its own file under `entities/` and must be listed in this table before creation.
+3. **P2-2 (levels 6–10):** Tile data for levels 6–10 in `world/tilemap.py`; introduce branching (Marked path vs Fleshforged path levels 6–8 differ, converge at level 9).
+4. **P2-3 (Warden scripting):** Fully scripted boss intro dialogue, phase-transition visual effects, unique per-phase attack patterns, Phase 3 arena shrink via platform tiles.
+5. **P2-4 (Architect boss):** Final boss, four phases, faction-specific defeat dialogue.
+6. **P2-5 (upgrade system):** After boss kill, award one of three permanent stat upgrades; store in `save_data["upgrades"]`.
+7. **P2-6 (enemy drops):** `HeatCore` and `SoulShard` collectibles (extend `systems/collectible.py`) dropped based on enemy faction; faction-matched healing.
+8. **P2-7 (environmental hazards):** Spike tiles (`'s'`), crumbling platforms (`'~'` disappears after 30 standing frames); add parsers to `TileMap` and collision handling to `physics.py`/`gameplay.py`.
 
 ## Phase 3 — Story Integration
 
@@ -538,29 +561,31 @@ ABILITY_SLOTS_MAX     = 1   # Only one ability in v0.1
 
 ## Known Bugs / Tech Debt
 
-1. **CRITICAL — Missing files cause immediate ImportError on startup**: `entities/crawler.py`, `systems/checkpoint.py`, `systems/collectible.py` are imported in `gameplay.py` but do not exist. `LEVEL_2` is imported from `tilemap.py` but not defined there. `CHECKPOINT_GLOW_COLOR` is used in `gameplay.py` but not in `settings.py`. The game will crash on `import` before any scene renders. Fix: Task P1-1.
+_Legend: ✅ Fixed | ⚠️ Flagged / deferred | 🔴 Open_
 
-2. **`HitStop` classmethod+property bug**: `core/hitstop.py` defines `instance` as both `@classmethod` and `@property`, which is deprecated/broken in Python 3.11+. However, the module-level `hitstop = HitStop()` singleton is what all code actually imports and uses, so the class method is dead code. The `@classmethod @property` decorator should be removed to avoid confusion and future breakage.
+1. ✅ **CRITICAL — Missing files cause immediate ImportError on startup** — Fixed by Task P1-1. All files created; `CHECKPOINT_GLOW_COLOR` added to `settings.py`.
 
-3. **`TileMap` missing attributes**: `TileMap.__init__` only initializes `self.tiles`, `self.player_spawn`, and `self.enemy_spawns`. The `gameplay.py` scene accesses `tilemap.crawler_spawns`, `tilemap.checkpoints`, and (after Phase 1) `tilemap.boss_spawn` and `tilemap.ability_orb_spawns`. These will throw `AttributeError` at runtime.
+2. ✅ **`HitStop` classmethod+property bug** — Fixed (REVIEW_BUGS BUG-004). Removed the `_inst` class variable and `instance` classmethod from `core/hitstop.py`.
 
-4. **`Enemy.get_drop_fragments()` missing**: `gameplay.py` calls `dead_e.get_drop_fragments()` on every dead enemy, but `Enemy` has no such method. This will throw `AttributeError` every time an enemy dies.
+3. ✅ **`TileMap` missing attributes** — Fixed by Task P1-1. `crawler_spawns`, `checkpoints`, `boss_spawn`, `ability_orb_spawns` all initialised in `TileMap.__init__`.
 
-5. **Entity iframes applied to enemies**: `entity.py` `take_damage()` applies `PLAYER_IFRAMES = 45` to all entities, including enemies. Enemies end up invincible for 45 frames (0.75 seconds) after being hit. They should have a shorter iframe window (e.g., 4–8 frames) or none. Fix: give `Enemy.__init__` its own iframe constant, or override `take_damage()`.
+4. 🔴 **`Enemy.get_drop_fragments()` missing** — Still open. `gameplay.py` calls this method on every dead enemy but `entities/enemy.py` has no `get_drop_fragments()`. Will throw `AttributeError` on first enemy death. **Assign to build-agent; fix before next playtest.**
 
-6. **Pause menu is not a real menu**: `_draw_pause` renders static text but pressing UP/DOWN/ENTER during pause has no effect (events are swallowed but not routed to pause menu navigation). "Return to Main Menu" is not interactive — only F1 works. Fix: Task P1-5.
+5. 🔴 **Entity iframes applied to enemies** — Still open. `entity.py` `take_damage()` applies `PLAYER_IFRAMES = 45` to all entities; enemies become briefly invincible after each hit. Override in `Enemy.__init__` with a shorter constant (e.g. 6 frames). **Assign to build-agent.**
 
-7. **`gameplay.py` animation draw duplication**: The `player.py` `draw()` method was rewritten to use `self._anim.current_frame` but an old copy of `draw()` is still present in `player.py` that also draws eye circles and attack arc on top of the animation blit. This causes the eye/arc to be drawn correctly, but the code structure has two draw sections. Should be consolidated.
+6. ✅ **Pause menu is not a real menu** — Fixed by Task P1-5. Full navigable pause overlay with Resume / Return to Main Menu / Settings (soon).
 
-8. **`dialogue.py` hint text hardcoded to "SPACE — continue"** on both branches of the condition (line 131-133 of dialogue.py). The else branch says "SPACE — continue" instead of "SPACE — close" or similar. Minor UX bug.
+7. ⚠️ **`player.py` animation draw duplication** — Deferred. Eye and attack-arc draw code is overlaid on top of the animation blit; works correctly but structure is messy. Consolidate in Phase 4 (sprite pass).
 
-9. **Level transition check uses raw pixel boundary**: `gameplay.py` checks `player.rect.right >= self.tilemap.width - 64` for level transition. If the player is tall or the level width is not tile-aligned, this could trigger prematurely or not at all. Should be a dedicated exit tile or zone marker (`'>'` tile type) parsed by TileMap.
+8. ✅ **`dialogue.py` hint text hardcoded** — Fixed (REVIEW_BUGS BUG-003). `else` branch now reads `"SPACE — dismiss"`.
 
-10. **`faction_select.py` uses `*` import from settings**: `from settings import *` is used in several scene files. While convenient, it makes dependency tracking harder and can shadow local names. Future refactor should enumerate specific imports.
+9. ⚠️ **Level transition uses raw pixel boundary** — Deferred. Works reliably for current level widths. If level geometry changes add a `'>'` exit tile in the parser. Assign to build-agent if levels are resized.
 
-11. **No audio subsystem**: `pygame.mixer` is never initialized. `pygame.init()` in `main.py` initializes all subsystems including mixer, so it won't crash, but no sounds exist yet.
+10. ⚠️ **Wildcard imports in scene files** — Flagged (REVIEW_BUGS FLAG-001). Architectural style; not blocking; defer to Phase 4 cleanup.
 
-12. **World bounds not enforced for enemies**: Enemies use `move_and_collide` for horizontal tile collisions but have no check against world pixel boundaries (x < 0, x > world_width). A chased enemy could theoretically be knocked off-screen.
+11. 🔴 **Audio subsystem incomplete** — `systems/voice_player.py` added (voice lines); `systems/audio.py` for music/SFX still absent. `pygame.mixer` is initialised by `pygame.init()` but no sounds play. Assign to build-agent in Phase 4.
+
+12. ⚠️ **World bounds not enforced for enemies** — Flagged. Low-priority edge case; assign to build-agent if enemies escape the visible world during playtesting.
 
 ---
 
@@ -572,27 +597,29 @@ ABILITY_SLOTS_MAX     = 1   # Only one ability in v0.1
 | `AGENTS.md` | orchestrator | Update if new agents are added |
 | `settings.py` | build-agent (primary) | All new constants go here; review-agent and hk-agent may read only |
 | `main.py` | build-agent | Rarely changes; only for new subsystem init |
-| `core/game.py` | build-agent | Save/load additions go here (P1-3) |
+| `core/game.py` | build-agent | Save/load complete (P1-3); stable |
 | `core/camera.py` | build-agent | Stable; unlikely to change |
-| `core/hitstop.py` | build-agent | Fix classmethod+property bug (Tech Debt #2) |
+| `core/hitstop.py` | build-agent | Stable (Tech Debt #2 fixed) |
 | `scenes/base_scene.py` | build-agent | Stable interface; do not change method signatures |
-| `scenes/main_menu.py` | build-agent | Add "Continue" option (P1-3) |
+| `scenes/main_menu.py` | build-agent | Continue/New Game complete (P1-3); stable |
 | `scenes/faction_select.py` | build-agent | Stable until Phase 3 |
 | `scenes/marked_prologue.py` | build-agent | Stable until Phase 3 |
 | `scenes/fleshforged_prologue.py` | build-agent | Stable until Phase 3 |
-| `scenes/gameplay.py` | build-agent | Primary integration point for all Phase 1 tasks |
-| `entities/entity.py` | build-agent | Minimal changes expected; iframe fix (Tech Debt #5) |
-| `entities/player.py` | build-agent | Ability slots (P1-8), animation draw consolidation |
-| `entities/enemy.py` | build-agent | Add `get_drop_fragments()` (Tech Debt #4), iframe fix |
-| `entities/crawler.py` | build-agent (create) | P1-1 |
-| `entities/boss.py` | build-agent (create) | P1-2 |
+| `scenes/gameplay.py` | build-agent | All Phase 1 features integrated; open tasks: Tech Debt #4, #5 |
+| `entities/entity.py` | build-agent | Open: iframe fix (Tech Debt #5) |
+| `entities/player.py` | build-agent | Ability slots done; animation draw consolidation deferred to Phase 4 |
+| `entities/enemy.py` | build-agent | Open: `get_drop_fragments()` (Tech Debt #4), iframe fix (Tech Debt #5) |
+| `entities/crawler.py` | build-agent | Created (P1-1); stable |
+| `entities/boss.py` | build-agent | Created (P1-2); Phase 2 scripted intro pending |
 | `systems/physics.py` | build-agent | Stable; do not change call signatures |
 | `systems/combat.py` | build-agent | Stable; hitbox logic complete |
-| `systems/dialogue.py` | build-agent | Hint text fix (Tech Debt #8) |
+| `systems/dialogue.py` | build-agent | Hint text fix done (Tech Debt #8); stable |
 | `systems/animation.py` | build-agent | Stable until sprite replacement (Phase 4) |
-| `systems/checkpoint.py` | build-agent (create) | P1-1 |
-| `systems/collectible.py` | build-agent (create) | P1-1, P1-8 |
-| `systems/minimap.py` | build-agent (create) | P1-7 |
-| `world/tilemap.py` | build-agent | Add LEVEL_2–5 (P1-4), extend parser (P1-1) |
-| `REVIEW_BUGS.md` | review-agent (create/own) | Never modifies .py files |
-| `REVIEW_HK.md` | hk-agent (create/own) | Never modifies .py files |
+| `systems/checkpoint.py` | build-agent | Created (P1-1); stable |
+| `systems/collectible.py` | build-agent | Created (P1-1, P1-8); extend with HeatCore/SoulShard in Phase 2 |
+| `systems/minimap.py` | build-agent | Created (P1-7); stable |
+| `systems/tutorial_minigame.py` | build-agent (created outside roadmap) | Inline control tutorial for prologues; registered here for tracking |
+| `systems/voice_player.py` | build-agent (created outside roadmap) | Voice-line playback; no MP3 assets yet; blocked on Phase 4 audio pass |
+| `world/tilemap.py` | build-agent | LEVEL_1–5 complete; extend with LEVEL_6–10 in Phase 2 |
+| `REVIEW_BUGS.md` | review-agent (own) | Never modifies .py files |
+| `REVIEW_HK.md` | hk-agent (own) | Never modifies .py files |
