@@ -31,7 +31,7 @@ class ShieldGuard(Enemy):
         if knockback_dir != 0:
             # knockback_dir points away from attacker; if it matches our facing,
             # the blow came from the front → partial block.
-            if knockback_dir == self.facing:
+            if knockback_dir == -self.facing:
                 amount = max(1, int(amount * SHIELD_GUARD_DEFENSE))
         super().take_damage(amount, knockback_dir)
 

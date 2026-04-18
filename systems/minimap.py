@@ -117,7 +117,9 @@ class MiniMap:
                 pygame.draw.rect(surface, TILE_COLOR, (tx, ty, ts, ts))
 
             # Enemy spawns — small red dots
-            for (ex, ey) in tilemap.enemy_spawns + tilemap.crawler_spawns:
+            for (ex, ey) in (tilemap.enemy_spawns + tilemap.crawler_spawns
+                             + tilemap.shield_guard_spawns + tilemap.ranged_spawns
+                             + tilemap.jumper_spawns):
                 dx = int(ex / TILE_SIZE) * ts + ox + ts // 2
                 dy = int(ey / TILE_SIZE) * ts + oy + ts // 2
                 pygame.draw.circle(surface, (200, 40, 40), (dx, dy), max(1, ts // 2))

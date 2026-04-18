@@ -54,6 +54,7 @@ class Jumper(Enemy):
     # ------------------------------------------------------------------
 
     def _do_patrol_jump(self) -> None:
+        self._jump_timer = min(self._jump_timer, JUMPER_JUMP_COOLDOWN)
         self.vx = self._patrol_dir * JUMPER_SPEED
         self.facing = self._patrol_dir
         if self.rect.right >= self.right_limit:

@@ -11,6 +11,7 @@
 
 import pygame
 from core.hitstop import hitstop
+from settings import FACTION_MARKED
 
 
 class AttackHitbox:
@@ -60,6 +61,11 @@ class AttackHitbox:
         direction = 1 if target.rect.centerx >= self.owner.rect.centerx else -1
         target.vx = direction * self.knockback_x
         target.vy = self.knockback_y
+
+        # Marked faction: soul regen on confirmed hit (not on missed swings)
+        if (hasattr(self, 'owner') and hasattr(self.owner, 'faction')
+                and self.owner.faction == FACTION_MARKED):
+            self.owner._regen_resource(3)
 
         # Hit-stop: freeze game for 4 frames so hits feel punchy
         hitstop.trigger(4)

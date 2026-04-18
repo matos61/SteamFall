@@ -314,18 +314,21 @@ class GameplayScene(BaseScene):
                 remaining.append(frag)
         self.fragments = remaining
 
-        # --- Spawn fragments from newly dead enemies ---
-        newly_dead = [e for e in self.enemies if not e.alive]
-        for dead_e in newly_dead:
-            for frag in dead_e.get_drop_fragments():
-                self.fragments.append(frag)
+        # --- Spawn fragments from newly dead enemies + prune enemy list ---
+        # Guard with hitstop check so drops spawn exactly once per kill,
+        # not once per frozen frame during the hitstop window (BUG-007/BUG-011).
+        if not hitstop.is_active():
+            newly_dead = [e for e in self.enemies if not e.alive]
+            for dead_e in newly_dead:
+                for frag in dead_e.get_drop_fragments():
+                    self.fragments.append(frag)
 
-        # If the boss just died, clear the boss reference
-        if self._boss and not self._boss.alive:
-            self._boss = None
+            # If the boss just died, clear the boss reference
+            if self._boss and not self._boss.alive:
+                self._boss = None
 
-        # --- Prune dead enemies ---
-        self.enemies = [e for e in self.enemies if e.alive]
+            # Prune dead enemies
+            self.enemies = [e for e in self.enemies if e.alive]
 
         # --- Checkpoints ---
         faction = self.game.player_faction or FACTION_MARKED

@@ -22,14 +22,20 @@ class Projectile:
     """A simple axis-aligned projectile spawned by Ranged enemies."""
 
     def __init__(self, x: int, y: int, vx: float, damage: int, owner):
-        self.rect   = pygame.Rect(x, y, 10, 8)
-        self.vx     = vx
-        self.damage = damage
-        self.owner  = owner
-        self.alive  = True
+        self.rect          = pygame.Rect(x, y, 10, 8)
+        self.vx            = vx
+        self.damage        = damage
+        self.owner         = owner
+        self.alive         = True
+        self._dist_traveled = 0
+        self.max_range      = RANGED_SIGHT_RANGE * 2
 
     def update(self, solid_rects) -> None:
         self.rect.x += int(self.vx)
+        self._dist_traveled += abs(self.vx)
+        if self._dist_traveled >= self.max_range:
+            self.alive = False
+            return
         for r in solid_rects:
             if self.rect.colliderect(r):
                 self.alive = False
@@ -71,6 +77,7 @@ class Ranged(Enemy):
         in_sight = dist_y < 80 and dist_x <= RANGED_SIGHT_RANGE
 
         if not in_sight:
+            self._state = _PATROL
             self._do_patrol()
             return
 

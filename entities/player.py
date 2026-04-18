@@ -173,6 +173,8 @@ class Player(Entity):
             self._coyote_timer = self._COYOTE_FRAMES
         elif self._coyote_timer > 0:
             self._coyote_timer -= 1
+        elif self.on_ground:
+            self._coyote_timer = 0
 
         # Jump buffer: count down after pressing jump in the air
         if self._jump_buffer > 0:
@@ -236,10 +238,14 @@ class Player(Entity):
         # Variable jump height: releasing jump early cuts the arc.
         # Marked cut is gentle (floatier short hop).
         # Fleshforged cut is sharp (committed arc or nothing).
+        # Variable jump height: releasing jump early cuts the arc.
+        # Guard with _jump_held so knockback arcs are NOT dampened.
+        if not jump_pressed and self._jump_held and self.vy < -4:
+            self.vy *= self._jump_cut   # Faction-tuned dampening
+
+        # Clear _jump_held once the key is released or the player lands
         if not jump_pressed and self._jump_held:
             self._jump_held = False
-        if not jump_pressed and self.vy < -4:
-            self.vy *= self._jump_cut   # Faction-tuned dampening
 
         # Reset jump_held when we land so the next press works
         if self.on_ground and not jump_pressed:
@@ -280,9 +286,6 @@ class Player(Entity):
             # Begin windup telegraph before hitbox activates
             self._windup_timer    = WINDUP_FRAMES
             self._attack_cooldown = PLAYER_ATTACK_COOLDOWN
-            # Small soul regen per hit (Marked philosophy: power through contact)
-            if self.faction == FACTION_MARKED:
-                self._regen_resource(3)
 
     # ------------------------------------------------------------------
 
