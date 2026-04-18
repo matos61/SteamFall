@@ -19,7 +19,12 @@ from settings           import *
 from scenes.base_scene  import BaseScene
 from core.camera        import Camera
 from core.hitstop       import hitstop
-from world.tilemap      import TileMap, LEVEL_1, LEVEL_2, LEVEL_3, LEVEL_4, LEVEL_5
+from world.tilemap      import (TileMap,
+                                LEVEL_1, LEVEL_2, LEVEL_3, LEVEL_4, LEVEL_5,
+                                LEVEL_6_MARKED, LEVEL_6_FLESHFORGED,
+                                LEVEL_7_MARKED, LEVEL_7_FLESHFORGED,
+                                LEVEL_8_MARKED, LEVEL_8_FLESHFORGED,
+                                LEVEL_9, LEVEL_10)
 from entities.player       import Player
 from entities.enemy        import Enemy
 from entities.crawler      import Crawler
@@ -34,25 +39,58 @@ from systems.minimap    import MiniMap
 
 # Level display names and progression chain
 _LEVEL_NAMES = {
-    "level_1": "I \u2014 The Outer District",
-    "level_2": "II \u2014 The Descent",
-    "level_3": "III \u2014 The Foundry",
-    "level_4": "IV \u2014 The Ruined Spire",
-    "level_5": "V \u2014 The Sanctum",
+    "level_1":             "I \u2014 The Outer District",
+    "level_2":             "II \u2014 The Descent",
+    "level_3":             "III \u2014 The Foundry",
+    "level_4":             "IV \u2014 The Ruined Spire",
+    "level_5":             "V \u2014 The Sanctum",
+    "level_6_marked":      "VI \u2014 The Ink Labyrinth",
+    "level_6_fleshforged": "VI \u2014 The Steam Tunnels",
+    "level_7_marked":      "VII \u2014 The Rune Vaults",
+    "level_7_fleshforged": "VII \u2014 The Engine Room",
+    "level_8_marked":      "VIII \u2014 The Sanctum Approach",
+    "level_8_fleshforged": "VIII \u2014 The Forge Gate",
+    "level_9":             "IX \u2014 The Convergence",
+    "level_10":            "X \u2014 The Final Approach",
 }
 _LEVEL_DATA = {
-    "level_1": LEVEL_1,
-    "level_2": LEVEL_2,
-    "level_3": LEVEL_3,
-    "level_4": LEVEL_4,
-    "level_5": LEVEL_5,
+    "level_1":             LEVEL_1,
+    "level_2":             LEVEL_2,
+    "level_3":             LEVEL_3,
+    "level_4":             LEVEL_4,
+    "level_5":             LEVEL_5,
+    "level_6_marked":      LEVEL_6_MARKED,
+    "level_6_fleshforged": LEVEL_6_FLESHFORGED,
+    "level_7_marked":      LEVEL_7_MARKED,
+    "level_7_fleshforged": LEVEL_7_FLESHFORGED,
+    "level_8_marked":      LEVEL_8_MARKED,
+    "level_8_fleshforged": LEVEL_8_FLESHFORGED,
+    "level_9":             LEVEL_9,
+    "level_10":            LEVEL_10,
 }
+# _LEVEL_CHAIN covers levels 1–5 and 9–10.
+# Levels 6–8 use faction branching; handled by _faction_next_level().
 _LEVEL_CHAIN = {
-    "level_1": "level_2",
-    "level_2": "level_3",
-    "level_3": "level_4",
-    "level_4": "level_5",
+    "level_1":             "level_2",
+    "level_2":             "level_3",
+    "level_3":             "level_4",
+    "level_4":             "level_5",
+    "level_9":             "level_10",
 }
+
+
+def _faction_next_level(current_level: str, faction: str) -> str | None:
+    """Return the next level key, resolving faction variants for levels 6-8."""
+    variant = "fleshforged" if faction == FACTION_FLESHFORGED else "marked"
+    if current_level == "level_5":
+        return f"level_6_{variant}"
+    if current_level in ("level_6_marked", "level_6_fleshforged"):
+        return f"level_7_{variant}"
+    if current_level in ("level_7_marked", "level_7_fleshforged"):
+        return f"level_8_{variant}"
+    if current_level in ("level_8_marked", "level_8_fleshforged"):
+        return "level_9"
+    return _LEVEL_CHAIN.get(current_level)
 
 
 class GameplayScene(BaseScene):
@@ -306,10 +344,18 @@ class GameplayScene(BaseScene):
             self.player.take_damage(self.player.max_health)
 
         # --- Level transition: right edge → next level (alive players only) ---
-        next_level = _LEVEL_CHAIN.get(self._level_name)
-        if next_level and self.player.alive and self.player.rect.right >= self.tilemap.width - 64:
-            self._begin_transition(SCENE_GAMEPLAY, level=next_level)
-            return
+        _faction = self.game.player_faction or FACTION_MARKED
+        next_level = _faction_next_level(self._level_name, _faction)
+        if self.player.alive and self.player.rect.right >= self.tilemap.width - 64:
+            if next_level:
+                self._begin_transition(SCENE_GAMEPLAY, level=next_level)
+                return
+            elif self._level_name == "level_10":
+                # Architect defeated / level 10 right-edge reached: Victory!
+                self.game.save_data["victory"] = True
+                self.game.save_to_disk()
+                self._begin_transition(SCENE_MAIN_MENU)
+                return
 
         # --- Player death ---
         if not self.player.alive:
