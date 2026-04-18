@@ -523,10 +523,10 @@ _Applied by hk-agent 2026-04-12; see `REVIEW_HK.md` for full analysis._
 | Enemy-specific 2-frame hit flash color | ✅ Done | `entities/enemy.py` — red 2-frame flash in draw override |
 | Caller-side `knockback_dir` in enemy touch damage | ✅ Done | `scenes/gameplay.py` — body contact with directional knockback |
 | Particle system (landing dust, nail sparks, camera pan) | ⏳ Phase 4 | New `systems/particles.py` |
-| ShieldGuard full block (DEFENSE 0.35→0.0, HP 80→65); fix facing locked to patrol dir | ⬅ P2-2b | `settings.py`, `entities/shield_guard.py` |
-| Ranged: reduce cooldown (90→55 frames); add projectile arc (vy from player delta Y, ±4 cap); extract `RANGED_PREFERRED_DIST` constant | ⬅ P2-2b | `entities/ranged.py`, `settings.py` |
-| Jumper: reduce cooldown (55→32 frames); add burst pattern (`JUMPER_BURST_COUNT=2`, `JUMPER_BURST_PAUSE=70`) | ⬅ P2-2b | `entities/jumper.py`, `settings.py` |
-| Add `SHIELD_GUARD_KNOCKBACK_Y=-3.5`, `JUMPER_KNOCKBACK_Y_AERIAL=2.0` knockback constants | ⬅ P2-2b | `settings.py`, respective entity files |
+| ShieldGuard full block (DEFENSE 0.35→0.0, HP 80→65); fix facing locked to patrol dir | ✅ Done | `settings.py`, `entities/shield_guard.py` — P2-2b |
+| Ranged: reduce cooldown (90→55 frames); add projectile arc (vy from player delta Y, ±4 cap); extract `RANGED_PREFERRED_DIST` constant | ✅ Done | `entities/ranged.py`, `settings.py` — P2-2b |
+| Jumper: reduce cooldown (55→32 frames); add burst pattern (`JUMPER_BURST_COUNT=2`, `JUMPER_BURST_PAUSE=70`) | ✅ Done | `entities/jumper.py`, `settings.py` — P2-2b |
+| Add `SHIELD_GUARD_KNOCKBACK_Y=-3.5`, `JUMPER_KNOCKBACK_Y_AERIAL=2.0` knockback constants | ✅ Done | `settings.py`, respective entity files — P2-2b |
 
 ---
 
@@ -537,8 +537,8 @@ _Applied by hk-agent 2026-04-12; see `REVIEW_HK.md` for full analysis._
 1. ~~**P2-0 (tech debt unblock)**~~ ✅ **DONE (2026-04-17):** `Enemy.get_drop_fragments()` added; enemy iframes fixed via `ENEMY_IFRAMES=6` overriding `PLAYER_IFRAMES=45`.
 2. ~~**P2-1 (enemy variety)**~~ ✅ **DONE (2026-04-17):** `ShieldGuard`, `Ranged`, `Jumper` created in `entities/`; wired into `tilemap.py` (`'G'`/`'R'`/`'J'` tile chars) and `gameplay.py`.
 3. ~~**P2-2 (levels 6–10)**~~ ✅ **DONE (2026-04-18):** `LEVEL_6_MARKED/FLESHFORGED` through `LEVEL_10` in `tilemap.py`; `_faction_next_level()` routing in `gameplay.py`; victory flag on level 10 completion.
-4. **P2-2b (HK feel sprint):** ShieldGuard full block + facing fix, Ranged arc + cooldown + RANGED_PREFERRED_DIST, Jumper burst pattern, knockback constants. Unblocked by P2-0b. **← NEXT for build-agent**
-5. **P2-3 (Warden scripting):** Fully scripted boss intro dialogue, phase-transition visual effects, unique per-phase attack patterns, Phase 3 arena shrink via platform tiles. Pending after P2-2b.
+4. ~~**P2-2b (HK feel sprint)**~~ ✅ **DONE (2026-04-18):** All 13 constants in place; ShieldGuard full block + patrol-facing fix; Ranged arc projectile; Jumper burst pattern + aerial knockback.
+5. **P2-3 (Warden scripting):** Fully scripted boss intro dialogue, phase-transition visual effects, unique per-phase attack patterns, Phase 3 arena shrink via platform tiles. **← NEXT for build-agent**
 6. **P2-4 (Architect boss):** Final boss, four phases, faction-specific defeat dialogue.
 7. **P2-5 (upgrade system):** After boss kill, award one of three permanent stat upgrades; store in `save_data["upgrades"]`.
 8. **P2-6 (enemy drops):** `HeatCore` and `SoulShard` collectibles (extend `systems/collectible.py`) dropped based on enemy faction; faction-matched healing.
@@ -625,7 +625,19 @@ _Review-agent 2026-04-18 pass found these correctness bugs that must be fixed be
 
 ---
 
-### Task P2-2b: HK Feel Sprint — ShieldGuard / Ranged / Jumper ⬅ NEXT
+### Task P2-2b: HK Feel Sprint — ShieldGuard / Ranged / Jumper ✅ DONE (2026-04-18)
+
+**What was built:**
+- `settings.py`: All 13 constants updated/added (SHIELD_GUARD_DEFENSE=0.0, SHIELD_GUARD_HP=65, SHIELD_GUARD_SPEED=1.6, SHIELD_GUARD_KNOCKBACK_Y=-3.5, RANGED_ATTACK_COOLDOWN=55, RANGED_PROJ_SPEED=6, RANGED_PREFERRED_DIST=240, JUMPER_JUMP_COOLDOWN=32, JUMPER_JUMP_FORCE=-12, JUMPER_SPEED=2.4, JUMPER_BURST_COUNT=2, JUMPER_BURST_PAUSE=70, JUMPER_KNOCKBACK_Y_GROUND=-4.5, JUMPER_KNOCKBACK_Y_AERIAL=2.0).
+- `entities/shield_guard.py`: DEFENSE=0.0 (100% frontal block); facing update gated to CHASE/ATTACK state; SHIELD_GUARD_KNOCKBACK_Y extracted; BUG-005 fix confirmed present.
+- `entities/ranged.py`: Projectile has vy field + mild gravity arc (0.15/frame); _fire() computes arc toward player Y (±4 cap); _PREFERRED_DIST uses RANGED_PREFERRED_DIST constant.
+- `entities/jumper.py`: Burst pattern with _burst_remaining / _burst_pause; aerial vs ground knockback via JUMPER_KNOCKBACK_Y_AERIAL / JUMPER_KNOCKBACK_Y_GROUND.
+
+**Known remaining issue:** BUG-016 (ShieldGuard patrol facing) — see Known Bugs #13.
+
+---
+
+### Task P2-2b: HK Feel Sprint — ShieldGuard / Ranged / Jumper (SPEC — kept for reference)
 
 _Unblocked by P2-0b completion (2026-04-18). See `REVIEW_HK.md` 2026-04-18 pass for full justification._
 
@@ -738,6 +750,8 @@ _Legend: ✅ Fixed | ⚠️ Flagged / deferred | 🔴 Open_
 11. 🔴 **Audio subsystem incomplete** — `systems/voice_player.py` added (voice lines); `systems/audio.py` for music/SFX still absent. `pygame.mixer` is initialised by `pygame.init()` but no sounds play. Assign to build-agent in Phase 4.
 
 12. ⚠️ **World bounds not enforced for enemies** — Flagged. Low-priority edge case; assign to build-agent if enemies escape the visible world during playtesting.
+
+13. 🔴 **BUG-016: ShieldGuard patrol facing inconsistency** — `_do_patrol()` does not set `self.facing = self._patrol_dir`, so the guard walks one direction while visually facing another during patrol. Shield indicator points wrong way. Fix: add `self.facing = self._patrol_dir` in `ShieldGuard._do_patrol()`. Assign to build-agent alongside P2-3 or as a hotfix.
 
 ---
 
