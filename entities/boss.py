@@ -24,7 +24,7 @@ from settings        import (BOSS_MAX_HEALTH, BOSS_PHASE2_THRESH,
                               BOSS_PHASE3_THRESH, ENEMY_ATTACK_DAMAGE,
                               ENEMY_ATTACK_RANGE,
                               BOSS_DASH_SPEED, BOSS_DASH_FRAMES,
-                              BOSS_DASH_COOLDOWN)
+                              BOSS_DASH_COOLDOWN, BOSS_PROJ_SPREAD_VY)
 
 _MAX_RAGE_FLASH = 60   # Normalise alpha against this cap
 
@@ -41,6 +41,17 @@ class Boss(Enemy):
         self._phase2_entered   = False
         self._phase3_entered   = False
         self._rage_flash_timer = 0
+
+        # --- Scripted intro cutscene (P2-3a) ---
+        self._intro_done      = False
+        self._intro_timer     = 0
+        self._intro_lines     = [
+            "You carry the stench of the unfinished rite.",
+            "The Sanctum does not open for the half-made.",
+            "Kneel, or be unmade entirely.",
+        ]
+        self._intro_line_idx   = 0
+        self._intro_line_timer = 0
 
         # Projectiles (phase 3): each entry is [pygame.Rect, vx, vy]
         self._proj_cooldown    = 0
@@ -204,8 +215,8 @@ class Boss(Enemy):
 
     def _fire_spread(self, player) -> None:
         direction = 1 if player.rect.centerx > self.rect.centerx else -1
-        # Fan: straight, up-angled, down-angled
-        for vy_offset in (0, -3, 3):
+        # Fan: straight, up-angled, down-angled using BOSS_PROJ_SPREAD_VY
+        for vy_offset in (0, -BOSS_PROJ_SPREAD_VY, BOSS_PROJ_SPREAD_VY):
             rect = pygame.Rect(
                 self.rect.centerx - 6, self.rect.centery - 6, 12, 12)
             self._projectiles.append([rect, direction * 5, float(vy_offset)])
@@ -233,13 +244,18 @@ class Boss(Enemy):
     def draw(self, surface: pygame.Surface, camera) -> None:
         super().draw(surface, camera)
 
-        # Rage flash — red tint that fades over time
+        # Rage flash — phase-appropriate tint that fades over time
         if self._rage_flash_timer > 0:
             sr    = camera.apply(self)
             frac  = min(1.0, self._rage_flash_timer / _MAX_RAGE_FLASH)
             alpha = int(180 * frac)
             flash = pygame.Surface((sr.width, sr.height), pygame.SRCALPHA)
-            flash.fill((220, 0, 0, alpha))
+            # Phase 3 → deep red; Phase 2 → orange
+            if self.phase >= 3:
+                flash_color = (200, 0, 0, alpha)
+            else:
+                flash_color = (220, 100, 0, alpha)
+            flash.fill(flash_color)
             surface.blit(flash, sr.topleft)
 
         # Dash speed-lines — thin horizontal lines behind the boss during dash

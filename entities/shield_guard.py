@@ -47,7 +47,8 @@ class ShieldGuard(Enemy):
             self.facing = 1 if player.rect.centerx > self.rect.centerx else -1
 
     def _do_patrol(self) -> None:
-        self.vx = self._patrol_dir * SHIELD_GUARD_SPEED
+        self.vx     = self._patrol_dir * SHIELD_GUARD_SPEED
+        self.facing = self._patrol_dir          # BUG-016: sync facing to patrol direction
         if self.rect.right >= self.right_limit:
             self._patrol_dir = -1
         elif self.rect.left <= self.left_limit:

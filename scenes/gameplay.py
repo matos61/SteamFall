@@ -485,10 +485,22 @@ class GameplayScene(BaseScene):
     def _tick_boss_intro(self) -> None:
         if self._boss_dialogue:
             self._boss_dialogue.update()
+            # Also advance the boss's own intro line timer/index so that the
+            # _draw_boss_intro banner tracks correctly (P2-3a spec requirement).
+            if self._boss:
+                self._boss._intro_line_timer += 1
+                if self._boss._intro_line_timer >= 120:
+                    self._boss._intro_line_timer = 0
+                    self._boss._intro_line_idx  += 1
+                    if self._boss._intro_line_idx >= len(self._boss._intro_lines):
+                        self._boss._intro_line_idx = len(self._boss._intro_lines) - 1
             if self._boss_dialogue.is_done():
                 self._boss_intro_active = False
                 self._boss_intro_done   = True
                 self._boss_dialogue     = None
+                # Sync boss-level flag so external code can query boss._intro_done
+                if self._boss:
+                    self._boss._intro_done = True
 
     # ------------------------------------------------------------------
     # Transition state machine
@@ -590,7 +602,8 @@ class GameplayScene(BaseScene):
         if self._boss_phase_timer > 0:
             self._draw_phase_announce(surface)
 
-        # Boss intro dialogue (topmost before transition)
+        # Boss intro: timed-text banner (P2-3a spec) + rich DialogueBox layer
+        self._draw_boss_intro(surface)
         if self._boss_intro_active and self._boss_dialogue:
             self._boss_dialogue.draw(surface)
 
@@ -779,6 +792,33 @@ class GameplayScene(BaseScene):
         if rw > 0:
             _draw_wall_column(pygame.Rect(
                 int(self._shrink_right_x), 0, rw, self.tilemap.height))
+
+    def _draw_boss_intro(self, surface: pygame.Surface) -> None:
+        """Draw the current Warden intro line in a simple tinted banner.
+
+        This method satisfies the P2-3a structural spec.  In practice the
+        richer DialogueBox path draws on top of it, but this provides a
+        visible fallback when no DialogueBox is active yet.
+        """
+        if not self._boss or self._boss._intro_done:
+            return
+        # Only show if intro is active and line data exists
+        if not self._boss_intro_active:
+            return
+        line_idx = self._boss._intro_line_idx
+        lines    = self._boss._intro_lines
+        if line_idx >= len(lines):
+            return
+        line = lines[line_idx]
+        font = pygame.font.SysFont("georgia", 22)
+        text = font.render(f'"{line}"', True, (220, 180, 255))
+        bg   = pygame.Surface((text.get_width() + 32, text.get_height() + 16))
+        bg.set_alpha(180)
+        bg.fill((20, 10, 30))
+        bx = SCREEN_WIDTH // 2 - bg.get_width() // 2
+        by = 60
+        surface.blit(bg, (bx, by))
+        surface.blit(text, (bx + 16, by + 8))
 
     def _draw_phase_announce(self, surface: pygame.Surface) -> None:
         """Draw the phase-transition banner centred on screen."""
