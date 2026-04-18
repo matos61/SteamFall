@@ -538,8 +538,8 @@ _Applied by hk-agent 2026-04-12; see `REVIEW_HK.md` for full analysis._
 2. ~~**P2-1 (enemy variety)**~~ ✅ **DONE (2026-04-17):** `ShieldGuard`, `Ranged`, `Jumper` created in `entities/`; wired into `tilemap.py` (`'G'`/`'R'`/`'J'` tile chars) and `gameplay.py`.
 3. ~~**P2-2 (levels 6–10)**~~ ✅ **DONE (2026-04-18):** `LEVEL_6_MARKED/FLESHFORGED` through `LEVEL_10` in `tilemap.py`; `_faction_next_level()` routing in `gameplay.py`; victory flag on level 10 completion.
 4. ~~**P2-2b (HK feel sprint)**~~ ✅ **DONE (2026-04-18):** All 13 constants in place; ShieldGuard full block + patrol-facing fix; Ranged arc projectile; Jumper burst pattern + aerial knockback.
-5. **P2-3 (Warden scripting):** Fully scripted boss intro dialogue, phase-transition visual effects, unique per-phase attack patterns, Phase 3 arena shrink via platform tiles. **← NEXT for build-agent**
-6. **P2-4 (Architect boss):** Final boss, four phases, faction-specific defeat dialogue.
+5. ~~**P2-3 (Warden scripting)**~~ ✅ **DONE (2026-04-18):** 3-beat Warden intro dialogue; phase-differentiated rage flash (orange/red); BOSS_PROJ_SPREAD_VY; BUG-016 fixed. Prior commits had already implemented dash, arena shrink, and projectile spread.
+6. **P2-4 (Architect boss):** Final boss, four phases, faction-specific defeat dialogue. **← NEXT for build-agent**
 7. **P2-5 (upgrade system):** After boss kill, award one of three permanent stat upgrades; store in `save_data["upgrades"]`.
 8. **P2-6 (enemy drops):** `HeatCore` and `SoulShard` collectibles (extend `systems/collectible.py`) dropped based on enemy faction; faction-matched healing.
 9. **P2-7 (environmental hazards):** Spike tiles (`'s'`), crumbling platforms (`'~'` disappears after 30 standing frames); add parsers to `TileMap` and collision handling to `physics.py`/`gameplay.py`.
@@ -751,7 +751,7 @@ _Legend: ✅ Fixed | ⚠️ Flagged / deferred | 🔴 Open_
 
 12. ⚠️ **World bounds not enforced for enemies** — Flagged. Low-priority edge case; assign to build-agent if enemies escape the visible world during playtesting.
 
-13. 🔴 **BUG-016: ShieldGuard patrol facing inconsistency** — `_do_patrol()` does not set `self.facing = self._patrol_dir`, so the guard walks one direction while visually facing another during patrol. Shield indicator points wrong way. Fix: add `self.facing = self._patrol_dir` in `ShieldGuard._do_patrol()`. Assign to build-agent alongside P2-3 or as a hotfix.
+13. ✅ **BUG-016: ShieldGuard patrol facing inconsistency** — Fixed (P2-3 commit). Added `self.facing = self._patrol_dir` in `ShieldGuard._do_patrol()`.
 
 ---
 
