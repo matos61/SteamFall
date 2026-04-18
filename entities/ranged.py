@@ -9,21 +9,23 @@ import pygame
 from entities.enemy import Enemy
 from settings import (RANGED_HP, RANGED_SPEED, RANGED_DAMAGE, RANGED_PROJ_SPEED,
                       RANGED_ATTACK_COOLDOWN, RANGED_SIGHT_RANGE, RANGED_COLOR,
+                      RANGED_PREFERRED_DIST,
                       ENEMY_IFRAMES, TILE_SIZE)
 
 _PATROL    = "patrol"
 _RETREAT   = "retreat"   # Back away to maintain preferred firing distance
 _SHOOT     = "shoot"
 
-_PREFERRED_DIST = 220   # Pixels — ideal separation from player
+_PREFERRED_DIST = RANGED_PREFERRED_DIST   # Pixels — ideal separation from player
 
 
 class Projectile:
     """A simple axis-aligned projectile spawned by Ranged enemies."""
 
-    def __init__(self, x: int, y: int, vx: float, damage: int, owner):
+    def __init__(self, x: int, y: int, vx: float, damage: int, owner, vy: float = 0):
         self.rect          = pygame.Rect(x, y, 10, 8)
         self.vx            = vx
+        self.vy            = vy
         self.damage        = damage
         self.owner         = owner
         self.alive         = True
@@ -32,6 +34,8 @@ class Projectile:
 
     def update(self, solid_rects) -> None:
         self.rect.x += int(self.vx)
+        self.vy += 0.15   # mild gravity arc
+        self.rect.y += int(self.vy)
         self._dist_traveled += abs(self.vx)
         if self._dist_traveled >= self.max_range:
             self.alive = False
@@ -102,7 +106,11 @@ class Ranged(Enemy):
         vx = RANGED_PROJ_SPEED * self.facing
         cx = self.rect.right if self.facing == 1 else self.rect.left - 10
         cy = self.rect.centery - 4
-        self.projectiles.append(Projectile(cx, cy, vx, RANGED_DAMAGE, self))
+        dist_x      = abs(player.rect.centerx - self.rect.centerx)
+        travel_frames = max(1, dist_x / RANGED_PROJ_SPEED)
+        raw_vy      = (player.rect.centery - self.rect.centery) / travel_frames
+        vy          = max(-4.0, min(4.0, raw_vy))
+        self.projectiles.append(Projectile(cx, cy, vx, RANGED_DAMAGE, self, vy=vy))
 
     # ------------------------------------------------------------------
 

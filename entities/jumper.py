@@ -8,6 +8,8 @@ import pygame
 from entities.enemy import Enemy
 from settings import (JUMPER_HP, JUMPER_SPEED, JUMPER_DAMAGE,
                       JUMPER_JUMP_FORCE, JUMPER_JUMP_COOLDOWN,
+                      JUMPER_BURST_COUNT, JUMPER_BURST_PAUSE,
+                      JUMPER_KNOCKBACK_Y_GROUND, JUMPER_KNOCKBACK_Y_AERIAL,
                       JUMPER_COLOR, ENEMY_SIGHT_RANGE, ENEMY_ATTACK_RANGE,
                       ENEMY_IFRAMES)
 
@@ -23,9 +25,11 @@ class Jumper(Enemy):
         self.health          = JUMPER_HP
         self.rect.width      = 26
         self.rect.height     = 34
-        self._iframes_on_hit = ENEMY_IFRAMES
-        self._jump_cooldown  = 0
-        self._jump_timer     = 0   # frames since last jump (for auto-jump in patrol)
+        self._iframes_on_hit  = ENEMY_IFRAMES
+        self._jump_cooldown   = 0
+        self._jump_timer      = 0   # frames since last jump (for auto-jump in patrol)
+        self._burst_remaining = JUMPER_BURST_COUNT
+        self._burst_pause     = 0
 
     # ------------------------------------------------------------------
 
@@ -70,10 +74,16 @@ class Jumper(Enemy):
         direction = 1 if player.rect.centerx > self.rect.centerx else -1
         self.vx     = direction * JUMPER_SPEED * 1.3
         self.facing = direction
-        # Jump toward player when grounded and cooldown expired
+        if self._burst_pause > 0:
+            self._burst_pause -= 1
+            return
         if self.on_ground and self._jump_cooldown <= 0:
             self.vy             = JUMPER_JUMP_FORCE
             self._jump_cooldown = JUMPER_JUMP_COOLDOWN
+            self._burst_remaining -= 1
+            if self._burst_remaining <= 0:
+                self._burst_remaining = JUMPER_BURST_COUNT
+                self._burst_pause     = JUMPER_BURST_PAUSE
 
     def _do_attack(self, player) -> None:
         # Bounce away after contact attack
@@ -86,10 +96,14 @@ class Jumper(Enemy):
                self.rect.left - ENEMY_ATTACK_RANGE)
         hrect = pygame.Rect(hx, self.rect.top + 4,
                             ENEMY_ATTACK_RANGE, self.rect.height - 8)
+        if not self.on_ground and player.rect.centery > self.rect.centery:
+            ky = JUMPER_KNOCKBACK_Y_AERIAL   # downward spike when attacking from above
+        else:
+            ky = JUMPER_KNOCKBACK_Y_GROUND   # upward bounce on ground-level attack
         from systems.combat import AttackHitbox
         self.hitboxes.append(
             AttackHitbox(hrect, damage=JUMPER_DAMAGE, owner=self,
-                         knockback_x=4.0, knockback_y=-4.5, duration=6))
+                         knockback_x=4.0, knockback_y=ky, duration=6))
         # Bounce back after attack
         if self.on_ground:
             self.vy     = JUMPER_JUMP_FORCE * 0.7

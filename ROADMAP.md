@@ -523,10 +523,10 @@ _Applied by hk-agent 2026-04-12; see `REVIEW_HK.md` for full analysis._
 | Enemy-specific 2-frame hit flash color | ✅ Done | `entities/enemy.py` — red 2-frame flash in draw override |
 | Caller-side `knockback_dir` in enemy touch damage | ✅ Done | `scenes/gameplay.py` — body contact with directional knockback |
 | Particle system (landing dust, nail sparks, camera pan) | ⏳ Phase 4 | New `systems/particles.py` |
-| ShieldGuard full block (DEFENSE 0.35→0.0, HP 80→65); fix facing locked to patrol dir | ⏳ Pending | `settings.py`, `entities/shield_guard.py` — assign to build-agent post-P2-0b |
-| Ranged: reduce cooldown (90→55 frames); add projectile arc (vy from player delta Y, ±4 cap); extract `RANGED_PREFERRED_DIST` constant | ⏳ Pending | `entities/ranged.py`, `settings.py` — assign to build-agent |
-| Jumper: reduce cooldown (55→32 frames); add burst pattern (`JUMPER_BURST_COUNT=2`, `JUMPER_BURST_PAUSE=70`) | ⏳ Pending | `entities/jumper.py`, `settings.py` — assign to build-agent |
-| Add `SHIELD_GUARD_KNOCKBACK_Y=-3.5`, `JUMPER_KNOCKBACK_Y_AERIAL=2.0` knockback constants | ⏳ Pending | `settings.py`, respective entity files — assign to build-agent |
+| ShieldGuard full block (DEFENSE 0.35→0.0, HP 80→65); fix facing locked to patrol dir | ⬅ P2-2b | `settings.py`, `entities/shield_guard.py` |
+| Ranged: reduce cooldown (90→55 frames); add projectile arc (vy from player delta Y, ±4 cap); extract `RANGED_PREFERRED_DIST` constant | ⬅ P2-2b | `entities/ranged.py`, `settings.py` |
+| Jumper: reduce cooldown (55→32 frames); add burst pattern (`JUMPER_BURST_COUNT=2`, `JUMPER_BURST_PAUSE=70`) | ⬅ P2-2b | `entities/jumper.py`, `settings.py` |
+| Add `SHIELD_GUARD_KNOCKBACK_Y=-3.5`, `JUMPER_KNOCKBACK_Y_AERIAL=2.0` knockback constants | ⬅ P2-2b | `settings.py`, respective entity files |
 
 ---
 
@@ -537,11 +537,12 @@ _Applied by hk-agent 2026-04-12; see `REVIEW_HK.md` for full analysis._
 1. ~~**P2-0 (tech debt unblock)**~~ ✅ **DONE (2026-04-17):** `Enemy.get_drop_fragments()` added; enemy iframes fixed via `ENEMY_IFRAMES=6` overriding `PLAYER_IFRAMES=45`.
 2. ~~**P2-1 (enemy variety)**~~ ✅ **DONE (2026-04-17):** `ShieldGuard`, `Ranged`, `Jumper` created in `entities/`; wired into `tilemap.py` (`'G'`/`'R'`/`'J'` tile chars) and `gameplay.py`.
 3. ~~**P2-2 (levels 6–10)**~~ ✅ **DONE (2026-04-18):** `LEVEL_6_MARKED/FLESHFORGED` through `LEVEL_10` in `tilemap.py`; `_faction_next_level()` routing in `gameplay.py`; victory flag on level 10 completion.
-4. **P2-3 (Warden scripting):** Fully scripted boss intro dialogue, phase-transition visual effects, unique per-phase attack patterns, Phase 3 arena shrink via platform tiles. **← NEXT for build-agent**
-5. **P2-4 (Architect boss):** Final boss, four phases, faction-specific defeat dialogue.
-6. **P2-5 (upgrade system):** After boss kill, award one of three permanent stat upgrades; store in `save_data["upgrades"]`.
-7. **P2-6 (enemy drops):** `HeatCore` and `SoulShard` collectibles (extend `systems/collectible.py`) dropped based on enemy faction; faction-matched healing.
-8. **P2-7 (environmental hazards):** Spike tiles (`'s'`), crumbling platforms (`'~'` disappears after 30 standing frames); add parsers to `TileMap` and collision handling to `physics.py`/`gameplay.py`.
+4. **P2-2b (HK feel sprint):** ShieldGuard full block + facing fix, Ranged arc + cooldown + RANGED_PREFERRED_DIST, Jumper burst pattern, knockback constants. Unblocked by P2-0b. **← NEXT for build-agent**
+5. **P2-3 (Warden scripting):** Fully scripted boss intro dialogue, phase-transition visual effects, unique per-phase attack patterns, Phase 3 arena shrink via platform tiles. Pending after P2-2b.
+6. **P2-4 (Architect boss):** Final boss, four phases, faction-specific defeat dialogue.
+7. **P2-5 (upgrade system):** After boss kill, award one of three permanent stat upgrades; store in `save_data["upgrades"]`.
+8. **P2-6 (enemy drops):** `HeatCore` and `SoulShard` collectibles (extend `systems/collectible.py`) dropped based on enemy faction; faction-matched healing.
+9. **P2-7 (environmental hazards):** Spike tiles (`'s'`), crumbling platforms (`'~'` disappears after 30 standing frames); add parsers to `TileMap` and collision handling to `physics.py`/`gameplay.py`.
 
 ---
 
@@ -621,6 +622,74 @@ _Review-agent 2026-04-18 pass found these correctness bugs that must be fixed be
 **What was built:**
 - `world/tilemap.py`: `LEVEL_6_MARKED`, `LEVEL_6_FLESHFORGED`, `LEVEL_7_MARKED`, `LEVEL_7_FLESHFORGED`, `LEVEL_8_MARKED`, `LEVEL_8_FLESHFORGED`, `LEVEL_9`, `LEVEL_10`.
 - `scenes/gameplay.py`: `_LEVEL_DATA` dict, `_faction_next_level()` helper routing levels 6–8 by faction, victory flag written to `save_data` on level 10 completion.
+
+---
+
+### Task P2-2b: HK Feel Sprint — ShieldGuard / Ranged / Jumper ⬅ NEXT
+
+_Unblocked by P2-0b completion (2026-04-18). See `REVIEW_HK.md` 2026-04-18 pass for full justification._
+
+**Files to touch:**
+- `settings.py` (constants)
+- `entities/shield_guard.py` (full block + facing fix + knockback constant)
+- `entities/ranged.py` (arc projectile + cooldown + RANGED_PREFERRED_DIST)
+- `entities/jumper.py` (burst pattern + aerial knockback constant)
+
+**What to build:**
+
+`settings.py` — update and add:
+```python
+SHIELD_GUARD_DEFENSE       = 0.0    # was 0.35 — full frontal block; forces player to flank
+SHIELD_GUARD_HP            = 65     # was 80 — lower HP compensates for 100% block
+SHIELD_GUARD_SPEED         = 1.6    # was 1.2 — faster chase so it punishes kiting
+SHIELD_GUARD_KNOCKBACK_Y   = -3.5   # NEW — heavy upward bash; extract from hardcode in shield_guard.py
+RANGED_ATTACK_COOLDOWN     = 55     # was 90 — ~0.9 s between shots; creates real pressure
+RANGED_PROJ_SPEED          = 6      # was 5 — faster bolt, tighter reaction window
+RANGED_PREFERRED_DIST      = 240    # NEW — extract _PREFERRED_DIST = 220 hardcode from ranged.py
+JUMPER_JUMP_COOLDOWN       = 32     # was 55 — ~0.53 s; urgency, harder to exploit landing
+JUMPER_JUMP_FORCE          = -12    # was -11 — higher hop, harder to hit mid-air
+JUMPER_SPEED               = 2.4    # was 2.0 — faster horizontal component
+JUMPER_BURST_COUNT         = 2      # NEW — jumps per burst before pause
+JUMPER_BURST_PAUSE         = 70     # NEW — frames of pause after a full burst
+JUMPER_KNOCKBACK_Y_GROUND  = -4.5   # NEW — upward bounce on ground-level attack (was hardcoded)
+JUMPER_KNOCKBACK_Y_AERIAL  =  2.0   # NEW — downward spike when Jumper attacks from above
+```
+
+`entities/shield_guard.py`:
+- Update `SHIELD_GUARD_DEFENSE` reference (now 0.0 — the guard absorbs the full hit; player takes 0 damage from front).
+- Fix facing update: currently `_update_ai` always sets `self.facing` toward the player before calling `super()`. Change so `self.facing` is only updated when `self._state in (_CHASE, _ATTACK)`. During `_PATROL`, facing follows patrol direction naturally.
+- Replace `knockback_y=-2.0` hardcode in the melee `AttackHitbox` creation with `SHIELD_GUARD_KNOCKBACK_Y`.
+
+`entities/ranged.py`:
+- Replace `_PREFERRED_DIST = 220` module constant with `from settings import RANGED_PREFERRED_DIST` and `_PREFERRED_DIST = RANGED_PREFERRED_DIST`.
+- Add `vy=0` parameter to `Projectile.__init__`; store as `self.vy`. In `Projectile.update()`, apply `self.vy += 0.15` (mild gravity) and `self.rect.y += int(self.vy)` each frame.
+- In `Ranged._fire(player)`, compute a mild vy arc toward the player's current Y:
+  ```python
+  dist_x = abs(player.rect.centerx - self.rect.centerx)
+  travel_frames = max(1, dist_x / RANGED_PROJ_SPEED)
+  raw_vy = (player.rect.centery - self.rect.centery) / travel_frames
+  vy = max(-4.0, min(4.0, raw_vy))
+  ```
+  Pass `vy=vy` to the `Projectile` constructor.
+
+`entities/jumper.py`:
+- Add `self._burst_remaining = JUMPER_BURST_COUNT` and `self._burst_pause = 0` to `__init__`.
+- In `_do_chase_jump`, implement burst:
+  - If `self._burst_pause > 0`: decrement and return early (no jump).
+  - If `self.on_ground and self._jump_cooldown <= 0`: launch jump, decrement `_burst_remaining`. If `_burst_remaining <= 0`, reset `_burst_remaining = JUMPER_BURST_COUNT` and set `_burst_pause = JUMPER_BURST_PAUSE`.
+- Replace `knockback_y=-4.5` hardcode in melee `AttackHitbox` with conditional: if `not self.on_ground and player.rect.centery > self.rect.centery` use `JUMPER_KNOCKBACK_Y_AERIAL` (downward spike), else use `JUMPER_KNOCKBACK_Y_GROUND`.
+- Replace the existing `knockback_y` hardcode constant with the new settings constants.
+
+**Acceptance criteria — done when:**
+- ShieldGuard takes 0 damage when struck from the front (shield side); full damage from behind.
+- ShieldGuard faces patrol direction during patrol; only turns toward player in CHASE/ATTACK.
+- Ranged fires every ~0.9 s (55 frames) with projectiles that arc toward the player's Y.
+- Ranged projectiles use `RANGED_PREFERRED_DIST` (not the hardcode 220).
+- Jumper fires 2 hops in quick succession then pauses ~1.17 s before bursting again.
+- Jumper aerial attack sends player downward; ground attack sends player upward.
+- `python main.py` launches without ImportError.
+
+---
 
 ## Phase 3 — Story Integration
 

@@ -144,28 +144,34 @@ ABILITY_SLOTS_DEFAULT = 0
 ABILITY_SLOTS_MAX     = 1
 
 # --- ShieldGuard enemy ---
-SHIELD_GUARD_HP        = 80
-SHIELD_GUARD_SPEED     = 1.2
-SHIELD_GUARD_DAMAGE    = 20
-SHIELD_GUARD_DEFENSE   = 0.35   # Fraction of damage received from front (65% reduction)
-SHIELD_GUARD_COLOR     = (50, 80, 140)   # Steel blue
+SHIELD_GUARD_HP          = 65      # was 80 — lower HP compensates for full frontal block
+SHIELD_GUARD_SPEED       = 1.6     # was 1.2 — faster chase punishes kiting
+SHIELD_GUARD_DAMAGE      = 20
+SHIELD_GUARD_DEFENSE     = 0.0     # was 0.35 — full frontal block; player must flank
+SHIELD_GUARD_KNOCKBACK_Y = -3.5    # Heavy upward bash (extracted from hardcode)
+SHIELD_GUARD_COLOR       = (50, 80, 140)   # Steel blue
 
 # --- Ranged enemy ---
 RANGED_HP              = 40
 RANGED_SPEED           = 1.0
 RANGED_DAMAGE          = 12
-RANGED_PROJ_SPEED      = 5
-RANGED_ATTACK_COOLDOWN = 90    # Frames between shots
-RANGED_SIGHT_RANGE     = 380   # Wider than melee enemies
+RANGED_PROJ_SPEED      = 6         # was 5 — faster bolt, tighter reaction window
+RANGED_ATTACK_COOLDOWN = 55        # was 90 — ~0.9 s between shots; creates real pressure
+RANGED_SIGHT_RANGE     = 380       # Wider than melee enemies
+RANGED_PREFERRED_DIST  = 240       # was hardcoded 220 in ranged.py
 RANGED_COLOR           = (100, 60, 30)   # Rust brown
 
 # --- Jumper enemy ---
-JUMPER_HP              = 35
-JUMPER_SPEED           = 2.0
-JUMPER_DAMAGE          = 12
-JUMPER_JUMP_FORCE      = -11
-JUMPER_JUMP_COOLDOWN   = 55    # Frames between jumps
-JUMPER_COLOR           = (50, 140, 80)   # Sickly green
+JUMPER_HP               = 35
+JUMPER_SPEED            = 2.4      # was 2.0 — faster horizontal component
+JUMPER_DAMAGE           = 12
+JUMPER_JUMP_FORCE       = -12      # was -11 — higher hop, harder to hit mid-air
+JUMPER_JUMP_COOLDOWN    = 32       # was 55 — ~0.53 s; urgency, harder to exploit landing
+JUMPER_BURST_COUNT      = 2        # Jumps per burst before pause
+JUMPER_BURST_PAUSE      = 70       # Frames of pause after a full burst
+JUMPER_KNOCKBACK_Y_GROUND = -4.5   # Upward bounce on ground-level attack (was hardcoded)
+JUMPER_KNOCKBACK_Y_AERIAL =  2.0   # Downward spike when Jumper attacks from above
+JUMPER_COLOR            = (50, 140, 80)   # Sickly green
 
 # --- P2-3: Warden scripting ---
 # Boss scripted intro cutscene

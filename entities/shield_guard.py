@@ -8,6 +8,7 @@ import pygame
 from entities.enemy import Enemy
 from settings import (SHIELD_GUARD_HP, SHIELD_GUARD_SPEED, SHIELD_GUARD_DAMAGE,
                       SHIELD_GUARD_DEFENSE, SHIELD_GUARD_COLOR,
+                      SHIELD_GUARD_KNOCKBACK_Y,
                       ENEMY_ATTACK_RANGE, ENEMY_SIGHT_RANGE, ENEMY_IFRAMES)
 
 _PATROL = "patrol"
@@ -38,12 +39,12 @@ class ShieldGuard(Enemy):
     # ------------------------------------------------------------------
 
     def _update_ai(self, player) -> None:
-        # Always face the player so the shield is relevant
-        if player.rect.centerx > self.rect.centerx:
-            self.facing = 1
-        else:
-            self.facing = -1
+        # Run base AI first so _state is resolved correctly this frame
         super()._update_ai(player)
+        # Only turn toward the player while actively chasing or attacking;
+        # during patrol the guard faces its patrol direction naturally.
+        if self._state in (_CHASE, _ATTACK):
+            self.facing = 1 if player.rect.centerx > self.rect.centerx else -1
 
     def _do_patrol(self) -> None:
         self.vx = self._patrol_dir * SHIELD_GUARD_SPEED
@@ -68,7 +69,8 @@ class ShieldGuard(Enemy):
         from systems.combat import AttackHitbox
         self.hitboxes.append(
             AttackHitbox(hrect, damage=SHIELD_GUARD_DAMAGE, owner=self,
-                         knockback_x=4.5, knockback_y=-2.0, duration=10))
+                         knockback_x=4.5, knockback_y=SHIELD_GUARD_KNOCKBACK_Y,
+                         duration=10))
 
     # ------------------------------------------------------------------
 
