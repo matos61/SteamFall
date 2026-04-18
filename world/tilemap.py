@@ -12,6 +12,7 @@
 #   'G' = ShieldGuard spawn point
 #   'R' = Ranged enemy spawn point
 #   'J' = Jumper enemy spawn point
+#   'X' = Architect (final boss) spawn point
 #
 # When you have real tile sprites, replace the pygame.draw calls in
 # draw_tile() with surface.blit(tile_image, screen_rect).
@@ -280,8 +281,9 @@ LEVEL_9 = [
 ]
 
 # ---------------------------------------------------------------------------
-# LEVEL_10 — "The Final Approach" (lead-up to Architect boss).
-# Sparse enemies, environmental pressure, ends with boss tile.
+# LEVEL_10 — "The Final Approach" (Architect final boss arena).
+# Sparse enemies early, then a wide open arena at the end for the Architect.
+# 'X' marks the Architect spawn (replaces the generic 'B' Warden tile).
 # ---------------------------------------------------------------------------
 LEVEL_10 = [
     "                                                                 ",
@@ -294,7 +296,7 @@ LEVEL_10 = [
     "  G                   ###                                        ",
     "          ###                    ###         G                   ",
     "   ################                                    P         ",
-    "                                             B                   ",
+    "                                             X                   ",
     "#################################################################",
     "#################################################################",
 ]
@@ -312,6 +314,7 @@ class TileMap:
         self.shield_guard_spawns: list[tuple] = []
         self.ranged_spawns: list[tuple]       = []
         self.jumper_spawns: list[tuple]       = []
+        self.architect_spawn: tuple | None    = None
 
         self._parse(level_data)
 
@@ -358,6 +361,10 @@ class TileMap:
 
                 elif char == 'J':
                     self.jumper_spawns.append((x + TILE_SIZE // 2, y - 64))
+
+                elif char == 'X':
+                    # Architect (final boss) spawn; feet land 80 px above tile top
+                    self.architect_spawn = (x + TILE_SIZE // 2, y - 80)
 
     # ------------------------------------------------------------------
 

@@ -192,3 +192,12 @@ BOSS_PROJ_SPREAD_VY        = 3     # vy offset for the upper/lower spread projec
 ARENA_SHRINK_SPEED         = 0.5   # px/frame the walls move inward
 ARENA_SHRINK_AMOUNT        = 200   # max px each side shrinks inward
 ARENA_WALL_COLOR           = (45, 25, 75)   # dark purple tile colour
+
+# --- P2-4: The Architect final boss ---
+ARCHITECT_MAX_HEALTH    = 600
+ARCHITECT_PHASE2_THRESH = 0.75   # 75% HP — adds teleport
+ARCHITECT_PHASE3_THRESH = 0.50   # 50% HP — adds 5-projectile fan
+ARCHITECT_PHASE4_THRESH = 0.25   # 25% HP — adds Crawler spawns
+ARCHITECT_TELEPORT_CD   = 200    # frames between teleports
+ARCHITECT_FAN_CD        = 90     # frames between fan spread shots
+ARCHITECT_MINION_CD     = 300    # frames between Crawler spawns

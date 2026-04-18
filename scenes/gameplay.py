@@ -31,6 +31,7 @@ from entities.player       import Player
 from entities.enemy        import Enemy
 from entities.crawler      import Crawler
 from entities.boss         import Boss
+from entities.architect    import Architect
 from entities.shield_guard import ShieldGuard
 from entities.ranged       import Ranged
 from entities.jumper       import Jumper
@@ -152,13 +153,22 @@ class GameplayScene(BaseScene):
         for (jx, jy) in self.tilemap.jumper_spawns:
             self.enemies.append(Jumper(jx, jy))
 
-        # Spawn boss
+        # Spawn Warden boss (tile 'B')
         self._boss = None
         if self.tilemap.boss_spawn:
             bx, by = self.tilemap.boss_spawn
             boss = Boss(bx, by, name="The Warden")
             self.enemies.append(boss)
             self._boss = boss
+
+        # Spawn Architect final boss (tile 'X')
+        self._architect = None
+        if self.tilemap.architect_spawn:
+            ax, ay   = self.tilemap.architect_spawn
+            _faction = self.game.player_faction or FACTION_MARKED
+            arch     = Architect(ax, ay, faction=_faction)
+            self.enemies.append(arch)
+            self._architect = arch
 
         # Checkpoints
         self.checkpoints: list[Checkpoint] = list(self.tilemap.checkpoints)
@@ -197,6 +207,10 @@ class GameplayScene(BaseScene):
         self._damage_flash = 0
         self._prev_iframes = 0
 
+        # --- Architect defeat dialogue cadence ---
+        self._architect_defeat_timer = 0   # counts frames between lines
+        self._architect_victory_done = False
+
         # Fonts
         self.font_hud       = pygame.font.SysFont("monospace", 16, bold=True)
         self.font_debug     = pygame.font.SysFont("monospace", 13)
@@ -208,9 +222,10 @@ class GameplayScene(BaseScene):
         self.font_phase_ann = pygame.font.SysFont("georgia",   42, bold=True)
 
         # --- Boss intro cutscene ---
-        self._boss_intro_active = False
-        self._boss_intro_done   = False
-        self._boss_dialogue     = None
+        self._boss_intro_active  = False
+        self._boss_intro_done    = False
+        self._boss_intro_subject = "warden"   # "warden" or "architect"
+        self._boss_dialogue      = None
 
         # --- Phase announce banner ---
         self._boss_phase_text  = ""
@@ -289,12 +304,22 @@ class GameplayScene(BaseScene):
             return
 
         # --- Boss intro: trigger then freeze while active ---
+        # Warden intro
         if (self._boss and self._boss.alive
                 and not self._boss_intro_done
                 and not self._boss_intro_active):
             dist = abs(self.player.rect.centerx - self._boss.rect.centerx)
             if dist < BOSS_INTRO_TRIGGER_DIST:
                 self._start_boss_intro()
+
+        # Architect intro — uses same cutscene machinery but tracks _intro_done
+        # on the Architect instance itself (no separate _architect_intro_done flag needed).
+        if (self._architect and self._architect.alive
+                and not self._architect._intro_done
+                and not self._boss_intro_active):
+            dist = abs(self.player.rect.centerx - self._architect.rect.centerx)
+            if dist < BOSS_INTRO_TRIGGER_DIST:
+                self._start_architect_intro()
 
         if self._boss_intro_active:
             self._tick_boss_intro()
@@ -410,6 +435,15 @@ class GameplayScene(BaseScene):
                 self._shrink_target_right = float(
                     self.tilemap.width - ARENA_SHRINK_AMOUNT)
 
+        # --- Flush Architect-spawned minions into the main enemy list ---
+        # Collect additions first so we never modify the list we're iterating.
+        minion_additions = []
+        for e in self.enemies:
+            if isinstance(e, Architect) and hasattr(e, '_spawned_minions'):
+                minion_additions.extend(e._spawned_minions)
+                e._spawned_minions.clear()
+        self.enemies.extend(minion_additions)
+
         # --- Spawn fragments from newly dead enemies + prune enemy list ---
         # Guard with hitstop check so drops spawn exactly once per kill,
         # not once per frozen frame during the hitstop window (BUG-007/BUG-011).
@@ -419,12 +453,36 @@ class GameplayScene(BaseScene):
                 for frag in dead_e.get_drop_fragments():
                     self.fragments.append(frag)
 
-            # If the boss just died, clear the boss reference
+            # If the Warden boss just died, clear that reference
             if self._boss and not self._boss.alive:
                 self._boss = None
 
+            # If the Architect just died, keep the reference for defeat dialogue
+            # but remove it from the active enemy list so it stops updating.
+            if self._architect and not self._architect.alive:
+                pass  # reference kept; pruned below
+
             # Prune dead enemies
             self.enemies = [e for e in self.enemies if e.alive]
+
+        # --- Architect defeat dialogue advancement ---
+        if self._architect and not self._architect.alive and not self._architect_victory_done:
+            arch = self._architect
+            if arch._defeat_dialogue_active:
+                if arch._defeat_line_idx < len(arch._defeat_lines):
+                    self._architect_defeat_timer += 1
+                    if self._architect_defeat_timer >= 120:
+                        self._architect_defeat_timer = 0
+                        arch._defeat_line_idx += 1
+                else:
+                    # All lines shown; wait 2 seconds (120 frames) then write victory
+                    self._architect_defeat_timer += 1
+                    if self._architect_defeat_timer >= 120:
+                        self._architect_victory_done = True
+                        self.game.save_data["victory"] = True
+                        self.game.save_data["faction"] = arch.faction
+                        self.game.save_to_disk()
+                        self._begin_transition(SCENE_MAIN_MENU)
 
         # --- Checkpoints ---
         faction = self.game.player_faction or FACTION_MARKED
@@ -475,6 +533,7 @@ class GameplayScene(BaseScene):
 
     def _start_boss_intro(self) -> None:
         self._boss_intro_active = True
+        self._boss_intro_subject = "warden"
         faction = self.game.player_faction or FACTION_MARKED
         self._boss_dialogue = DialogueBox(faction=faction)
         self._boss_dialogue.queue(_WARDEN_INTRO_LINES)
@@ -482,25 +541,43 @@ class GameplayScene(BaseScene):
         self.player.vx = 0
         self.player.vy = 0
 
+    def _start_architect_intro(self) -> None:
+        self._boss_intro_active  = True
+        self._boss_intro_subject = "architect"
+        faction = self.game.player_faction or FACTION_MARKED
+        self._boss_dialogue = DialogueBox(faction=faction)
+        # Build DialogueBox lines from the Architect's own intro_lines list
+        arch_lines = [(self._architect.name, line)
+                      for line in self._architect._intro_lines]
+        self._boss_dialogue.queue(arch_lines)
+        self.player.vx = 0
+        self.player.vy = 0
+
     def _tick_boss_intro(self) -> None:
+        subject = getattr(self, "_boss_intro_subject", "warden")
+        # Pick the active boss entity so we can tick its line counters
+        active_boss = self._architect if subject == "architect" else self._boss
         if self._boss_dialogue:
             self._boss_dialogue.update()
-            # Also advance the boss's own intro line timer/index so that the
-            # _draw_boss_intro banner tracks correctly (P2-3a spec requirement).
-            if self._boss:
-                self._boss._intro_line_timer += 1
-                if self._boss._intro_line_timer >= 120:
-                    self._boss._intro_line_timer = 0
-                    self._boss._intro_line_idx  += 1
-                    if self._boss._intro_line_idx >= len(self._boss._intro_lines):
-                        self._boss._intro_line_idx = len(self._boss._intro_lines) - 1
+            # Advance the entity's own intro line timer so _draw_boss_intro
+            # banner stays in sync (P2-3a spec requirement).
+            if active_boss:
+                active_boss._intro_line_timer += 1
+                if active_boss._intro_line_timer >= 120:
+                    active_boss._intro_line_timer = 0
+                    active_boss._intro_line_idx  += 1
+                    if active_boss._intro_line_idx >= len(active_boss._intro_lines):
+                        active_boss._intro_line_idx = len(active_boss._intro_lines) - 1
             if self._boss_dialogue.is_done():
                 self._boss_intro_active = False
-                self._boss_intro_done   = True
                 self._boss_dialogue     = None
-                # Sync boss-level flag so external code can query boss._intro_done
-                if self._boss:
-                    self._boss._intro_done = True
+                if subject == "warden":
+                    self._boss_intro_done = True
+                    if self._boss:
+                        self._boss._intro_done = True
+                else:
+                    if self._architect:
+                        self._architect._intro_done = True
 
     # ------------------------------------------------------------------
     # Transition state machine
@@ -607,6 +684,9 @@ class GameplayScene(BaseScene):
         if self._boss_intro_active and self._boss_dialogue:
             self._boss_dialogue.draw(surface)
 
+        # Architect defeat dialogue overlay
+        self._draw_architect_defeat(surface)
+
         # Level transition overlay (topmost)
         if self._transition_phase is not None:
             self._draw_transition_overlay(surface)
@@ -638,9 +718,13 @@ class GameplayScene(BaseScene):
         if self.game.save_data.get("checkpoint_pos"):
             self._draw_checkpoint_indicator(surface)
 
-        # Boss health bar
+        # Boss health bar — Warden
         if self._boss and self._boss.alive:
             self._draw_boss_bar(surface, self._boss)
+
+        # Boss health bar — Architect (uses same renderer; works for any Boss subclass)
+        if self._architect and self._architect.alive:
+            self._draw_boss_bar(surface, self._architect)
 
         hints = [
             "A/D Move   W/Space Jump   Z Attack   X Ability   M Map",
@@ -679,8 +763,10 @@ class GameplayScene(BaseScene):
         bar_h   = BOSS_BAR_HEIGHT
         fill    = boss.health / boss.max_health
 
-        # Color by phase
-        if boss.phase == 3:
+        # Color by phase (handles both 3-phase Warden and 4-phase Architect)
+        if boss.phase >= 4:
+            bar_color = (180, 0, 60)    # Architect phase 4 — blood violet
+        elif boss.phase == 3:
             bar_color = (220, 0, 0)
         elif boss.phase == 2:
             bar_color = (220, 120, 0)
@@ -692,8 +778,12 @@ class GameplayScene(BaseScene):
         pygame.draw.rect(surface, bar_color, (bar_x, bar_y, filled_w, bar_h))
         pygame.draw.rect(surface, (60, 55, 75), (bar_x, bar_y, bar_w, bar_h), 1)
 
-        # Phase threshold ticks at 50% and 25%
-        for frac in (0.50, 0.25):
+        # Phase threshold ticks — 4-phase boss gets 3 ticks; 3-phase gets 2
+        if isinstance(boss, Architect):
+            tick_fracs = (0.75, 0.50, 0.25)
+        else:
+            tick_fracs = (0.50, 0.25)
+        for frac in tick_fracs:
             tx = bar_x + int(bar_w * frac)
             pygame.draw.line(surface, WHITE,
                              (tx, bar_y), (tx, bar_y + bar_h), 2)
@@ -794,29 +884,53 @@ class GameplayScene(BaseScene):
                 int(self._shrink_right_x), 0, rw, self.tilemap.height))
 
     def _draw_boss_intro(self, surface: pygame.Surface) -> None:
-        """Draw the current Warden intro line in a simple tinted banner.
+        """Draw the current boss intro line in a simple tinted banner.
 
-        This method satisfies the P2-3a structural spec.  In practice the
-        richer DialogueBox path draws on top of it, but this provides a
-        visible fallback when no DialogueBox is active yet.
+        Handles both Warden (purple tint) and Architect (violet-gold tint).
+        The richer DialogueBox path draws on top, but this provides a fallback.
         """
-        if not self._boss or self._boss._intro_done:
-            return
-        # Only show if intro is active and line data exists
         if not self._boss_intro_active:
             return
-        line_idx = self._boss._intro_line_idx
-        lines    = self._boss._intro_lines
+        subject = getattr(self, "_boss_intro_subject", "warden")
+        active_boss = self._architect if subject == "architect" else self._boss
+        if not active_boss or active_boss._intro_done:
+            return
+        line_idx = active_boss._intro_line_idx
+        lines    = active_boss._intro_lines
         if line_idx >= len(lines):
             return
         line = lines[line_idx]
         font = pygame.font.SysFont("georgia", 22)
-        text = font.render(f'"{line}"', True, (220, 180, 255))
+        if subject == "architect":
+            text_color = (255, 200, 255)   # pale violet-white
+            bg_color   = (30, 5, 40)
+        else:
+            text_color = (220, 180, 255)
+            bg_color   = (20, 10, 30)
+        text = font.render(f'"{line}"', True, text_color)
         bg   = pygame.Surface((text.get_width() + 32, text.get_height() + 16))
         bg.set_alpha(180)
-        bg.fill((20, 10, 30))
+        bg.fill(bg_color)
         bx = SCREEN_WIDTH // 2 - bg.get_width() // 2
         by = 60
+        surface.blit(bg, (bx, by))
+        surface.blit(text, (bx + 16, by + 8))
+
+    def _draw_architect_defeat(self, surface: pygame.Surface) -> None:
+        """Draw faction-specific defeat dialogue lines after the Architect dies."""
+        arch = self._architect
+        if not arch or not arch._defeat_dialogue_active:
+            return
+        if arch._defeat_line_idx >= len(arch._defeat_lines):
+            return
+        line = arch._defeat_lines[arch._defeat_line_idx]
+        font = pygame.font.SysFont("georgia", 22)
+        text = font.render(f'"{line}"', True, (255, 220, 140))
+        bg   = pygame.Surface((text.get_width() + 32, text.get_height() + 16))
+        bg.set_alpha(180)
+        bg.fill((30, 20, 5))
+        bx = SCREEN_WIDTH // 2 - bg.get_width() // 2
+        by = SCREEN_HEIGHT // 2 - bg.get_height() // 2
         surface.blit(bg, (bx, by))
         surface.blit(text, (bx + 16, by + 8))
 
