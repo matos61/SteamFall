@@ -537,7 +537,7 @@ _Applied by hk-agent 2026-04-12; see `REVIEW_HK.md` for full analysis._
 1. ~~**P2-0 (tech debt unblock)**~~ ✅ **DONE (2026-04-17):** `Enemy.get_drop_fragments()` added; enemy iframes fixed via `ENEMY_IFRAMES=6` overriding `PLAYER_IFRAMES=45`.
 2. ~~**P2-1 (enemy variety)**~~ ✅ **DONE (2026-04-17):** `ShieldGuard`, `Ranged`, `Jumper` created in `entities/`; wired into `tilemap.py` (`'G'`/`'R'`/`'J'` tile chars) and `gameplay.py`.
 3. ~~**P2-2 (levels 6–10)**~~ ✅ **DONE (2026-04-18):** `LEVEL_6_MARKED/FLESHFORGED` through `LEVEL_10` in `tilemap.py`; `_faction_next_level()` routing in `gameplay.py`; victory flag on level 10 completion.
-4. **P2-3 (Warden scripting):** Fully scripted boss intro dialogue, phase-transition visual effects, unique per-phase attack patterns, Phase 3 arena shrink via platform tiles. **← NEXT for build-agent (after P2-0b bug fixes)**
+4. **P2-3 (Warden scripting):** Fully scripted boss intro dialogue, phase-transition visual effects, unique per-phase attack patterns, Phase 3 arena shrink via platform tiles. **← NEXT for build-agent**
 5. **P2-4 (Architect boss):** Final boss, four phases, faction-specific defeat dialogue.
 6. **P2-5 (upgrade system):** After boss kill, award one of three permanent stat upgrades; store in `save_data["upgrades"]`.
 7. **P2-6 (enemy drops):** `HeatCore` and `SoulShard` collectibles (extend `systems/collectible.py`) dropped based on enemy faction; faction-matched healing.
@@ -571,7 +571,7 @@ _Applied by hk-agent 2026-04-12; see `REVIEW_HK.md` for full analysis._
 
 ---
 
-### Task P2-0b: Critical Bug-Fix Sprint ← ASSIGN TO BUILD-AGENT
+### Task P2-0b: Critical Bug-Fix Sprint ✅ DONE (2026-04-18)
 
 _Review-agent 2026-04-18 pass found these correctness bugs that must be fixed before P2-3 content work._
 
