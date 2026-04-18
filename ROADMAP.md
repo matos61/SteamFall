@@ -539,8 +539,8 @@ _Applied by hk-agent 2026-04-12; see `REVIEW_HK.md` for full analysis._
 3. ~~**P2-2 (levels 6–10)**~~ ✅ **DONE (2026-04-18):** `LEVEL_6_MARKED/FLESHFORGED` through `LEVEL_10` in `tilemap.py`; `_faction_next_level()` routing in `gameplay.py`; victory flag on level 10 completion.
 4. ~~**P2-2b (HK feel sprint)**~~ ✅ **DONE (2026-04-18):** All 13 constants in place; ShieldGuard full block + patrol-facing fix; Ranged arc projectile; Jumper burst pattern + aerial knockback.
 5. ~~**P2-3 (Warden scripting)**~~ ✅ **DONE (2026-04-18):** 3-beat Warden intro dialogue; phase-differentiated rage flash (orange/red); BOSS_PROJ_SPREAD_VY; BUG-016 fixed. Prior commits had already implemented dash, arena shrink, and projectile spread.
-6. **P2-4 (Architect boss):** Final boss, four phases, faction-specific defeat dialogue. **← NEXT for build-agent**
-7. **P2-5 (upgrade system):** After boss kill, award one of three permanent stat upgrades; store in `save_data["upgrades"]`.
+6. ~~**P2-4 (Architect boss)**~~ ✅ **DONE (2026-04-18):** `entities/architect.py` created; 4-phase AI (teleport/fan/minions); faction-specific intro + defeat dialogue; 'X' tile in LEVEL_10; victory write to save_data.
+7. **P2-5 (upgrade system):** After boss kill, award one of three permanent stat upgrades; store in `save_data["upgrades"]`. **← NEXT for build-agent**
 8. **P2-6 (enemy drops):** `HeatCore` and `SoulShard` collectibles (extend `systems/collectible.py`) dropped based on enemy faction; faction-matched healing.
 9. **P2-7 (environmental hazards):** Spike tiles (`'s'`), crumbling platforms (`'~'` disappears after 30 standing frames); add parsers to `TileMap` and collision handling to `physics.py`/`gameplay.py`.
 
@@ -753,6 +753,8 @@ _Legend: ✅ Fixed | ⚠️ Flagged / deferred | 🔴 Open_
 
 13. ✅ **BUG-016: ShieldGuard patrol facing inconsistency** — Fixed (P2-3 commit). Added `self.facing = self._patrol_dir` in `ShieldGuard._do_patrol()`.
 
+14. ⚠️ **BUG-017: Boss intro first line shows for 119 frames instead of 120** — Off-by-one in `_tick_boss_intro()` (timer increments before the ≥120 check). Cosmetic only (~16 ms at 60 fps). Fix: change `if self._boss._intro_line_timer >= 120` to `>= 121`, or increment timer after the check. Assign to build-agent as low-priority hotfix.
+
 ---
 
 ## Agent Coordination Notes
@@ -776,7 +778,8 @@ _Legend: ✅ Fixed | ⚠️ Flagged / deferred | 🔴 Open_
 | `entities/player.py` | build-agent | Ability slots done; animation draw consolidation deferred to Phase 4 |
 | `entities/enemy.py` | build-agent | Open: `get_drop_fragments()` (Tech Debt #4), iframe fix (Tech Debt #5) |
 | `entities/crawler.py` | build-agent | Created (P1-1); stable |
-| `entities/boss.py` | build-agent | Created (P1-2); Phase 2 scripted intro pending (P2-3) |
+| `entities/boss.py` | build-agent | Warden scripting complete (P2-3); stable |
+| `entities/architect.py` | build-agent | Created (P2-4); Architect final boss; stable |
 | `entities/shield_guard.py` | build-agent | Created (P2-1); stable |
 | `entities/ranged.py` | build-agent | Created (P2-1); stable |
 | `entities/jumper.py` | build-agent | Created (P2-1); stable |
