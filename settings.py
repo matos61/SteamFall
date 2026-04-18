@@ -166,3 +166,20 @@ JUMPER_DAMAGE          = 12
 JUMPER_JUMP_FORCE      = -11
 JUMPER_JUMP_COOLDOWN   = 55    # Frames between jumps
 JUMPER_COLOR           = (50, 140, 80)   # Sickly green
+
+# --- P2-3: Warden scripting ---
+# Boss scripted intro cutscene
+BOSS_INTRO_TRIGGER_DIST    = 520   # px — proximity that starts the pre-fight cutscene
+
+# Phase-transition announce banner
+BOSS_PHASE_ANNOUNCE_FRAMES = 90    # frames the phase banner stays visible
+
+# Phase 2 — dash charge attack
+BOSS_DASH_SPEED            = 9     # vx during the dash
+BOSS_DASH_FRAMES           = 22    # frames each dash lasts
+BOSS_DASH_COOLDOWN         = 110   # frames between dash opportunities
+
+# Phase 3 — arena shrink walls
+ARENA_SHRINK_SPEED         = 0.5   # px/frame the walls move inward
+ARENA_SHRINK_AMOUNT        = 200   # max px each side shrinks inward
+ARENA_WALL_COLOR           = (45, 25, 75)   # dark purple tile colour

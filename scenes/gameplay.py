@@ -14,11 +14,13 @@
 #   • Add entry to _LEVEL_CHAIN and _LEVEL_NAMES below
 # =============================================================================
 
+import random
 import pygame
 from settings           import *
 from scenes.base_scene  import BaseScene
 from core.camera        import Camera
 from core.hitstop       import hitstop
+from systems.dialogue   import DialogueBox
 from world.tilemap      import (TileMap,
                                 LEVEL_1, LEVEL_2, LEVEL_3, LEVEL_4, LEVEL_5,
                                 LEVEL_6_MARKED, LEVEL_6_FLESHFORGED,
@@ -36,6 +38,16 @@ from systems.checkpoint import Checkpoint
 from systems.collectible import SoulFragment
 from systems.minimap    import MiniMap
 
+
+# Scripted dialogue for The Warden boss encounter
+_WARDEN_INTRO_LINES = [
+    ("",            "The torches flicker. A hulking shape separates from the shadow."),
+    ("The Warden",  "...Another one. They always have that same fire in their eyes."),
+    ("The Warden",  "Marked or Forged — it makes no difference here. Both claim to transcend. Both break."),
+    ("The Warden",  "I have guarded this threshold for thirty years. None have passed."),
+    ("",            "His war-blade scrapes the stone floor. The air grows cold."),
+    ("The Warden",  "Come then. Prove me wrong."),
+]
 
 # Level display names and progression chain
 _LEVEL_NAMES = {
@@ -193,6 +205,26 @@ class GameplayScene(BaseScene):
         self.font_trans     = pygame.font.SysFont("georgia",   36)
         self.font_boss_name = pygame.font.SysFont("georgia",   14, bold=True)
         self.font_pause_opt = pygame.font.SysFont("georgia",   30)
+        self.font_phase_ann = pygame.font.SysFont("georgia",   42, bold=True)
+
+        # --- Boss intro cutscene ---
+        self._boss_intro_active = False
+        self._boss_intro_done   = False
+        self._boss_dialogue     = None
+
+        # --- Phase announce banner ---
+        self._boss_phase_text  = ""
+        self._boss_phase_timer = 0
+
+        # --- Screen shake ---
+        self._screen_shake = 0
+
+        # --- Phase 3 arena shrink walls ---
+        self._shrink_active       = False
+        self._shrink_left_x       = 0.0
+        self._shrink_right_x      = float(self.tilemap.width)
+        self._shrink_target_left  = 0.0
+        self._shrink_target_right = float(self.tilemap.width)
 
     # ------------------------------------------------------------------
     # Event handling
@@ -202,6 +234,13 @@ class GameplayScene(BaseScene):
         if not self._setup_done:
             return
         if event.type != pygame.KEYDOWN:
+            return
+
+        # Boss intro freezes all other input; only SPACE/RETURN advances dialogue
+        if self._boss_intro_active:
+            if event.key in (pygame.K_SPACE, pygame.K_RETURN):
+                if self._boss_dialogue:
+                    self._boss_dialogue.advance()
             return
 
         if self._paused:
@@ -249,10 +288,50 @@ class GameplayScene(BaseScene):
         if self._map_open or self._paused:
             return
 
+        # --- Boss intro: trigger then freeze while active ---
+        if (self._boss and self._boss.alive
+                and not self._boss_intro_done
+                and not self._boss_intro_active):
+            dist = abs(self.player.rect.centerx - self._boss.rect.centerx)
+            if dist < BOSS_INTRO_TRIGGER_DIST:
+                self._start_boss_intro()
+
+        if self._boss_intro_active:
+            self._tick_boss_intro()
+            return
+
+        # --- Phase announce timer ---
+        if self._boss_phase_timer > 0:
+            self._boss_phase_timer -= 1
+
+        # --- Screen shake decay ---
+        if self._screen_shake > 0:
+            self._screen_shake -= 1
+
+        # --- Arena shrink advance ---
+        if self._shrink_active:
+            if self._shrink_left_x < self._shrink_target_left:
+                self._shrink_left_x = min(
+                    self._shrink_left_x + ARENA_SHRINK_SPEED,
+                    self._shrink_target_left)
+            if self._shrink_right_x > self._shrink_target_right:
+                self._shrink_right_x = max(
+                    self._shrink_right_x - ARENA_SHRINK_SPEED,
+                    self._shrink_target_right)
+
         # --- Tick hitstop FIRST ---
         hitstop.tick()
 
         solid = self.tilemap.get_solid_rects()
+        # Inject arena shrink walls into solid rects so physics respects them
+        if self._shrink_active and self._shrink_left_x > 0:
+            solid = list(solid) + [
+                pygame.Rect(0, 0,
+                            int(self._shrink_left_x), self.tilemap.height),
+                pygame.Rect(int(self._shrink_right_x), 0,
+                            self.tilemap.width - int(self._shrink_right_x),
+                            self.tilemap.height),
+            ]
 
         if not hitstop.is_active():
             prev_iframes = self._prev_iframes
@@ -314,6 +393,23 @@ class GameplayScene(BaseScene):
                 remaining.append(frag)
         self.fragments = remaining
 
+        # --- Boss phase announce + arena shrink trigger ---
+        if self._boss and self._boss.alive and self._boss.announce_phase:
+            phase = self._boss.announce_phase
+            self._boss.announce_phase = 0
+            labels = ("", "I", "II", "III")
+            suffix = " \u2014 ENRAGED" if phase == 2 else " \u2014 UNLEASHED"
+            self._boss_phase_text  = f"PHASE {labels[phase]}{suffix}"
+            self._boss_phase_timer = BOSS_PHASE_ANNOUNCE_FRAMES
+            self._screen_shake     = 10
+            if phase == 3:
+                self._shrink_active       = True
+                self._shrink_left_x       = 0.0
+                self._shrink_right_x      = float(self.tilemap.width)
+                self._shrink_target_left  = float(ARENA_SHRINK_AMOUNT)
+                self._shrink_target_right = float(
+                    self.tilemap.width - ARENA_SHRINK_AMOUNT)
+
         # --- Spawn fragments from newly dead enemies + prune enemy list ---
         # Guard with hitstop check so drops spawn exactly once per kill,
         # not once per frozen frame during the hitstop window (BUG-007/BUG-011).
@@ -374,6 +470,27 @@ class GameplayScene(BaseScene):
                     self.game.change_scene(SCENE_MAIN_MENU)
 
     # ------------------------------------------------------------------
+    # Boss intro cutscene
+    # ------------------------------------------------------------------
+
+    def _start_boss_intro(self) -> None:
+        self._boss_intro_active = True
+        faction = self.game.player_faction or FACTION_MARKED
+        self._boss_dialogue = DialogueBox(faction=faction)
+        self._boss_dialogue.queue(_WARDEN_INTRO_LINES)
+        # Freeze player in place
+        self.player.vx = 0
+        self.player.vy = 0
+
+    def _tick_boss_intro(self) -> None:
+        if self._boss_dialogue:
+            self._boss_dialogue.update()
+            if self._boss_dialogue.is_done():
+                self._boss_intro_active = False
+                self._boss_intro_done   = True
+                self._boss_dialogue     = None
+
+    # ------------------------------------------------------------------
     # Transition state machine
     # ------------------------------------------------------------------
 
@@ -410,8 +527,21 @@ class GameplayScene(BaseScene):
 
         surface.fill((10, 7, 22))
 
+        # Apply screen shake by temporarily nudging camera offset
+        shake_x = shake_y = 0
+        if self._screen_shake > 0:
+            amp     = self._screen_shake // 2 + 1
+            shake_x = random.randint(-amp, amp)
+            shake_y = random.randint(-amp, amp)
+            self.camera.offset.x += shake_x
+            self.camera.offset.y += shake_y
+
         # World
         self.tilemap.draw(surface, self.camera)
+
+        # Arena shrink walls (draw as tiled columns)
+        if self._shrink_active:
+            self._draw_arena_walls(surface)
 
         # Checkpoints
         for cp in self.checkpoints:
@@ -425,6 +555,11 @@ class GameplayScene(BaseScene):
         for enemy in self.enemies:
             enemy.draw(surface, self.camera)
         self.player.draw(surface, self.camera)
+
+        # Restore shake offset before HUD (HUD is in screen space)
+        if shake_x or shake_y:
+            self.camera.offset.x -= shake_x
+            self.camera.offset.y -= shake_y
 
         # HUD
         self._draw_hud(surface)
@@ -450,6 +585,14 @@ class GameplayScene(BaseScene):
         # Death overlay
         if not self.player.alive:
             self._draw_death(surface)
+
+        # Phase announce banner
+        if self._boss_phase_timer > 0:
+            self._draw_phase_announce(surface)
+
+        # Boss intro dialogue (topmost before transition)
+        if self._boss_intro_active and self._boss_dialogue:
+            self._boss_dialogue.draw(surface)
 
         # Level transition overlay (topmost)
         if self._transition_phase is not None:
@@ -614,6 +757,40 @@ class GameplayScene(BaseScene):
             "\u2191\u2193 Navigate   ENTER Confirm   ESC Resume", True, (50, 50, 60))
         surface.blit(hint,
                      (cx - hint.get_width() // 2, SCREEN_HEIGHT - 38))
+
+    def _draw_arena_walls(self, surface: pygame.Surface) -> None:
+        """Draw the closing arena-shrink walls as stacked tile rects."""
+        def _draw_wall_column(world_rect: pygame.Rect) -> None:
+            sr = self.camera.apply_rect(world_rect)
+            # Clip to screen before tiling to avoid millions of off-screen draws
+            visible = sr.clip(pygame.Rect(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT))
+            if visible.width <= 0 or visible.height <= 0:
+                return
+            pygame.draw.rect(surface, ARENA_WALL_COLOR, visible)
+            # Draw top edge highlights every TILE_SIZE rows for a tiled look
+            for ty in range(visible.top, visible.bottom, TILE_SIZE):
+                pygame.draw.line(surface, TILE_EDGE_COLOR,
+                                 (visible.left, ty), (visible.right, ty), 1)
+
+        lw = int(self._shrink_left_x)
+        rw = int(self.tilemap.width - self._shrink_right_x)
+        if lw > 0:
+            _draw_wall_column(pygame.Rect(0, 0, lw, self.tilemap.height))
+        if rw > 0:
+            _draw_wall_column(pygame.Rect(
+                int(self._shrink_right_x), 0, rw, self.tilemap.height))
+
+    def _draw_phase_announce(self, surface: pygame.Surface) -> None:
+        """Draw the phase-transition banner centred on screen."""
+        frac  = self._boss_phase_timer / BOSS_PHASE_ANNOUNCE_FRAMES
+        alpha = min(255, int(frac * 510))   # fade in fast, fade out slow
+        if alpha <= 0:
+            return
+        color = (220, 60, 60) if "UNLEASHED" in self._boss_phase_text else (220, 140, 40)
+        txt   = self.font_phase_ann.render(self._boss_phase_text, True, color)
+        txt.set_alpha(alpha)
+        surface.blit(txt, (SCREEN_WIDTH // 2 - txt.get_width() // 2,
+                           SCREEN_HEIGHT // 2 - 80))
 
     def _draw_transition_overlay(self, surface: pygame.Surface) -> None:
         if self._transition_phase == "fade_out":
