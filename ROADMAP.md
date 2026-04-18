@@ -523,6 +523,10 @@ _Applied by hk-agent 2026-04-12; see `REVIEW_HK.md` for full analysis._
 | Enemy-specific 2-frame hit flash color | ✅ Done | `entities/enemy.py` — red 2-frame flash in draw override |
 | Caller-side `knockback_dir` in enemy touch damage | ✅ Done | `scenes/gameplay.py` — body contact with directional knockback |
 | Particle system (landing dust, nail sparks, camera pan) | ⏳ Phase 4 | New `systems/particles.py` |
+| ShieldGuard full block (DEFENSE 0.35→0.0, HP 80→65); fix facing locked to patrol dir | ⏳ Pending | `settings.py`, `entities/shield_guard.py` — assign to build-agent post-P2-0b |
+| Ranged: reduce cooldown (90→55 frames); add projectile arc (vy from player delta Y, ±4 cap); extract `RANGED_PREFERRED_DIST` constant | ⏳ Pending | `entities/ranged.py`, `settings.py` — assign to build-agent |
+| Jumper: reduce cooldown (55→32 frames); add burst pattern (`JUMPER_BURST_COUNT=2`, `JUMPER_BURST_PAUSE=70`) | ⏳ Pending | `entities/jumper.py`, `settings.py` — assign to build-agent |
+| Add `SHIELD_GUARD_KNOCKBACK_Y=-3.5`, `JUMPER_KNOCKBACK_Y_AERIAL=2.0` knockback constants | ⏳ Pending | `settings.py`, respective entity files — assign to build-agent |
 
 ---
 
@@ -532,8 +536,8 @@ _Applied by hk-agent 2026-04-12; see `REVIEW_HK.md` for full analysis._
 
 1. ~~**P2-0 (tech debt unblock)**~~ ✅ **DONE (2026-04-17):** `Enemy.get_drop_fragments()` added; enemy iframes fixed via `ENEMY_IFRAMES=6` overriding `PLAYER_IFRAMES=45`.
 2. ~~**P2-1 (enemy variety)**~~ ✅ **DONE (2026-04-17):** `ShieldGuard`, `Ranged`, `Jumper` created in `entities/`; wired into `tilemap.py` (`'G'`/`'R'`/`'J'` tile chars) and `gameplay.py`.
-3. **P2-2 (levels 6–10):** Tile data for levels 6–10 in `world/tilemap.py`; introduce branching (Marked path vs Fleshforged path levels 6–8 differ, converge at level 9). **← NEXT for build-agent**
-4. **P2-3 (Warden scripting):** Fully scripted boss intro dialogue, phase-transition visual effects, unique per-phase attack patterns, Phase 3 arena shrink via platform tiles.
+3. ~~**P2-2 (levels 6–10)**~~ ✅ **DONE (2026-04-18):** `LEVEL_6_MARKED/FLESHFORGED` through `LEVEL_10` in `tilemap.py`; `_faction_next_level()` routing in `gameplay.py`; victory flag on level 10 completion.
+4. **P2-3 (Warden scripting):** Fully scripted boss intro dialogue, phase-transition visual effects, unique per-phase attack patterns, Phase 3 arena shrink via platform tiles. **← NEXT for build-agent (after P2-0b bug fixes)**
 5. **P2-4 (Architect boss):** Final boss, four phases, faction-specific defeat dialogue.
 6. **P2-5 (upgrade system):** After boss kill, award one of three permanent stat upgrades; store in `save_data["upgrades"]`.
 7. **P2-6 (enemy drops):** `HeatCore` and `SoulShard` collectibles (extend `systems/collectible.py`) dropped based on enemy faction; faction-matched healing.
@@ -564,6 +568,59 @@ _Applied by hk-agent 2026-04-12; see `REVIEW_HK.md` for full analysis._
 - `entities/player.py`: `vx = 0` during `_windup_timer > 0` (movement lock during windup).
 - `entities/enemy.py`: Red 2-frame hit flash on enemy draw (replaces white flicker).
 - `scenes/gameplay.py`: Enemy body contact deals half-damage with directional knockback.
+
+---
+
+### Task P2-0b: Critical Bug-Fix Sprint ← ASSIGN TO BUILD-AGENT
+
+_Review-agent 2026-04-18 pass found these correctness bugs that must be fixed before P2-3 content work._
+
+**Files to touch:**
+- `entities/shield_guard.py` (BUG-005)
+- `entities/ranged.py` (BUG-006, BUG-014)
+- `entities/jumper.py` (BUG-008)
+- `entities/player.py` (BUG-009, BUG-010, BUG-015)
+- `scenes/gameplay.py` (BUG-007 / BUG-011)
+- `systems/minimap.py` (BUG-013)
+
+**Fixes required:**
+
+- **BUG-005** `shield_guard.py:34`: Change `knockback_dir == self.facing` → `knockback_dir == -self.facing`. The guard AI always faces toward the player, so knockback always points opposite to facing — the block condition was never True.
+
+- **BUG-006** `ranged.py` `Projectile`: Add `self._dist_traveled = 0` and a `max_range` (e.g. `RANGED_SIGHT_RANGE * 2`) to `Projectile.__init__`. In `update()`, increment `_dist_traveled` by `abs(vx)` each frame; set `self.alive = False` when it exceeds `max_range`.
+
+- **BUG-007 / BUG-011** `gameplay.py`: Move the dead-enemy fragment-spawn and enemy-prune block inside the `if not hitstop.is_active():` guard (or add a `_dropped = False` flag to each enemy and set it True after the first drop). Fragments must spawn at most once per kill.
+
+- **BUG-008** `jumper.py`: Clamp `_jump_timer` when entering patrol. Simplest fix: at the top of `_do_patrol_jump`, add `self._jump_timer = min(self._jump_timer, JUMPER_JUMP_COOLDOWN)` to prevent an instant jump after re-entering patrol from a long chase.
+
+- **BUG-009** `player.py:175`: After the `elif self._coyote_timer > 0` block, add `elif self.on_ground: self._coyote_timer = 0` to reset the stale coyote timer on landing.
+
+- **BUG-010** `player.py:241`: Guard the variable-jump cut with `self._jump_held`: change to `if not jump_pressed and self._jump_held and self.vy < -4: self.vy *= self._jump_cut`.
+
+- **BUG-013** `minimap.py:120`: Add `+ tilemap.shield_guard_spawns + tilemap.ranged_spawns + tilemap.jumper_spawns` to the enemy-dot loop.
+
+- **BUG-014** `ranged.py`: Before `self._do_patrol()` call, set `self._state = _PATROL`.
+
+- **BUG-015** `player.py`: Remove `_regen_resource(3)` from `_handle_attack` (on key press). Move it to `systems/combat.py` `AttackHitbox._apply_hit()`: after dealing damage, if `hasattr(self, 'owner') and hasattr(self.owner, 'faction') and self.owner.faction == FACTION_MARKED: self.owner._regen_resource(3)`. Import `FACTION_MARKED` in `combat.py`.
+
+**Acceptance criteria — done when:**
+- ShieldGuard blocks frontal hits (player hits from front → 65% reduction; from behind → full damage).
+- Projectiles disappear after traveling `RANGED_SIGHT_RANGE * 2` pixels.
+- Killing an enemy drops exactly one fragment set regardless of hitstop duration.
+- Jumper does not jump on the very first frame of patrol after a long chase.
+- Coyote timer is 0 after landing; no spurious double-jump through coyote window.
+- Knockback arcs are not dampened by the variable-jump cut.
+- Minimap shows G/R/J spawn dots.
+- Ranged enemy's `_state` reflects its actual behaviour (PATROL when not in sight).
+- Marked soul regen only triggers on hits that connect, not on missed swings.
+
+---
+
+### Task P2-2: Levels 6–10 ✅ DONE (2026-04-18)
+
+**What was built:**
+- `world/tilemap.py`: `LEVEL_6_MARKED`, `LEVEL_6_FLESHFORGED`, `LEVEL_7_MARKED`, `LEVEL_7_FLESHFORGED`, `LEVEL_8_MARKED`, `LEVEL_8_FLESHFORGED`, `LEVEL_9`, `LEVEL_10`.
+- `scenes/gameplay.py`: `_LEVEL_DATA` dict, `_faction_next_level()` helper routing levels 6–8 by faction, victory flag written to `save_data` on level 10 completion.
 
 ## Phase 3 — Story Integration
 
