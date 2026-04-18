@@ -517,11 +517,11 @@ _Applied by hk-agent 2026-04-12; see `REVIEW_HK.md` for full analysis._
 | Windup visual (dim gold glow) | ✅ Done | `entities/player.py` |
 | Damage vignette (red border on hit) | ✅ Done | `scenes/gameplay.py`, `settings.py` |
 | Touch knockback API (`take_damage(knockback_dir)`) | ✅ Done | `entities/entity.py` |
-| Heavier gravity / tighter arc (GRAVITY 0.6→0.85, JUMP_FORCE -13→-12) | ⏳ Pending | Assign to build-agent |
-| Air control reduction (speed × 0.7 when airborne) | ⏳ Pending | `entities/player.py` — assign to build-agent |
-| Movement lock during windup (`vx = 0` when `_windup_timer > 0`) | ⏳ Pending | `entities/player.py` — assign to build-agent |
-| Enemy-specific 2-frame hit flash color | ⏳ Pending | `entities/enemy.py` — assign to build-agent |
-| Caller-side `knockback_dir` in enemy touch damage | ⏳ Pending | `entities/enemy.py`, `entities/crawler.py` |
+| Heavier gravity / tighter arc (GRAVITY 0.6→0.85, JUMP_FORCE -13→-12) | ✅ Done | `settings.py` (GRAVITY=0.85, JUMP_FORCE=-12, FRICTION=0.74, TERMINAL_VELOCITY=20) |
+| Air control reduction (faction-specific: Marked 1.00, Fleshforged 0.72) | ✅ Done | `entities/player.py` (`_air_control` mult), `settings.py` |
+| Movement lock during windup (`vx = 0` when `_windup_timer > 0`) | ✅ Done | `entities/player.py` — applied in P2-1 commit |
+| Enemy-specific 2-frame hit flash color | ✅ Done | `entities/enemy.py` — red 2-frame flash in draw override |
+| Caller-side `knockback_dir` in enemy touch damage | ✅ Done | `scenes/gameplay.py` — body contact with directional knockback |
 | Particle system (landing dust, nail sparks, camera pan) | ⏳ Phase 4 | New `systems/particles.py` |
 
 ---
@@ -530,14 +530,40 @@ _Applied by hk-agent 2026-04-12; see `REVIEW_HK.md` for full analysis._
 
 **Priority order for build-agent** (tackle in this order):
 
-1. **P2-0 (tech debt unblock):** Fix Tech Debt #4 (`Enemy.get_drop_fragments()`) and Tech Debt #5 (enemy iframes) in `entities/enemy.py` + `entities/entity.py`. These will crash any playtest with enemies present.
-2. **P2-1 (enemy variety):** Add `ShieldGuard` (Enemy subclass, higher defense, blocks from front), `Ranged` (fires projectile in line of sight), `Jumper` (erratic vertical movement pattern). Each new class goes in its own file under `entities/` and must be listed in this table before creation.
-3. **P2-2 (levels 6–10):** Tile data for levels 6–10 in `world/tilemap.py`; introduce branching (Marked path vs Fleshforged path levels 6–8 differ, converge at level 9).
+1. ~~**P2-0 (tech debt unblock)**~~ ✅ **DONE (2026-04-17):** `Enemy.get_drop_fragments()` added; enemy iframes fixed via `ENEMY_IFRAMES=6` overriding `PLAYER_IFRAMES=45`.
+2. ~~**P2-1 (enemy variety)**~~ ✅ **DONE (2026-04-17):** `ShieldGuard`, `Ranged`, `Jumper` created in `entities/`; wired into `tilemap.py` (`'G'`/`'R'`/`'J'` tile chars) and `gameplay.py`.
+3. **P2-2 (levels 6–10):** Tile data for levels 6–10 in `world/tilemap.py`; introduce branching (Marked path vs Fleshforged path levels 6–8 differ, converge at level 9). **← NEXT for build-agent**
 4. **P2-3 (Warden scripting):** Fully scripted boss intro dialogue, phase-transition visual effects, unique per-phase attack patterns, Phase 3 arena shrink via platform tiles.
 5. **P2-4 (Architect boss):** Final boss, four phases, faction-specific defeat dialogue.
 6. **P2-5 (upgrade system):** After boss kill, award one of three permanent stat upgrades; store in `save_data["upgrades"]`.
 7. **P2-6 (enemy drops):** `HeatCore` and `SoulShard` collectibles (extend `systems/collectible.py`) dropped based on enemy faction; faction-matched healing.
 8. **P2-7 (environmental hazards):** Spike tiles (`'s'`), crumbling platforms (`'~'` disappears after 30 standing frames); add parsers to `TileMap` and collision handling to `physics.py`/`gameplay.py`.
+
+---
+
+### Task P2-0: Tech Debt Unblock ✅ DONE (2026-04-17)
+
+**What was built:**
+- `entities/enemy.py`: Added `get_drop_fragments()` returning a list of one `SoulFragment` at the enemy's center. Added `self._iframes_on_hit = ENEMY_IFRAMES` in `__init__`.
+- `entities/entity.py`: Exposed `_iframes_on_hit` as an overridable instance variable; `take_damage()` now uses it instead of hardcoded `PLAYER_IFRAMES`.
+- `settings.py`: Added `ENEMY_IFRAMES = 6`.
+
+---
+
+### Task P2-1: Enemy Variety ✅ DONE (2026-04-17)
+
+**What was built:**
+- `entities/shield_guard.py`: `ShieldGuard(Enemy)` — 65% frontal damage reduction; slow, high-damage melee; colored steel-gray.
+- `entities/ranged.py`: `Ranged(Enemy)` — holds distance, fires `Projectile` objects tracked per frame at range; projectiles deal `ENEMY_ATTACK_DAMAGE * 0.8`.
+- `entities/jumper.py`: `Jumper(Enemy)` — erratic hop AI, spring-coil visual during wind-up; bounces backward on attack.
+- `settings.py`: 15 new constants for the three enemy types.
+- `world/tilemap.py`: `'G'`/`'R'`/`'J'` tile chars; `shield_guard_spawns`, `ranged_spawns`, `jumper_spawns` lists in `TileMap.__init__`.
+- `scenes/gameplay.py`: Imports and spawns all three; handles ranged projectile–player collision.
+
+**HK feel improvements applied in same commit:**
+- `entities/player.py`: `vx = 0` during `_windup_timer > 0` (movement lock during windup).
+- `entities/enemy.py`: Red 2-frame hit flash on enemy draw (replaces white flicker).
+- `scenes/gameplay.py`: Enemy body contact deals half-damage with directional knockback.
 
 ## Phase 3 — Story Integration
 
@@ -569,9 +595,9 @@ _Legend: ✅ Fixed | ⚠️ Flagged / deferred | 🔴 Open_
 
 3. ✅ **`TileMap` missing attributes** — Fixed by Task P1-1. `crawler_spawns`, `checkpoints`, `boss_spawn`, `ability_orb_spawns` all initialised in `TileMap.__init__`.
 
-4. 🔴 **`Enemy.get_drop_fragments()` missing** — Still open. `gameplay.py` calls this method on every dead enemy but `entities/enemy.py` has no `get_drop_fragments()`. Will throw `AttributeError` on first enemy death. **Assign to build-agent; fix before next playtest.**
+4. ✅ **`Enemy.get_drop_fragments()` missing** — Fixed by P2-0 (2026-04-17). Method added to `entities/enemy.py`; returns a `SoulFragment` at enemy center.
 
-5. 🔴 **Entity iframes applied to enemies** — Still open. `entity.py` `take_damage()` applies `PLAYER_IFRAMES = 45` to all entities; enemies become briefly invincible after each hit. Override in `Enemy.__init__` with a shorter constant (e.g. 6 frames). **Assign to build-agent.**
+5. ✅ **Entity iframes applied to enemies** — Fixed by P2-0 (2026-04-17). `ENEMY_IFRAMES = 6` added to `settings.py`; `Entity._iframes_on_hit` is now overridable; `Enemy.__init__` sets it to `ENEMY_IFRAMES`.
 
 6. ✅ **Pause menu is not a real menu** — Fixed by Task P1-5. Full navigable pause overlay with Resume / Return to Main Menu / Settings (soon).
 
@@ -610,7 +636,10 @@ _Legend: ✅ Fixed | ⚠️ Flagged / deferred | 🔴 Open_
 | `entities/player.py` | build-agent | Ability slots done; animation draw consolidation deferred to Phase 4 |
 | `entities/enemy.py` | build-agent | Open: `get_drop_fragments()` (Tech Debt #4), iframe fix (Tech Debt #5) |
 | `entities/crawler.py` | build-agent | Created (P1-1); stable |
-| `entities/boss.py` | build-agent | Created (P1-2); Phase 2 scripted intro pending |
+| `entities/boss.py` | build-agent | Created (P1-2); Phase 2 scripted intro pending (P2-3) |
+| `entities/shield_guard.py` | build-agent | Created (P2-1); stable |
+| `entities/ranged.py` | build-agent | Created (P2-1); stable |
+| `entities/jumper.py` | build-agent | Created (P2-1); stable |
 | `systems/physics.py` | build-agent | Stable; do not change call signatures |
 | `systems/combat.py` | build-agent | Stable; hitbox logic complete |
 | `systems/dialogue.py` | build-agent | Hint text fix done (Tech Debt #8); stable |
