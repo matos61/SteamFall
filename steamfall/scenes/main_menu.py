@@ -16,7 +16,7 @@ class MainMenuScene(BaseScene):
         self.font_sub    = pygame.font.SysFont("georgia", 26)
         self.font_menu   = pygame.font.SysFont("georgia", 34)
 
-        self.options  = ["Begin", "Quit"]
+        self.options  = ["Begin", "Quit"]   # rebuilt in on_enter
         self.selected = 0
 
         # Subtle breathing animation for the title
@@ -24,6 +24,11 @@ class MainMenuScene(BaseScene):
         self._pulse_dir = 1
 
     def on_enter(self, **kwargs):
+        # Show "Continue" at top when a checkpoint save exists
+        if self.game.save_data.get("checkpoint_pos"):
+            self.options = ["Continue", "New Game", "Quit"]
+        else:
+            self.options = ["New Game", "Quit"]
         self.selected = 0
 
     # ------------------------------------------------------------------
@@ -38,7 +43,16 @@ class MainMenuScene(BaseScene):
                 self._activate()
 
     def _activate(self):
-        if self.options[self.selected] == "Begin":
+        opt = self.options[self.selected]
+        if opt == "Continue":
+            self.game.save_data["respawn"] = True
+            self.game.change_scene(
+                SCENE_GAMEPLAY,
+                level=self.game.save_data.get("checkpoint_level", "level_1"),
+            )
+        elif opt == "New Game":
+            self.game.player_faction = None
+            self.game.clear_save()
             self.game.change_scene(SCENE_FACTION_SELECT)
         else:
             self.game.running = False

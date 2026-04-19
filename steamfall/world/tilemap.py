@@ -14,7 +14,7 @@
 # =============================================================================
 
 import pygame
-from settings import TILE_SIZE, TILE_COLOR, TILE_EDGE_COLOR
+from settings import TILE_SIZE, TILE_COLOR, TILE_EDGE_COLOR, SCREEN_WIDTH, SCREEN_HEIGHT
 
 
 # ---------------------------------------------------------------------------
@@ -93,14 +93,72 @@ LEVEL_2 = [
 ]
 
 
+# ---------------------------------------------------------------------------
+# LEVEL_3 — "The Foundry": wide industrial level, multiple enemy types.
+# ---------------------------------------------------------------------------
+LEVEL_3 = [
+    "                                                                 ",
+    "                                                                 ",
+    "        ###              ###                     ###             ",
+    "                E                   E                     c      ",
+    "  ###                          #########                         ",
+    "                                                                 ",
+    "     E               ###                  E                      ",
+    "###########                                         ######       ",
+    "                 C               ###                             ",
+    "#################                           E              P     ",
+    "#################################################################",
+    "#################################################################",
+]
+
+# ---------------------------------------------------------------------------
+# LEVEL_4 — "The Ruined Spire": vertical ascent, shrinking platforms.
+# ---------------------------------------------------------------------------
+LEVEL_4 = [
+    "                     #                              ",
+    "                                                    ",
+    "              ###           ###                     ",
+    "    c                                    c          ",
+    "         ###                   ###                  ",
+    "  E                  c                        E     ",
+    "      #######              #######                  ",
+    "                                                    ",
+    "         E         C                 E              ",
+    "  ################   ################               ",
+    "                                          P         ",
+    "####################################################",
+    "####################################################",
+]
+
+# ---------------------------------------------------------------------------
+# LEVEL_5 — "The Sanctum": open boss arena. One checkpoint, one boss, no
+#            regular enemies — the Warden waits in the centre.
+# ---------------------------------------------------------------------------
+LEVEL_5 = [
+    "                                                     ",
+    "                                                     ",
+    "  ###                                          ###   ",
+    "                                                     ",
+    "                                                     ",
+    "           C                                         ",
+    "   P    ########                      ########       ",
+    "                                                     ",
+    "                        B                            ",
+    "#####################################################",
+    "#####################################################",
+]
+
+
 class TileMap:
     def __init__(self, level_data: list, level_name: str = "level_1"):
         self.level_name  = level_name
         self.tiles: list[pygame.Rect] = []   # Solid collision rects
         self.player_spawn = (100, 100)        # Default; overwritten if 'P' found
-        self.enemy_spawns: list[tuple]  = []
-        self.crawler_spawns: list[tuple] = []
-        self.checkpoints: list           = []  # Checkpoint objects
+        self.enemy_spawns:     list[tuple] = []
+        self.crawler_spawns:   list[tuple] = []
+        self.checkpoints:      list        = []
+        self.boss_spawn:       tuple       = None   # (x, y) or None
+        self.ability_orb_spawns: list[tuple] = []
 
         self._parse(level_data)
 
@@ -135,6 +193,13 @@ class TileMap:
                 elif char == 'C':
                     self.checkpoints.append(
                         Checkpoint(x, y, level=self.level_name))
+
+                elif char == 'B':
+                    self.boss_spawn = (x + TILE_SIZE // 2, y - 72)
+
+                elif char == 'A':
+                    self.ability_orb_spawns.append(
+                        (x + TILE_SIZE // 2, y - 18))
 
     # ------------------------------------------------------------------
 

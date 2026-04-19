@@ -30,6 +30,7 @@ from settings import (
     MARKED_JUMP_MULT,     MARKED_JUMP_CUT,
     FLESHFORGED_GRAVITY_MULT, FLESHFORGED_AIR_CONTROL, FLESHFORGED_FRICTION,
     FLESHFORGED_JUMP_MULT,    FLESHFORGED_JUMP_CUT,
+    ABILITY_SLOTS_DEFAULT,
 )
 
 ATTACK_DAMAGE    = 20
@@ -81,6 +82,11 @@ class Player(Entity):
         # Store constants on self so _handle_movement can read them
         self._COYOTE_FRAMES      = COYOTE_FRAMES
         self._JUMP_BUFFER_FRAMES = JUMP_BUFFER_FRAMES
+
+        # Permanent upgrade bonuses (applied from save_data by gameplay.py)
+        self.attack_bonus          = 0
+        self._upgrade_speed_mult   = 1.0
+        self.ability_slots         = ABILITY_SLOTS_DEFAULT
 
         # Death state — holds us in a death pose before switching scenes
         self.death_timer = 0
@@ -179,7 +185,7 @@ class Player(Entity):
     # ------------------------------------------------------------------
 
     def _handle_movement(self, keys) -> None:
-        speed = PLAYER_SPEED * (1.6 if self._overdrive else 1.0)
+        speed = PLAYER_SPEED * self._upgrade_speed_mult * (1.6 if self._overdrive else 1.0)
 
         # Air control: Fleshforged have reduced steering in the air (momentum).
         # Marked have full control — arcane precision.
@@ -249,7 +255,7 @@ class Player(Entity):
             self._attack_timer -= 1
             # Create hitbox while timer is active (first 2/3 of duration)
             if self._attack_timer > PLAYER_ATTACK_DURATION // 3:
-                dmg    = int(ATTACK_DAMAGE * (1.3 if self._overdrive else 1.0))
+                dmg    = int((ATTACK_DAMAGE + self.attack_bonus) * (1.3 if self._overdrive else 1.0))
                 hx     = (self.rect.right if self.facing == 1
                            else self.rect.left - ATTACK_REACH)
                 hrect  = pygame.Rect(hx, self.rect.top + 10,
@@ -273,6 +279,8 @@ class Player(Entity):
     # ------------------------------------------------------------------
 
     def _handle_ability(self, keys) -> None:
+        if self.ability_slots < 1:
+            return
         if self._ability_cooldown > 0:
             self._ability_cooldown -= 1
             return

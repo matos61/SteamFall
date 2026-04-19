@@ -53,6 +53,7 @@ class Checkpoint:
                                                       player.max_health)
         game.save_data["checkpoint_level"]        = self.level
         game.save_data["respawn"]                 = False
+        game.save_to_disk()
 
     # ------------------------------------------------------------------
 

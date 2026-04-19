@@ -117,3 +117,29 @@ CRAWLER_COLOR  = (40, 120, 80)   # Dark green
 # --- Soul Fragment collectible ---
 SOUL_FRAGMENT_COLOR = (130, 80, 220)   # Soft purple orb
 SOUL_FRAGMENT_SIZE  = 12               # Pixels square
+
+# --- Save file ---
+SAVE_FILE = "steamfall_save.json"
+
+# --- Boss ---
+BOSS_MAX_HEALTH    = 400
+BOSS_PHASE2_THRESH = 0.50
+BOSS_PHASE3_THRESH = 0.25
+BOSS_BAR_HEIGHT    = 18
+BOSS_BAR_Y         = SCREEN_HEIGHT - 38
+BOSS_BAR_MARGIN    = 80
+BOSS_ATTACK_DAMAGE = 20
+BOSS_PROJ_RANGE    = 800   # Pixels before projectile expires
+
+# --- Level transitions ---
+TRANSITION_FADE_FRAMES = 40
+TRANSITION_HOLD_FRAMES = 20
+TRANSITION_IN_FRAMES   = 30
+
+# --- Ability slots ---
+ABILITY_SLOTS_DEFAULT = 1   # Ability unlocked from the start in v0.1
+
+# --- Upgrade system (P2-5) ---
+UPGRADE_ATTACK_BONUS = 8      # Flat damage added to every melee swing
+UPGRADE_HEALTH_BONUS = 30     # Added to max health (and current health)
+UPGRADE_SPEED_BONUS  = 0.20   # Fraction increase to move speed (20%)
