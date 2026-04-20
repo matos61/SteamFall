@@ -88,6 +88,10 @@ class Player(Entity):
         # Landing dust: set > 0 on the frame the player lands
         self._land_timer = 0
 
+        # P2-5 upgrade bonuses (additive; set from gameplay.py via save_data)
+        self.attack_damage_bonus: int   = 0
+        self.max_resource_bonus: float  = 0.0
+
         # Animation state machine
         self._anim = AnimationController(color, width=30, height=54)
 
@@ -119,7 +123,8 @@ class Player(Entity):
 
     @property
     def max_resource(self) -> float:
-        return PLAYER_MAX_SOUL if self.faction == FACTION_MARKED else PLAYER_MAX_HEAT
+        base = PLAYER_MAX_SOUL if self.faction == FACTION_MARKED else PLAYER_MAX_HEAT
+        return base + self.max_resource_bonus
 
     def _spend_resource(self, amount: float) -> bool:
         """Deduct resource; return False if not enough."""
@@ -135,9 +140,9 @@ class Player(Entity):
 
     def _regen_resource(self, amount: float) -> None:
         if self.faction == FACTION_MARKED:
-            self.soul = min(self.soul + amount, PLAYER_MAX_SOUL)
+            self.soul = min(self.soul + amount, self.max_resource)
         else:
-            self.heat = min(self.heat + amount, PLAYER_MAX_HEAT)
+            self.heat = min(self.heat + amount, self.max_resource)
 
     # ------------------------------------------------------------------
     # Update
@@ -269,7 +274,7 @@ class Player(Entity):
             self._attack_timer -= 1
             # Create hitbox while timer is active (first 2/3 of duration)
             if self._attack_timer > PLAYER_ATTACK_DURATION // 3:
-                dmg    = int(ATTACK_DAMAGE * (1.3 if self._overdrive else 1.0))
+                dmg    = int((ATTACK_DAMAGE + self.attack_damage_bonus) * (1.3 if self._overdrive else 1.0))
                 hx     = (self.rect.right if self.facing == 1
                            else self.rect.left - ATTACK_REACH)
                 hrect  = pygame.Rect(hx, self.rect.top + 10,

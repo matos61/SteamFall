@@ -106,6 +106,19 @@ def _faction_next_level(current_level: str, faction: str) -> str | None:
     return _LEVEL_CHAIN.get(current_level)
 
 
+def _apply_upgrade_to_player(player, upg_id: str) -> None:
+    """Apply a single upgrade to a Player instance. Called on collection and on level load."""
+    if upg_id == "hp":
+        player.max_health            += UPGRADE_HP_BONUS
+        player.health                 = min(player.health + UPGRADE_HP_BONUS,
+                                            player.max_health)
+    elif upg_id == "dmg":
+        player.attack_damage_bonus   += UPGRADE_DMG_BONUS
+    elif upg_id == "res":
+        player.max_resource_bonus    += UPGRADE_RES_BONUS
+        player._regen_resource(UPGRADE_RES_BONUS)
+
+
 class GameplayScene(BaseScene):
     def __init__(self, game):
         super().__init__(game)
@@ -126,15 +139,22 @@ class GameplayScene(BaseScene):
 
         # Spawn player — use checkpoint position if respawning after death
         save = self.game.save_data
-        if save.get("checkpoint_pos") and save.get("respawn"):
+        _respawn = save.get("checkpoint_pos") and save.get("respawn")
+        if _respawn:
             cx, cy = save["checkpoint_pos"]
             self.player = Player(cx, cy, faction=faction)
-            self.player.health = int(
-                save.get("checkpoint_health_frac", 1.0) * self.player.max_health)
             save["respawn"] = False
         else:
             px, py = self.tilemap.player_spawn
             self.player = Player(px, py, faction=faction)
+
+        # Apply saved upgrades before setting respawn health so max_health is correct
+        for upg in save.get("upgrades", []):
+            _apply_upgrade_to_player(self.player, upg)
+
+        if _respawn:
+            self.player.health = int(
+                save.get("checkpoint_health_frac", 1.0) * self.player.max_health)
 
         # Spawn standard enemies
         self.enemies: list = []
@@ -211,6 +231,12 @@ class GameplayScene(BaseScene):
         self._architect_defeat_timer = 0   # counts frames between lines
         self._architect_victory_done = False
 
+        # --- P2-5: Upgrade selection ---
+        self._upgrade_active   = False
+        self._upgrade_pending  = False
+        self._upgrade_sel      = 0
+        self._upgrade_choices  = []   # list of (upg_id, name, description)
+
         # Fonts
         self.font_hud       = pygame.font.SysFont("monospace", 16, bold=True)
         self.font_debug     = pygame.font.SysFont("monospace", 13)
@@ -249,6 +275,17 @@ class GameplayScene(BaseScene):
         if not self._setup_done:
             return
         if event.type != pygame.KEYDOWN:
+            return
+
+        # Upgrade selection intercepts all input until a choice is made
+        if self._upgrade_active:
+            if event.key in (pygame.K_UP, pygame.K_w):
+                self._upgrade_sel = (self._upgrade_sel - 1) % len(self._upgrade_choices)
+            elif event.key in (pygame.K_DOWN, pygame.K_s):
+                self._upgrade_sel = (self._upgrade_sel + 1) % len(self._upgrade_choices)
+            elif event.key == pygame.K_RETURN:
+                upg_id = self._upgrade_choices[self._upgrade_sel][0]
+                self._confirm_upgrade(upg_id)
             return
 
         # Boss intro freezes all other input; only SPACE/RETURN advances dialogue
@@ -301,6 +338,10 @@ class GameplayScene(BaseScene):
 
         # --- Map and pause freeze game logic ---
         if self._map_open or self._paused:
+            return
+
+        # --- Upgrade selection screen freezes game logic ---
+        if self._upgrade_active:
             return
 
         # --- Boss intro: trigger then freeze while active ---
@@ -453,9 +494,10 @@ class GameplayScene(BaseScene):
                 for frag in dead_e.get_drop_fragments():
                     self.fragments.append(frag)
 
-            # If the Warden boss just died, clear that reference
+            # If the Warden boss just died, trigger upgrade selection
             if self._boss and not self._boss.alive:
                 self._boss = None
+                self._upgrade_pending = True
 
             # If the Architect just died, keep the reference for defeat dialogue
             # but remove it from the active enemy list so it stops updating.
@@ -464,6 +506,12 @@ class GameplayScene(BaseScene):
 
             # Prune dead enemies
             self.enemies = [e for e in self.enemies if e.alive]
+
+        # --- Activate upgrade selection screen after boss kill ---
+        if self._upgrade_pending:
+            self._upgrade_pending = False
+            self._setup_upgrade_choices()
+            return
 
         # --- Architect defeat dialogue advancement ---
         if self._architect and not self._architect.alive and not self._architect_victory_done:
@@ -686,6 +734,10 @@ class GameplayScene(BaseScene):
 
         # Architect defeat dialogue overlay
         self._draw_architect_defeat(surface)
+
+        # Upgrade selection overlay
+        if self._upgrade_active:
+            self._draw_upgrade_screen(surface)
 
         # Level transition overlay (topmost)
         if self._transition_phase is not None:
@@ -966,3 +1018,75 @@ class GameplayScene(BaseScene):
             lbl = self.font_trans.render(label, True, (200, 190, 140))
             surface.blit(lbl, (SCREEN_WIDTH // 2 - lbl.get_width() // 2,
                                SCREEN_HEIGHT // 2 - 20))
+
+    # ------------------------------------------------------------------
+    # P2-5: Upgrade system
+    # ------------------------------------------------------------------
+
+    def _setup_upgrade_choices(self) -> None:
+        faction   = self.game.player_faction or FACTION_MARKED
+        res_label = "Soul" if faction == FACTION_MARKED else "Heat"
+        self._upgrade_choices = [
+            ("hp",  "Heart of Iron",   f"+{UPGRADE_HP_BONUS} Max HP"),
+            ("dmg", "Sharpened Edge",  f"+{UPGRADE_DMG_BONUS} Attack Damage"),
+            ("res", "Reservoir Surge", f"+{UPGRADE_RES_BONUS} Max {res_label}"),
+        ]
+        self._upgrade_sel    = 0
+        self._upgrade_active = True
+
+    def _confirm_upgrade(self, upg_id: str) -> None:
+        upgs = self.game.save_data.setdefault("upgrades", [])
+        upgs.append(upg_id)
+        self.game.save_to_disk()
+        _apply_upgrade_to_player(self.player, upg_id)
+        self._upgrade_active = False
+
+    def _draw_upgrade_screen(self, surface: pygame.Surface) -> None:
+        overlay = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.SRCALPHA)
+        overlay.fill((0, 0, 0, 180))
+        surface.blit(overlay, (0, 0))
+
+        cx     = SCREEN_WIDTH // 2
+        faction = self.game.player_faction or FACTION_MARKED
+        accent  = MARKED_COLOR if faction == FACTION_MARKED else FLESHFORGED_COLOR
+
+        # Title
+        title = self.font_phase_ann.render("UPGRADE UNLOCKED", True, GOLD)
+        surface.blit(title, (cx - title.get_width() // 2, 160))
+
+        sub = self.font_hud.render("Choose one permanent upgrade:", True, (170, 160, 190))
+        surface.blit(sub, (cx - sub.get_width() // 2, 222))
+
+        # Option boxes
+        box_w, box_h, spacing = 400, 70, 88
+        start_y = 268
+        for i, (upg_id, name, desc) in enumerate(self._upgrade_choices):
+            bx     = cx - box_w // 2
+            by     = start_y + i * spacing
+            is_sel = (i == self._upgrade_sel)
+
+            box_surf = pygame.Surface((box_w, box_h), pygame.SRCALPHA)
+            box_surf.fill((*accent, 70) if is_sel else (20, 18, 30, 140))
+            surface.blit(box_surf, (bx, by))
+            border_color = accent if is_sel else (60, 55, 75)
+            pygame.draw.rect(surface, border_color, (bx, by, box_w, box_h),
+                             2 if is_sel else 1)
+
+            if is_sel:
+                mid_y = by + box_h // 2
+                pygame.draw.polygon(surface, GOLD, [
+                    (bx - 18, mid_y),
+                    (bx - 10, mid_y - 8),
+                    (bx - 2,  mid_y),
+                    (bx - 10, mid_y + 8),
+                ])
+
+            name_surf = self.font_pause_opt.render(name, True, WHITE if is_sel else GRAY)
+            surface.blit(name_surf, (bx + 16, by + 8))
+
+            desc_surf = self.font_debug.render(desc, True, (180, 175, 200))
+            surface.blit(desc_surf, (bx + 16, by + box_h - 22))
+
+        hint = self.font_debug.render(
+            "\u2191\u2193 Navigate   ENTER Confirm", True, (50, 50, 60))
+        surface.blit(hint, (cx - hint.get_width() // 2, SCREEN_HEIGHT - 38))

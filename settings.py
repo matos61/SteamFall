@@ -201,3 +201,8 @@ ARCHITECT_PHASE4_THRESH = 0.25   # 25% HP — adds Crawler spawns
 ARCHITECT_TELEPORT_CD   = 200    # frames between teleports
 ARCHITECT_FAN_CD        = 90     # frames between fan spread shots
 ARCHITECT_MINION_CD     = 300    # frames between Crawler spawns
+
+# --- P2-5: Upgrade system ---
+UPGRADE_HP_BONUS   = 25    # Max HP increase per upgrade selection
+UPGRADE_DMG_BONUS  = 5     # Attack damage bonus per upgrade selection
+UPGRADE_RES_BONUS  = 20    # Max resource increase per upgrade selection
