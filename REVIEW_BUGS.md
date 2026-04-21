@@ -224,3 +224,159 @@ All other .py files reviewed for:
 
 No blocking issues found.
 
+---
+
+# Bug Review — 2026-04-21
+
+**Scope:** New code added for P2-3 (Warden scripting), P2-4 (Architect boss), and P2-5 (upgrade system). All .py files read before writing this section. The prior review pass (2026-04-18) confirmed BUG-001 through BUG-016 resolved; this pass starts at BUG-018.
+
+---
+
+## New Bugs
+
+---
+
+### BUG-018: Player can select an upgrade while dead — upgrade screen stalls death sequence indefinitely
+
+- **File:** `scenes/gameplay.py`, lines 504–534 and 585–576
+- **Problem:** If the player and the Warden boss die on the same frame (player health reaches 0 via the boss's last hit just as the boss's own health reaches 0), the following sequence occurs:
+  1. Line 508: `if not hitstop.is_active()` — True.
+  2. Line 518–520: `self._boss.alive` is False → `self._upgrade_pending = True`.
+  3. Line 531–534: `_setup_upgrade_choices()` sets `self._upgrade_active = True` and `return`s.
+  4. On all subsequent frames, the `_upgrade_active` guard at line 348 (`if self._upgrade_active: return`) exits update before the player-death block at line 586 can run.
+  5. `self._death_timer` never increments. The upgrade screen is displayed to a dead player indefinitely. The only escape is pressing ENTER to confirm an upgrade, after which the death sequence resumes on the next frame.
+  - The upgrade should not be offered to a dead player. Confirming it applies a permanent bonus to a run that has already ended, which is an unintended reward for dying simultaneously with the boss.
+- **Fix:** In `_setup_upgrade_choices()` (line 1026), or at the call site (line 533), add a guard: `if not self.player.alive: return` (skip the upgrade screen if the player is already dead). Alternatively, check `self.player.alive` before setting `_upgrade_pending = True` at line 518.
+
+---
+
+### BUG-019: `P1-8` ability-slots feature entirely absent from live `entities/player.py` and `scenes/gameplay.py` — ability is always unlocked regardless of save state
+
+- **Files:** `entities/player.py` (all lines); `scenes/gameplay.py` (all lines)
+- **Problem:** ROADMAP Task P1-8 specifies:
+  - `Player.__init__` must initialise `self.ability_slots = ABILITY_SLOTS_DEFAULT` (= 0).
+  - `Player._handle_ability()` must guard with `if self.ability_slots < 1: return`.
+  - `gameplay.py` `on_enter()` must restore `player.ability_slots` from `save_data.get("ability_slots", ABILITY_SLOTS_DEFAULT)`.
+  - `_draw_hud()` must show "LOCKED" when `ability_slots == 0`.
+  - None of these are present in the live files under `/home/user/SteamFall/`. The `_handle_ability()` method at `player.py:297` has no `ability_slots` check. `on_enter()` at `gameplay.py:129` never sets `player.ability_slots`. `_draw_hud()` never shows "LOCKED".
+  - As a result, the ability (Soul Surge / Overdrive) is always available from the start of the game, regardless of whether the player has collected an `AbilityOrb`. The `AbilityOrb.collect()` method in `collectible.py` uses `getattr(player, "ability_slots", 0)` defensively (no crash), but it never actually gates anything. Additionally, `TileMap._parse()` has no handler for the `'A'` tile character, so `ability_orb_spawns` is always empty even if `'A'` tiles were placed in a level.
+- **Fix:** Three changes needed:
+  1. `entities/player.py:__init__`: add `self.ability_slots: int = ABILITY_SLOTS_DEFAULT` and import `ABILITY_SLOTS_DEFAULT` from settings; add `if self.ability_slots < 1: return` at the top of `_handle_ability()`.
+  2. `scenes/gameplay.py:on_enter()`: after creating the player, add `self.player.ability_slots = save.get("ability_slots", ABILITY_SLOTS_DEFAULT)`.
+  3. `world/tilemap.py`: add `self.ability_orb_spawns: list = []` to `__init__` and an `'A'` handler in `_parse()` to populate it; also spawn `AbilityOrb` objects in `gameplay.py:on_enter()` from `tilemap.ability_orb_spawns`.
+
+---
+
+### BUG-020: Architect teleport uses `SCREEN_WIDTH` as the arena bound instead of the level's playable width — Architect can never teleport into the right half of wide levels
+
+- **File:** `entities/architect.py`, lines 133–137
+- **Problem:**
+  ```python
+  arena_min = TILE_SIZE * 4
+  arena_max = SCREEN_WIDTH - TILE_SIZE * 4   # = 1280 - 128 = 1152
+  self.rect.centerx = random.randint(arena_min, arena_max)
+  ```
+  `LEVEL_10` has 65 columns × 32 px = 2080 px wide. The Architect is placed at tile column ~44 (char `'X'` at `row 10, col 44` in `LEVEL_10`), which is world x ≈ 1408 — beyond `arena_max` of 1152. As soon as the Architect enters phase 2 it will teleport into the visible screen window (x 128–1152), potentially far from its arena spawn position. More importantly, the right ~928 px of the level (x 1152–2080) is never a valid teleport destination, making the teleport heavily asymmetric and breaking level design intent. The bound should reference the level width, not the screen width.
+- **Fix:** Pass the tilemap width to `Architect` (e.g., via a `level_width` constructor parameter defaulting to `SCREEN_WIDTH`) and use it in `_update_ai`: `arena_max = self._level_width - TILE_SIZE * 4`. `gameplay.py` would set `arch = Architect(ax, ay, faction=_faction, level_width=self.tilemap.width)`.
+
+---
+
+### BUG-021: Architect phase transitions never trigger the phase-announce banner or arena-shrink effect — `announce_phase` signal is only consumed for the Warden (`self._boss`)
+
+- **File:** `scenes/gameplay.py`, lines 471–485
+- **Problem:** The phase-announce and arena-shrink logic reads `self._boss.announce_phase` (line 471). Both `Boss` and `Architect` (which inherits from `Boss`) set `self.announce_phase` on phase entry (via `_on_phase2_enter`/`_on_phase3_enter` inherited from `Boss`). However, `self._architect` is a separate reference and its `announce_phase` is never checked. The Architect transitions through four phases but the player sees no phase banner and no arena walls close in when the Architect changes phase. If the Warden is not present in the same level (and LEVEL_10 has no `'B'` tile), `self._boss` is `None` and the entire block is skipped.
+  - Additionally, the arena-shrink effect references `self._boss` hard-coded as the phase-3 signal source — but the Warden boss fight (LEVEL_5/8) and the Architect (LEVEL_10) are in different levels and can never coexist. The shrink was intended for the Architect's phase 4, not the Warden.
+- **Fix:** After the Warden announce block (lines 471–485), add a parallel block for the Architect:
+  ```python
+  if self._architect and self._architect.alive and self._architect.announce_phase:
+      phase = self._architect.announce_phase
+      self._architect.announce_phase = 0
+      # … same label/banner logic …
+      if phase == 4:
+          self._shrink_active = True
+          # … same shrink init …
+  ```
+
+---
+
+### BUG-022: `_tick_boss_intro` increments `active_boss._intro_line_idx` independently of the `DialogueBox` — the two timers run in lock-step but serve the same data, causing the banner to advance one line ahead of the dialogue box
+
+- **File:** `scenes/gameplay.py`, lines 604–628; `entities/boss.py`, lines 46–54
+- **Problem:** The `_tick_boss_intro` method maintains two parallel timers:
+  1. The `DialogueBox` (`self._boss_dialogue`) advances when the player presses SPACE/RETURN via `advance()` (called from `handle_event`, line 295).
+  2. The entity's `_intro_line_timer` / `_intro_line_idx` are incremented unconditionally every 120 frames on line 614–618.
+  The banner (`_draw_boss_intro`) renders `active_boss._intro_lines[line_idx]` (the raw string array on the entity), while the dialogue box renders `_WARDEN_INTRO_LINES` (the `(speaker, text)` tuple list). The banner advances on a 120-frame timer regardless of whether the player has dismissed the dialogue box. If the player reads slowly (does not press SPACE for > 120 frames), the banner advances to line N+1 while the dialogue box still shows line N. If the player presses SPACE quickly, the dialogue box can be on line N+3 while the banner is still on line 0. The two displays are desynchronised.
+  - For the Warden, the Warden's `_intro_lines` (3 lines) and `_WARDEN_INTRO_LINES` (6 tuples) have different lengths, so the banner will show index out-of-bounds territory if the dialogue outlasts the banner lines (guarded at line 952 `if line_idx >= len(lines): return`, so no crash, but the banner disappears while dialogue continues).
+- **Fix:** Drive the banner display directly from the `DialogueBox._index` rather than a separate entity-level counter. Replace the `active_boss._intro_line_idx` increment in `_tick_boss_intro` with a read from `self._boss_dialogue._index`. The entity-level timer fields are then only needed as fallback for non-`DialogueBox` contexts and can be removed or made private.
+
+---
+
+### BUG-023: `_apply_upgrade_to_player` applies HP upgrade additively on every `on_enter` call — multiple level loads with the same save will stack the HP bonus repeatedly
+
+- **File:** `scenes/gameplay.py`, lines 109–119 and 151–153
+- **Problem:** In `on_enter()`:
+  ```python
+  for upg in save.get("upgrades", []):
+      _apply_upgrade_to_player(self.player, upg)
+  ```
+  `_apply_upgrade_to_player` does `player.max_health += UPGRADE_HP_BONUS` for each `"hp"` entry. The player is freshly constructed each `on_enter` with `max_health = PLAYER_MAX_HEALTH` (100), so a single HP upgrade entry correctly yields `max_health = 125`. However, if the player selects "hp" upgrade multiple times across boss kills (only one Warden exists per run, but if the save somehow has multiple `"hp"` entries or if the loop is called multiple times), the bonus stacks correctly — this is actually intended cumulative design.
+  - **The real issue** is with `"res"` upgrades. `_apply_upgrade_to_player` for `"res"` calls `player._regen_resource(UPGRADE_RES_BONUS)` (line 119) in addition to increasing `max_resource_bonus`. On every `on_enter` load, `_regen_resource` is called for each saved `"res"` entry, refilling the resource bar (up to the new max). This is a benign side effect — the player respawns with slightly more resource than they had at the checkpoint. It's not a crash, but it is inconsistent with how HP is handled (HP is clamped to `checkpoint_health_frac`, but resource is always partially or fully refilled by the upgrade reapplication). The resource value should be restored from a saved fraction, not regenerated.
+- **Fix:** In `_apply_upgrade_to_player`, for the `"res"` case, remove the `_regen_resource(UPGRADE_RES_BONUS)` call (line 119). Resource restoration should be handled separately, like health is, using a saved fraction. Or, accept the mild refill as a quality-of-life bonus and document it as intentional.
+
+---
+
+### BUG-024: `AbilityOrb.collect()` has no double-collect guard — `alive` is set False inside the method but the caller in `gameplay.py` does not check `alive` before calling
+
+- **File:** `systems/collectible.py`, lines 205–210
+- **Problem:** `AbilityOrb.collect()` sets `self.alive = False` at line 208, but it does so unconditionally after modifying `player.ability_slots` and writing to `game.save_data`. If `collect()` were somehow called twice (e.g., if a future code path does not prune collected orbs before the next frame's collision check), the following would happen:
+  - `player.ability_slots` would be incremented again, but is clamped at `ABILITY_SLOTS_MAX` by `min(...)` — so the value stays correct.
+  - `game.save_data["ability_slots"]` would be set to the same clamped value — also harmless.
+  - `game.save_to_disk()` would be called an extra time — minor I/O waste.
+  - Currently `gameplay.py` does not spawn `AbilityOrb` objects at all (see BUG-019), so this cannot trigger. But when BUG-019 is fixed, the standard pattern should be: check `if not self.alive: return` at the start of `collect()`.
+- **Fix:** Add `if not self.alive: return` as the first line of `AbilityOrb.collect()` (before line 206).
+
+---
+
+### BUG-025: Arena shrink left-wall condition skips the right wall when `_shrink_left_x == 0.0` — right wall is never injected into solid rects on the first frame of phase 3
+
+- **File:** `scenes/gameplay.py`, lines 397–403
+- **Problem:**
+  ```python
+  if self._shrink_active and self._shrink_left_x > 0:
+      solid = list(solid) + [
+          pygame.Rect(0, 0, int(self._shrink_left_x), self.tilemap.height),
+          pygame.Rect(int(self._shrink_right_x), 0, ...),
+      ]
+  ```
+  On the first frame that phase 3 fires (`_shrink_active` is set True and both targets are initialised), `_shrink_left_x` is still `0.0` (it starts at 0 and advances by `ARENA_SHRINK_SPEED = 0.5` per frame). The condition `self._shrink_left_x > 0` is therefore False on frame 1. The right-wall rect is not added to `solid` until `_shrink_left_x > 0` (frame 2). This is a single-frame window where the right shrink wall is not solid, but since `_shrink_right_x` starts at `tilemap.width` and the right wall has zero effective width (target is `tilemap.width - ARENA_SHRINK_AMOUNT`), there is no entity to collide with on frame 1 anyway. However, the logic coupling the left-wall progress to both walls' injection is fragile and confusing. The right wall check should be independent.
+- **Fix:** Separate the condition: add the left wall rect only when `self._shrink_left_x > 0`, and add the right wall rect only when `self._shrink_right_x < self.tilemap.width`. Or simplify by always adding both (pygame does not penalise zero-width or zero-effective rects in collision checks since they will simply never collide).
+
+---
+
+## Flags (not crashes, but worth tracking)
+
+---
+
+### FLAG-007: `Architect._on_defeat` sets `self.alive = False` redundantly — `Entity.die()` already sets it
+
+- **File:** `entities/architect.py`, lines 173–179
+- **Problem:** `Architect.die()` calls `super().die()` (which sets `self.alive = False` via `Entity.die()`) and then calls `self._on_defeat()`. Inside `_on_defeat()`, line 178 sets `self.alive = False` again. This is redundant but harmless.
+- **Why not a crash:** Double-assignment of False. No observable effect.
+- **Suggestion:** Remove line 178 (`self.alive = False`) from `_on_defeat()` since `super().die()` already handles it.
+
+---
+
+### FLAG-008: `_draw_hud` divides `player.resource / player.max_resource` without guarding `max_resource > 0`
+
+- **File:** `scenes/gameplay.py`, line 760
+- **Problem:** `fill=self.player.resource / self.player.max_resource`. The `max_resource` property returns `base + self.max_resource_bonus`. `base` is `PLAYER_MAX_SOUL = 100` or `PLAYER_MAX_HEAT = 100` — both non-zero constants. `max_resource_bonus` starts at `0.0` and only increases. So `max_resource` can never be 0 in practice. Flagged as a fragile pattern consistent with FLAG-002 and FLAG-005.
+- **Why not fixed:** Non-zero by design.
+
+---
+
+### FLAG-009: Minimap `_LEVEL_ORDER` only covers levels 1–5, not the faction branches or levels 9–10 — players on levels 6–10 see their current room highlighted but outside the room-chain strip entirely
+
+- **File:** `systems/minimap.py`, lines 14–21 and 68–90
+- **Problem:** `_LEVEL_ORDER = ["level_1", ..., "level_5"]`. When `current_level_name` is `"level_6_marked"` or `"level_9"`, no rectangle in the chain matches, so none is highlighted with `MARKED_COLOR`. The player's current room appears unvisited-gray (or not in the chain at all). The `_LEVEL_LABELS` dict also lacks keys for levels 6–10, which would cause a `KeyError` at line 81 (`_LEVEL_LABELS[lname]`) if these levels were added to `_LEVEL_ORDER`.
+- **Suggestion:** Extend `_LEVEL_ORDER` to include all 13 level keys and add corresponding `_LEVEL_LABELS` entries. Lay them out in two rows (1–5 top, 6–10 bottom) or abbreviate the display names to fit the panel width.
+
