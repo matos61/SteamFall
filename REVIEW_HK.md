@@ -358,3 +358,82 @@ JUMPER_KNOCKBACK_Y_AERIAL  =  2.0   # NEW — downward spike when Jumper attacks
 | Touch knockback in projectiles | Gap | gameplay.py collision path may skip knockback_dir | Audit projectile-player collision handler |
 | ShieldGuard knockback_y | Minor | -2.0 is weak for a bulk enemy | Raise to -3.5; extract to `SHIELD_GUARD_KNOCKBACK_Y` |
 | Jumper aerial spike | Minor | Same knockback_y regardless of attack angle | Add `JUMPER_KNOCKBACK_Y_AERIAL = 2.0` for above-player attacks |
+
+---
+
+# HK Feel Review — Phase 2 Content (2026-04-21)
+
+_Focus: Architect boss (P2-4), upgrade balance (P2-5), LEVEL_9/10 arenas, Soul Surge / Overdrive feel, and drop rewards (P2-6)._
+
+---
+
+## 1. Architect Boss (P2-4) — 4-Phase Climax Feel
+
+The 4-phase escalation is structurally sound: colour shifts (deep violet → blood-red), a phase-4 rage flash (`_rage_flash_timer = 30`), and cumulative ability stacking all reinforce the sense of a boss deteriorating under pressure. However, the teleport telegraph is weak. `_teleport_cd = ARCHITECT_TELEPORT_CD` (200 frames, `settings.py` line 201) counts down between teleports, but the only pre-teleport signal is `_rage_flash_timer = 15` — a 15-frame red tint that is already in heavy use for phase transitions and is not visually distinct from ongoing combat noise. In HK, teleports are preceded by a dedicated 20-30 frame dissolve animation that is visually unambiguous. Recommend adding a dedicated `_teleport_wind_timer` constant — suggested `ARCHITECT_TELEPORT_WARN = 20` — during which the Architect is locked in place and a distinct colour pulse fires, before the actual position jump. Additionally `ARCHITECT_TELEPORT_CD = 200` is generous (~3.3 s at 60 FPS): reducing to `140` would increase urgency at phase 2 without overwhelming the player alongside the fan spread that activates at phase 3. The Crawler minion spawns at `ARCHITECT_MINION_CD = 300` (5 s) are infrequent enough that they risk feeling like background noise rather than genuine pressure; reducing to `210` and capping simultaneous live Crawlers at 2 would create threat without cluttering the arena.
+
+```python
+# settings.py — recommended changes
+ARCHITECT_TELEPORT_CD   = 140   # was 200 — tighter cadence once phase 2 starts
+ARCHITECT_TELEPORT_WARN = 20    # NEW — dedicated pre-teleport warning frames (lock + distinct flash)
+ARCHITECT_MINION_CD     = 210   # was 300 — more frequent spawns create real pressure
+```
+
+---
+
+## 2. Upgrade Balance (P2-5)
+
+At player base HP of `PLAYER_MAX_HEALTH = 100`, `UPGRADE_HP_BONUS = 25` is a 25% increase per selection — meaningful at every stage. Against the Architect (`ARCHITECT_MAX_HEALTH = 600`), the player is expected to take multiple hits, so extra HP has high practical value. `UPGRADE_DMG_BONUS = 5` is the least impactful: player base `ATTACK_DAMAGE` is 20 (hardcoded in `player.py` line 35), so +5 is a 25% damage increase per upgrade, which sounds comparable to HP — but because damage is applied per swing and the player can swing multiple times per encounter, the actual time-to-kill improvement compounds, making DMG upgrades quietly stronger than HP in skilled hands. `UPGRADE_RES_BONUS = 20` against `PLAYER_MAX_SOUL / PLAYER_MAX_HEAT` needs calibration context; without the base value visible in this block, the ratio is opaque. The core imbalance is that DMG bonus is additive with Overdrive's 1.3× multiplier (`player.py` line 277), meaning at 2 DMG upgrades the player deals `(20+10)*1.3 = 39` — nearly doubling base damage in Overdrive. This compounds sharply and should be capped or made multiplicative before factoring Overdrive. Recommend raising `UPGRADE_DMG_BONUS` slightly to 6 for feel while making it pre-Overdrive only (apply bonus to base before the multiplier, which it already does — keep that), and consider adding a constant `UPGRADE_DMG_MAX_STACKS = 3` to limit runaway scaling.
+
+```python
+# settings.py — recommended changes
+UPGRADE_DMG_BONUS  = 6          # was 5 — marginally more noticeable per swing
+UPGRADE_HP_BONUS   = 25         # keep — 25% base HP per selection is well-calibrated
+UPGRADE_RES_BONUS  = 20         # keep pending base-resource audit; add UPGRADE_RES_MAX_STACKS = 3
+```
+
+---
+
+## 3. LEVEL_9 and LEVEL_10 Arena Layout
+
+LEVEL_9 ("The Convergence") is well-constructed for a gauntlet: three distinct platform strata, scattered enemies across types (`G`, `J`, `c`, `C`, `R`), and a floor-level checkpoint `P` at the far right. The `################` mid-left platform on row 10 creates a natural defensive high ground, and enemy placement is offset so no single attack covers multiple threats. LEVEL_10 ("The Final Approach") opens cleanly with only a few weak enemies before the Architect (`X`) spawns at row 10, column 45. The bottom two rows of solid floor give stable footing, and the absence of mid-arena platforms is good design for a dash/teleport boss — the Architect can freely move horizontally. However there is a potential issue: the `#########` platforms at rows 6 (cols 6–14) and (cols 49–57) are each 9-tile wide ledges with no gaps. The Architect's fan spread fires 5 projectiles at `vy_offset` values of `-6, -3, 0, +3, +6` (`architect.py` line 155) — the uppermost two shots at `vy = -6` and `vy = -3` will arc upward steeply enough to clear any enemy standing on these ledges and hit a player hiding behind them. This is the intended design and works correctly. The only platform concern is the `################` platform at row 9 (cols 3–18): it sits one row above the floor and extends 16 tiles, which is long enough that the Architect's teleport destination range (`arena_min = TILE_SIZE*4` to `arena_max = SCREEN_WIDTH - TILE_SIZE*4`) may occasionally drop the Architect on top of this platform rather than floor level, since `rect.centerx` is repositioned but `rect.y` is unchanged during the teleport (`architect.py` line 135–137). Recommend verifying that this platform does not exist in the final LEVEL_10 layout or that the teleport logic clamps the Architect to floor Y after the position change.
+
+---
+
+## 4. Soul Surge / Overdrive Feel
+
+Soul Surge fires four `80×80` px hitboxes (`player.py` line 318) centered 20 px offset from the player in each cardinal direction, each dealing 35 damage with a 12-frame duration. The AOE size of 80 px is generous — approximately 2.7 tiles — and will reliably catch the Architect at close range. The 35 damage against Architect's 600 HP represents a 5.8% chunk per activation, which is noticeable but not game-breaking. The `_ability_cooldown = 90` (1.5 s) is responsive enough to fire multiple times per phase. Overdrive gives 3 seconds (`_ability_timer = 180`) of `speed * 1.6` and `damage * 1.3` with `_ability_cooldown = 240` (4 s between uses). The 3 s duration feels rewarding — long enough to land 4–5 attacks and notice the speed boost. `UPGRADE_RES_BONUS = 20` only increases the maximum resource pool, not the regen rate (passive regen is `0.05/frame` regardless of pool size — `player.py` line 192). This means a larger pool provides more stored uses rather than faster recharge, which is the correct tradeoff for a capstone ability. The practical effect is approximately 1 additional Overdrive activation per full pool if bonus pushes the max above `ABILITY_COST * N` thresholds. This is low-key but meaningful; to make it feel more rewarding, consider adding `UPGRADE_RES_REGEN_BONUS = 0.008` (applied additively per upgrade to the 0.05 base regen) so resource upgrades visibly speed up the refill bar.
+
+```python
+# settings.py — recommended addition
+UPGRADE_RES_REGEN_BONUS = 0.008   # NEW — per-upgrade passive regen boost; +0.008/frame per stack
+```
+
+---
+
+## 5. Drop Rewards (P2-6)
+
+`HEAT_CORE_HEAL = 8` and `SOUL_SHARD_HEAL = 8` both heal 8 HP against a player pool of 100–125 HP (base + up to 3 HP upgrades at `UPGRADE_HP_BONUS = 25` = 175 max, but realistically 100–125 at standard play). An 8 HP heal is 6.4–8% of base HP — equivalent to a Soul Vessel in HK restoring roughly 11% per mask depending on max masks. This ratio is slightly below HK's floor but within acceptable range for a drop that can come from standard enemies. The more material issue is perception: 8 HP against the Architect's melee damage of `ENEMY_ATTACK_DAMAGE` (sourced from `settings.py`) may represent only 1–2 hits of buffer. If `ENEMY_ATTACK_DAMAGE` is in the 18–20 range (as implied by boss projectile damage being `ENEMY_ATTACK_DAMAGE * 0.8` per `boss.py` line 234), 8 HP is less than half a hit — too small to feel impactful as a mid-boss-fight pickup. Recommend raising both heals to 12 HP for faction drops, which sits at ~10% of base HP and matches HK's single-mask restoration. The Architect's boss drop of 3 `SoulFragment`s (spaced at `cx-20`, `cx`, `cx+20` — `boss.py` lines 251–255) is a solid reward moment. Three fragments spread across 40 px will be clearly visible and collectible without overlapping. The narrative weight of the drop is appropriate for a final boss. No change needed to the fragment count, but consider separating them more (`cx-40`, `cx`, `cx+40`) so they do not stack under the Architect corpse.
+
+```python
+# settings.py — recommended changes
+HEAT_CORE_HEAL  = 12   # was 8 — ~10% base HP; feels impactful against boss-level damage
+SOUL_SHARD_HEAL = 12   # was 8 — match Marked/Fleshforged heal parity
+```
+
+---
+
+## Summary Table (2026-04-21)
+
+| Topic | Status | Key Issue | Recommended Change |
+|---|---|---|---|
+| Architect teleport telegraph | Gap | 15-frame rage flash reuses existing effect — not readable as a teleport warn | Add `ARCHITECT_TELEPORT_WARN = 20`; lock Architect and fire distinct pulse pre-teleport |
+| Architect teleport cadence | Gap | `ARCHITECT_TELEPORT_CD = 200` is too slow at phase 2 | Reduce to `140` |
+| Crawler minion spawns | Gap | `ARCHITECT_MINION_CD = 300` — too infrequent, feel like noise | Reduce to `210`; cap simultaneous live Crawlers at 2 |
+| Upgrade balance — DMG | Minor | `UPGRADE_DMG_BONUS = 5` compounds with 1.3× Overdrive; runaway at 2+ stacks | Raise to `6`; add `UPGRADE_DMG_MAX_STACKS = 3` cap |
+| Upgrade balance — RES | Minor | `UPGRADE_RES_BONUS = 20` only widens pool, not regen | Add `UPGRADE_RES_REGEN_BONUS = 0.008` per stack |
+| LEVEL_10 Architect teleport Y | Gap | Teleport repositions only `centerx`; long platform at row 9 may catch Architect mid-platform | Verify no platform at row 9 cols 3–18 or clamp teleport to floor Y |
+| Soul Surge AOE | Good | 80×80 px, 35 dmg, 12-frame duration — well-calibrated | No change |
+| Overdrive duration | Good | 180 frames (3 s), 1.3× speed+dmg — rewarding and fair | No change |
+| Resource upgrade feel | Minor | Pool increase alone feels passive | Add per-upgrade regen bonus constant |
+| Faction heal drops | Gap | 8 HP heal is less than half a hit of boss damage — not impactful | Raise `HEAT_CORE_HEAL` and `SOUL_SHARD_HEAL` to `12` |
+| Boss SoulFragment drop | Good | 3 fragments, spread 40 px — clear reward moment | Consider widening spread to 80 px (`cx±40`) to avoid stacking |
