@@ -10,7 +10,8 @@ from entities.enemy import Enemy
 from settings import (RANGED_HP, RANGED_SPEED, RANGED_DAMAGE, RANGED_PROJ_SPEED,
                       RANGED_ATTACK_COOLDOWN, RANGED_SIGHT_RANGE, RANGED_COLOR,
                       RANGED_PREFERRED_DIST,
-                      ENEMY_IFRAMES, TILE_SIZE)
+                      ENEMY_IFRAMES, TILE_SIZE,
+                      FACTION_FLESHFORGED)
 
 _PATROL    = "patrol"
 _RETREAT   = "retreat"   # Back away to maintain preferred firing distance
@@ -62,6 +63,7 @@ class Ranged(Enemy):
         self.rect.height     = 46
         self._iframes_on_hit = ENEMY_IFRAMES
         self.projectiles: list[Projectile] = []
+        self.faction_drop    = FACTION_FLESHFORGED   # drops HeatCore on death
 
     # ------------------------------------------------------------------
 

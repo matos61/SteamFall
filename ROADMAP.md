@@ -540,8 +540,8 @@ _Applied by hk-agent 2026-04-12; see `REVIEW_HK.md` for full analysis._
 4. ~~**P2-2b (HK feel sprint)**~~ ✅ **DONE (2026-04-18):** All 13 constants in place; ShieldGuard full block + patrol-facing fix; Ranged arc projectile; Jumper burst pattern + aerial knockback.
 5. ~~**P2-3 (Warden scripting)**~~ ✅ **DONE (2026-04-18):** 3-beat Warden intro dialogue; phase-differentiated rage flash (orange/red); BOSS_PROJ_SPREAD_VY; BUG-016 fixed. Prior commits had already implemented dash, arena shrink, and projectile spread.
 6. ~~**P2-4 (Architect boss)**~~ ✅ **DONE (2026-04-18):** `entities/architect.py` created; 4-phase AI (teleport/fan/minions); faction-specific intro + defeat dialogue; 'X' tile in LEVEL_10; victory write to save_data.
-7. **P2-5 (upgrade system):** After boss kill, award one of three permanent stat upgrades; store in `save_data["upgrades"]`. **← NEXT for build-agent**
-8. **P2-6 (enemy drops):** `HeatCore` and `SoulShard` collectibles (extend `systems/collectible.py`) dropped based on enemy faction; faction-matched healing.
+7. ~~**P2-5 (upgrade system)**~~ ✅ **DONE (2026-04-21):** Upgrade screen on Warden kill; three choices (HP/DMG/RES); stored in `save_data["upgrades"]`; reapplied on level load.
+8. **P2-6 (enemy drops):** `HeatCore` and `SoulShard` collectibles (extend `systems/collectible.py`) dropped based on enemy faction; faction-matched healing. **← NEXT for build-agent**
 9. **P2-7 (environmental hazards):** Spike tiles (`'s'`), crumbling platforms (`'~'` disappears after 30 standing frames); add parsers to `TileMap` and collision handling to `physics.py`/`gameplay.py`.
 
 ---
@@ -699,6 +699,118 @@ JUMPER_KNOCKBACK_Y_AERIAL  =  2.0   # NEW — downward spike when Jumper attacks
 - Ranged projectiles use `RANGED_PREFERRED_DIST` (not the hardcode 220).
 - Jumper fires 2 hops in quick succession then pauses ~1.17 s before bursting again.
 - Jumper aerial attack sends player downward; ground attack sends player upward.
+- `python main.py` launches without ImportError.
+
+---
+
+### Task P2-5: Upgrade System ✅ DONE (2026-04-21)
+
+**What was built:**
+- `settings.py`: `UPGRADE_HP_BONUS = 25`, `UPGRADE_DMG_BONUS = 5`, `UPGRADE_RES_BONUS = 20`.
+- `entities/player.py`: `attack_damage_bonus: int = 0` and `max_resource_bonus: float = 0.0` additive fields; applied in `_handle_attack` damage calc and `max_resource` property.
+- `scenes/gameplay.py`: `_apply_upgrade_to_player()` helper; `_setup_upgrade_choices()` / `_confirm_upgrade()` / `_draw_upgrade_screen()` methods; upgrade triggered on Warden (`_boss`) death; saved upgrades reapplied on `on_enter()`; upgrade screen intercepts all input until dismissed.
+
+---
+
+### Task P2-6: Enemy Drops
+
+**Files to touch:**
+- `systems/collectible.py` (add `HeatCore` and `SoulShard` classes)
+- `entities/enemy.py` (update `get_drop_fragments()` to return faction-appropriate drop)
+- `entities/boss.py` (override drop to return 3 fragments)
+- `scenes/gameplay.py` (handle pickup collision + apply faction heal)
+- `settings.py` (add drop constants)
+
+**What to build:**
+
+`settings.py`:
+```python
+HEAT_CORE_SIZE       = 10      # px square
+HEAT_CORE_HEAL       = 8       # HP healed when picked up by Fleshforged
+HEAT_CORE_COLOR      = (220, 100, 20)   # Burnt orange
+SOUL_SHARD_SIZE      = 10
+SOUL_SHARD_HEAL      = 8       # HP healed when picked up by Marked
+SOUL_SHARD_COLOR     = (130, 80, 220)   # Soft purple (matches SOUL_FRAGMENT_COLOR)
+DROP_BOB_SPEED       = 0.08    # radians/frame for bobbing sinusoid
+DROP_BOB_AMP         = 3       # pixel amplitude of bob
+```
+
+`systems/collectible.py` — add two new classes after `SoulFragment`:
+
+`HeatCore(x, y)`: bright orange spinning diamond collectible.
+- `rect` (10×10 px, centered on x, y), `alive=True`, `_bob=0`.
+- `update()`: `_bob += DROP_BOB_SPEED`; shift `rect.y` by `sin(_bob) * DROP_BOB_AMP`.
+- `draw(surface, camera)`: draw a small diamond using `HEAT_CORE_COLOR`.
+- `collect(player, game)`: if `player.faction == FACTION_FLESHFORGED`, call `player.heal(HEAT_CORE_HEAL)`; always set `alive = False`.
+
+`SoulShard(x, y)`: soft purple diamond collectible.
+- Same structure as `HeatCore` but uses `SOUL_SHARD_COLOR` and heals Marked players (`SOUL_SHARD_HEAL`).
+
+`entities/enemy.py` — update `get_drop_fragments()`:
+- Rename to still return `SoulFragment` by default (backward-compatible), but also check `self.faction_drop` attribute.
+- Add `self.faction_drop: str = ""` in `Enemy.__init__` (empty string = neutral drop).
+- If `faction_drop == FACTION_FLESHFORGED`: return one `HeatCore` at center.
+- If `faction_drop == FACTION_MARKED`: return one `SoulShard` at center.
+- Else (neutral): return one `SoulFragment` at center (existing behavior).
+- ShieldGuard and Ranged are Fleshforged-flavored → set `faction_drop = FACTION_FLESHFORGED` in their `__init__`.
+- Jumper and Crawler are Marked-flavored → set `faction_drop = FACTION_MARKED` in their `__init__`.
+- Base Enemy (and Boss) remain neutral (SoulFragment).
+
+`entities/boss.py` — override `get_drop_fragments()`:
+- Return three `SoulFragment` objects spread around the boss center (+/- 20px offsets).
+
+`scenes/gameplay.py`:
+- Import `HeatCore` and `SoulShard` from `systems.collectible`.
+- In `update()`, after fragment collection, add a similar loop for `self.drops: list = []` (initialise in `on_enter()`).
+- When enemies die, call `get_drop_fragments()` — the returned objects (now HeatCore/SoulShard/SoulFragment depending on enemy type) go into `self.drops`.
+- Each frame, check `player.rect.colliderect(drop.rect)` → call `drop.collect(player, game)` → remove from list.
+- In `draw()`, call `drop.draw(surface, camera)` for all drops after fragments.
+
+**Acceptance criteria — done when:**
+- Killing a ShieldGuard or Ranged spawns a HeatCore; Fleshforged player picking it up heals 8 HP; Marked player gets no heal but the drop is consumed.
+- Killing a Jumper or Crawler spawns a SoulShard; Marked player heals 8 HP on pickup.
+- Killing the Warden boss drops 3 SoulFragments (spread, not stacked).
+- Drops bob up and down while alive.
+- `python main.py` launches without ImportError.
+
+---
+
+### Task P2-7: Environmental Hazards
+
+**Files to touch:**
+- `world/tilemap.py` (parse `'s'` spike tiles and `'~'` crumble tiles)
+- `systems/physics.py` (or `gameplay.py`) (spike damage, crumble logic)
+- `scenes/gameplay.py` (tick crumble platforms, draw hazards, apply spike damage)
+- `settings.py` (hazard constants)
+
+**What to build:**
+
+`settings.py`:
+```python
+SPIKE_DAMAGE        = 20    # HP lost per frame of contact with a spike tile
+CRUMBLE_STAND_FRAMES = 30   # Frames player must stand on crumble tile before it falls
+CRUMBLE_RESPAWN_FRAMES = 180  # Frames before a crumble tile reappears
+SPIKE_COLOR         = (180, 60, 60)   # Dark red spike pixel color
+CRUMBLE_COLOR       = (110, 90, 60)   # Brownish crumble tile color
+CRUMBLE_WARNING_COLOR = (160, 120, 40)  # Color shift when about to crumble
+```
+
+`world/tilemap.py`:
+- In `_parse()`, add: `'s'` → append `pygame.Rect(x, y, TILE_SIZE, TILE_SIZE)` to `self.spike_tiles: list = []`; mark as non-solid (player can enter but takes damage).
+- `'~'` → append `{'rect': pygame.Rect(x, y, TILE_SIZE, TILE_SIZE), 'timer': 0, 'state': 'solid'}` dict to `self.crumble_tiles: list = []`; initially solid.
+
+`scenes/gameplay.py`:
+- In `update()`, after physics: check if player rect overlaps any spike tile rect → `player.take_damage(SPIKE_DAMAGE)`.
+- For each crumble tile in `tilemap.crumble_tiles`:
+  - If `state == 'solid'` and player stands on its top edge: increment `timer`; change color to warning at `timer > CRUMBLE_STAND_FRAMES * 0.6`; at `timer >= CRUMBLE_STAND_FRAMES` set `state = 'falling'`, `timer = 0`, remove from solid-tile set used by physics.
+  - If `state == 'falling'`: increment `timer`; at `>= CRUMBLE_RESPAWN_FRAMES` set `state = 'solid'`, `timer = 0`, add back to solid-tile set.
+- In `draw()`, render spike tiles as a row of small triangles (3-point polygon per tile), crumble tiles as colored rects with a crack overlay line when in warning state.
+
+**Acceptance criteria — done when:**
+- Stepping on a spike tile immediately deals 20 HP damage.
+- Standing on a `'~'` tile for 30 frames causes it to disappear (player falls through).
+- Crumble tile reappears after 3 seconds (180 frames).
+- Visual warning (color shift) appears before the tile crumbles.
 - `python main.py` launches without ImportError.
 
 ---

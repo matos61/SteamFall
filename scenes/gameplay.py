@@ -36,7 +36,7 @@ from entities.shield_guard import ShieldGuard
 from entities.ranged       import Ranged
 from entities.jumper       import Jumper
 from systems.checkpoint import Checkpoint
-from systems.collectible import SoulFragment
+from systems.collectible import SoulFragment, HeatCore, SoulShard
 from systems.minimap    import MiniMap
 
 
@@ -193,8 +193,12 @@ class GameplayScene(BaseScene):
         # Checkpoints
         self.checkpoints: list[Checkpoint] = list(self.tilemap.checkpoints)
 
-        # Soul fragments
+        # Soul fragments (neutral resource orbs)
         self.fragments: list[SoulFragment] = []
+
+        # Faction-specific drops: HeatCore (Fleshforged) or SoulShard (Marked)
+        # Kept separate from fragments because their collect() takes (player, game).
+        self.drops: list = []
 
         # --- Transition state ---
         _fade_in = kwargs.get("_fade_in", False)
@@ -419,6 +423,10 @@ class GameplayScene(BaseScene):
             for frag in self.fragments:
                 frag.update()
 
+            # Faction drops (HeatCore / SoulShard)
+            for drop in self.drops:
+                drop.update()
+
         # --- Combat: player hits enemies ---
         living_enemies = [e for e in self.enemies if e.alive]
         for hb in self.player.all_hitboxes():
@@ -459,6 +467,15 @@ class GameplayScene(BaseScene):
                 remaining.append(frag)
         self.fragments = remaining
 
+        # --- Collect faction drops (HeatCore / SoulShard) ---
+        remaining_drops = []
+        for drop in self.drops:
+            if drop.alive and drop.rect.colliderect(self.player.rect):
+                drop.collect(self.player, self.game)
+            if drop.alive:
+                remaining_drops.append(drop)
+        self.drops = remaining_drops
+
         # --- Boss phase announce + arena shrink trigger ---
         if self._boss and self._boss.alive and self._boss.announce_phase:
             phase = self._boss.announce_phase
@@ -485,14 +502,17 @@ class GameplayScene(BaseScene):
                 e._spawned_minions.clear()
         self.enemies.extend(minion_additions)
 
-        # --- Spawn fragments from newly dead enemies + prune enemy list ---
+        # --- Spawn drops from newly dead enemies + prune enemy list ---
         # Guard with hitstop check so drops spawn exactly once per kill,
         # not once per frozen frame during the hitstop window (BUG-007/BUG-011).
         if not hitstop.is_active():
             newly_dead = [e for e in self.enemies if not e.alive]
             for dead_e in newly_dead:
-                for frag in dead_e.get_drop_fragments():
-                    self.fragments.append(frag)
+                for drop in dead_e.get_drop_fragments():
+                    if isinstance(drop, (HeatCore, SoulShard)):
+                        self.drops.append(drop)
+                    else:
+                        self.fragments.append(drop)
 
             # If the Warden boss just died, trigger upgrade selection
             if self._boss and not self._boss.alive:
@@ -687,6 +707,10 @@ class GameplayScene(BaseScene):
         # Soul fragments
         for frag in self.fragments:
             frag.draw(surface, self.camera)
+
+        # Faction drops (HeatCore / SoulShard)
+        for drop in self.drops:
+            drop.draw(surface, self.camera)
 
         # Entities
         for enemy in self.enemies:

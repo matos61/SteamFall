@@ -9,7 +9,8 @@ from entities.enemy import Enemy
 from settings import (SHIELD_GUARD_HP, SHIELD_GUARD_SPEED, SHIELD_GUARD_DAMAGE,
                       SHIELD_GUARD_DEFENSE, SHIELD_GUARD_COLOR,
                       SHIELD_GUARD_KNOCKBACK_Y,
-                      ENEMY_ATTACK_RANGE, ENEMY_SIGHT_RANGE, ENEMY_IFRAMES)
+                      ENEMY_ATTACK_RANGE, ENEMY_SIGHT_RANGE, ENEMY_IFRAMES,
+                      FACTION_FLESHFORGED)
 
 _PATROL = "patrol"
 _CHASE  = "chase"
@@ -24,6 +25,7 @@ class ShieldGuard(Enemy):
         self.rect.width      = 38
         self.rect.height     = 58
         self._iframes_on_hit = ENEMY_IFRAMES
+        self.faction_drop    = FACTION_FLESHFORGED   # drops HeatCore on death
 
     # ------------------------------------------------------------------
 

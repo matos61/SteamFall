@@ -16,7 +16,8 @@ from systems.combat    import AttackHitbox
 from settings          import (ENEMY_PATROL_SPEED, ENEMY_CHASE_SPEED,
                                 ENEMY_SIGHT_RANGE, ENEMY_ATTACK_RANGE,
                                 ENEMY_ATTACK_DAMAGE, FLESHFORGED_COLOR, RED,
-                                ENEMY_IFRAMES)
+                                ENEMY_IFRAMES,
+                                FACTION_FLESHFORGED, FACTION_MARKED)
 
 # AI states
 _PATROL = "patrol"
@@ -41,6 +42,10 @@ class Enemy(Entity):
 
         # Hitboxes spawned this frame (cleared after checking)
         self.hitboxes: list[AttackHitbox] = []
+
+        # Faction-specific drop type (set in subclass __init__ as needed)
+        # "" → neutral SoulFragment; FACTION_FLESHFORGED → HeatCore; FACTION_MARKED → SoulShard
+        self.faction_drop: str = ""
 
     # ------------------------------------------------------------------
 
@@ -125,9 +130,22 @@ class Enemy(Entity):
     # ------------------------------------------------------------------
 
     def get_drop_fragments(self) -> list:
-        """Return soul fragments to spawn when this enemy dies."""
+        """Return collectibles to spawn when this enemy dies.
+
+        The drop type depends on self.faction_drop:
+          FACTION_FLESHFORGED → one HeatCore
+          FACTION_MARKED      → one SoulShard
+          ""  (default)       → one SoulFragment (neutral / resource orb)
+        """
+        cx, cy = self.rect.centerx, self.rect.centery
+        if self.faction_drop == FACTION_FLESHFORGED:
+            from systems.collectible import HeatCore
+            return [HeatCore(cx, cy)]
+        if self.faction_drop == FACTION_MARKED:
+            from systems.collectible import SoulShard
+            return [SoulShard(cx, cy)]
         from systems.collectible import SoulFragment
-        return [SoulFragment(self.rect.centerx, self.rect.centery)]
+        return [SoulFragment(cx, cy)]
 
     def draw(self, surface: pygame.Surface, camera) -> None:
         screen_rect = camera.apply(self)

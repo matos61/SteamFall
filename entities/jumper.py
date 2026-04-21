@@ -11,7 +11,7 @@ from settings import (JUMPER_HP, JUMPER_SPEED, JUMPER_DAMAGE,
                       JUMPER_BURST_COUNT, JUMPER_BURST_PAUSE,
                       JUMPER_KNOCKBACK_Y_GROUND, JUMPER_KNOCKBACK_Y_AERIAL,
                       JUMPER_COLOR, ENEMY_SIGHT_RANGE, ENEMY_ATTACK_RANGE,
-                      ENEMY_IFRAMES)
+                      ENEMY_IFRAMES, FACTION_MARKED)
 
 _PATROL = "patrol"
 _CHASE  = "chase"
@@ -30,6 +30,7 @@ class Jumper(Enemy):
         self._jump_timer      = 0   # frames since last jump (for auto-jump in patrol)
         self._burst_remaining = JUMPER_BURST_COUNT
         self._burst_pause     = 0
+        self.faction_drop     = FACTION_MARKED   # drops SoulShard on death
 
     # ------------------------------------------------------------------
 
