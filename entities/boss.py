@@ -241,6 +241,22 @@ class Boss(Enemy):
     # Draw
     # ------------------------------------------------------------------
 
+    # ------------------------------------------------------------------
+    # Drop override
+    # ------------------------------------------------------------------
+
+    def get_drop_fragments(self) -> list:
+        """Return three SoulFragments spread around the boss centre."""
+        from systems.collectible import SoulFragment
+        cx, cy = self.rect.centerx, self.rect.centery
+        return [
+            SoulFragment(cx - 20, cy),
+            SoulFragment(cx,       cy),
+            SoulFragment(cx + 20,  cy),
+        ]
+
+    # ------------------------------------------------------------------
+
     def draw(self, surface: pygame.Surface, camera) -> None:
         super().draw(surface, camera)
 
