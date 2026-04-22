@@ -523,14 +523,14 @@ _Applied by hk-agent 2026-04-12; see `REVIEW_HK.md` for full analysis._
 | Enemy-specific 2-frame hit flash color | ✅ Done | `entities/enemy.py` — red 2-frame flash in draw override |
 | Caller-side `knockback_dir` in enemy touch damage | ✅ Done | `scenes/gameplay.py` — body contact with directional knockback |
 | Particle system (landing dust, nail sparks, camera pan) | ⏳ Phase 4 | New `systems/particles.py` |
-| Architect teleport telegraph (`ARCHITECT_TELEPORT_WARN=20`, lock+distinct pulse before teleport) | ⏳ Pending | `entities/architect.py`, `settings.py` |
-| Architect teleport cadence (`ARCHITECT_TELEPORT_CD` 200→140, `ARCHITECT_MINION_CD` 300→210) | ⏳ Pending | `settings.py` |
-| Upgrade DMG cap (`UPGRADE_DMG_BONUS` 5→6, `UPGRADE_DMG_MAX_STACKS=3`) | ⏳ Pending | `settings.py`, `entities/player.py` |
-| Upgrade RES regen (`UPGRADE_RES_REGEN_BONUS=0.008` per stack, applied to passive regen) | ⏳ Pending | `settings.py`, `entities/player.py` |
-| Faction heal drops (`HEAT_CORE_HEAL`/`SOUL_SHARD_HEAL` 8→12) | ⏳ Pending (P2-6) | `settings.py` |
-| Boss SoulFragment spread (widen from ±20 to ±40 px at drop) | ⏳ Pending | `entities/boss.py` |
-| LEVEL_10 Architect teleport Y floor clamp (prevent landing on mid-arena platform at row 9) | ⏳ Pending | `entities/architect.py` |
-| Minimap room-chain extended to levels 6–10 (FLAG-009) | ⏳ Pending | `systems/minimap.py` |
+| Architect teleport telegraph (`ARCHITECT_TELEPORT_WARN=20`, lock+distinct pulse before teleport) | ⏳ P2-8 | `entities/architect.py`, `settings.py` |
+| Architect teleport cadence (`ARCHITECT_TELEPORT_CD` 200→140, `ARCHITECT_MINION_CD` 300→210) | ⏳ P2-8 | `settings.py` |
+| Upgrade DMG cap (`UPGRADE_DMG_BONUS` 5→6, `UPGRADE_DMG_MAX_STACKS=3`) | ⏳ P2-8 | `settings.py`, `entities/player.py` |
+| Upgrade RES regen (`UPGRADE_RES_REGEN_BONUS=0.008` per stack, applied to passive regen) | ⏳ P2-8 | `settings.py`, `entities/player.py` |
+| Faction heal drops (`HEAT_CORE_HEAL`/`SOUL_SHARD_HEAL` 8→12) | ✅ Incorporated into P2-6 spec | `settings.py` |
+| Boss SoulFragment spread (widen from ±20 to ±40 px at drop) | ✅ Incorporated into P2-6 spec | `entities/boss.py` |
+| LEVEL_10 Architect teleport Y floor clamp (prevent landing on mid-arena platform at row 9) | ⏳ P2-8 | `entities/architect.py` |
+| Minimap room-chain extended to levels 6–10 (FLAG-009) | ⏳ P2-8 | `systems/minimap.py` |
 | ShieldGuard full block (DEFENSE 0.35→0.0, HP 80→65); fix facing locked to patrol dir | ✅ Done | `settings.py`, `entities/shield_guard.py` — P2-2b |
 | Ranged: reduce cooldown (90→55 frames); add projectile arc (vy from player delta Y, ±4 cap); extract `RANGED_PREFERRED_DIST` constant | ✅ Done | `entities/ranged.py`, `settings.py` — P2-2b |
 | Jumper: reduce cooldown (55→32 frames); add burst pattern (`JUMPER_BURST_COUNT=2`, `JUMPER_BURST_PAUSE=70`) | ✅ Done | `entities/jumper.py`, `settings.py` — P2-2b |
@@ -552,6 +552,7 @@ _Applied by hk-agent 2026-04-12; see `REVIEW_HK.md` for full analysis._
 8. **P2-0c (critical bug-fix sprint):** BUG-018 through BUG-025 from the 2026-04-21 review pass — ability-slots feature missing (BUG-019), Architect teleport bound wrong (BUG-020), Architect phase-announce absent (BUG-021), upgrade-while-dead stall (BUG-018). Must be cleared before P2-6. **← NEXT for build-agent**
 9. **P2-6 (enemy drops):** `HeatCore` and `SoulShard` collectibles (extend `systems/collectible.py`) dropped based on enemy faction; faction-matched healing.
 10. **P2-7 (environmental hazards):** Spike tiles (`'s'`), crumbling platforms (`'~'` disappears after 30 standing frames); add parsers to `TileMap` and collision handling to `physics.py`/`gameplay.py`.
+11. **P2-8 (HK feel sprint — Architect/Upgrades/Minimap):** All outstanding hk-agent 2026-04-21 recommendations — teleport telegraph, minion cap, upgrade DMG/RES, minimap room-chain 6–10.
 
 ---
 
@@ -777,10 +778,10 @@ _Unblocked by P2-5 completion. Review-agent 2026-04-21 pass found these correctn
 `settings.py`:
 ```python
 HEAT_CORE_SIZE       = 10      # px square
-HEAT_CORE_HEAL       = 8       # HP healed when picked up by Fleshforged
+HEAT_CORE_HEAL       = 12      # HP healed when picked up by Fleshforged (raised from 8 per hk-agent review)
 HEAT_CORE_COLOR      = (220, 100, 20)   # Burnt orange
 SOUL_SHARD_SIZE      = 10
-SOUL_SHARD_HEAL      = 8       # HP healed when picked up by Marked
+SOUL_SHARD_HEAL      = 12      # HP healed when picked up by Marked (raised from 8 per hk-agent review)
 SOUL_SHARD_COLOR     = (130, 80, 220)   # Soft purple (matches SOUL_FRAGMENT_COLOR)
 DROP_BOB_SPEED       = 0.08    # radians/frame for bobbing sinusoid
 DROP_BOB_AMP         = 3       # pixel amplitude of bob
@@ -808,7 +809,7 @@ DROP_BOB_AMP         = 3       # pixel amplitude of bob
 - Base Enemy (and Boss) remain neutral (SoulFragment).
 
 `entities/boss.py` — override `get_drop_fragments()`:
-- Return three `SoulFragment` objects spread around the boss center (+/- 20px offsets).
+- Return three `SoulFragment` objects spread around the boss center (+/- 40px offsets — widened from ±20 px per hk-agent review to avoid stacking under corpse).
 
 `scenes/gameplay.py`:
 - Import `HeatCore` and `SoulShard` from `systems.collectible`.
@@ -862,6 +863,55 @@ CRUMBLE_WARNING_COLOR = (160, 120, 40)  # Color shift when about to crumble
 - Standing on a `'~'` tile for 30 frames causes it to disappear (player falls through).
 - Crumble tile reappears after 3 seconds (180 frames).
 - Visual warning (color shift) appears before the tile crumbles.
+- `python main.py` launches without ImportError.
+
+---
+
+### Task P2-8: HK Feel Sprint — Architect / Upgrades / Minimap
+
+_Blocked until P2-7 is complete. Implements all outstanding hk-agent recommendations from the 2026-04-21 pass._
+
+**Files to touch:**
+- `settings.py` (new and updated constants)
+- `entities/architect.py` (teleport warn + cadence + minion cap + Y floor clamp)
+- `entities/player.py` (upgrade DMG cap, RES regen bonus)
+- `systems/minimap.py` (extend room-chain to levels 6–10)
+
+**What to build:**
+
+`settings.py` — add / update:
+```python
+ARCHITECT_TELEPORT_CD   = 140   # was 200 — tighter cadence from phase 2 onward
+ARCHITECT_TELEPORT_WARN = 20    # NEW — pre-teleport lock+pulse frames before position jump
+ARCHITECT_MINION_CD     = 210   # was 300 — more frequent minion pressure; cap live crawlers at 2
+UPGRADE_DMG_BONUS       = 6     # was 5 — marginal per-swing increase
+UPGRADE_DMG_MAX_STACKS  = 3     # NEW — cap to prevent Overdrive compound runaway
+UPGRADE_RES_REGEN_BONUS = 0.008 # NEW — per-upgrade additive boost to 0.05/frame passive regen
+```
+
+`entities/architect.py`:
+- Add `_teleport_warn_timer = 0` to `__init__`.
+- Before the teleport position change, decrement `_teleport_cd` as normal; when it reaches 0, instead of teleporting immediately, set `_teleport_warn_timer = ARCHITECT_TELEPORT_WARN` and lock `vx = 0`.
+- While `_teleport_warn_timer > 0`, decrement it and draw a distinct white-blue pulse (separate from `_rage_flash_timer`). When it reaches 0, execute the actual position change.
+- In `_on_phase2_enter()`, replace `ARCHITECT_TELEPORT_CD` constant reference (already imported) — no code change needed since the constant change handles this.
+- Add a cap on simultaneous live crawlers: in the minion-spawn branch, count `sum(1 for e in live_enemies if isinstance(e, Crawler))` before spawning; skip if `>= 2`. Gameplay.py must pass the enemy list to Architect or the cap can be enforced in gameplay.py after the minion call.
+- For the Y floor clamp: after setting `self.rect.centerx`, also set `self.rect.bottom = self._level_floor_y` where `self._level_floor_y` is stored from a constructor parameter (default `SCREEN_HEIGHT - TILE_SIZE * 2`). Pass `level_floor_y=self.tilemap.height - TILE_SIZE * 2` when spawning in `gameplay.py`.
+
+`entities/player.py`:
+- Apply `UPGRADE_DMG_MAX_STACKS` cap in `_apply_upgrade_to_player` (or inside `gameplay.py`): count `"dmg"` entries in `save_data["upgrades"]`; skip if `>= UPGRADE_DMG_MAX_STACKS`.
+- Add `self._res_regen_bonus: float = 0.0` to `__init__`. In the passive regen line (`player.py:192`), change `0.05` to `0.05 + self._res_regen_bonus`. In `gameplay.py` `_apply_upgrade_to_player`, for the `"res"` case, add `player._res_regen_bonus += UPGRADE_RES_REGEN_BONUS`.
+
+`systems/minimap.py`:
+- Extend `_LEVEL_ORDER` to all 13 level keys: `["level_1", "level_2", "level_3", "level_4", "level_5", "level_6_marked", "level_6_fleshforged", "level_7_marked", "level_7_fleshforged", "level_8_marked", "level_8_fleshforged", "level_9", "level_10"]`.
+- Add matching `_LEVEL_LABELS` entries for all new keys (short names to fit the panel: "VI-M", "VI-F", etc.).
+- Lay the room chain in two rows: levels 1–5 top row, levels 6–10 bottom row (use the faction branches as two parallel nodes in row 2).
+
+**Acceptance criteria — done when:**
+- Architect flashes a distinct pre-teleport warning for 20 frames before jumping position.
+- No more than 2 live Crawlers in the arena at once.
+- 3rd `"dmg"` upgrade selection works; a 4th is blocked/skipped.
+- Resource upgrade visibly speeds up the regen bar.
+- Minimap room-chain shows all 13 level nodes across 2 rows; current level is highlighted regardless of faction branch.
 - `python main.py` launches without ImportError.
 
 ---
@@ -968,7 +1018,7 @@ _Legend: ✅ Fixed | ⚠️ Flagged / deferred | 🔴 Open_
 | `systems/animation.py` | build-agent | Stable until sprite replacement (Phase 4) |
 | `systems/checkpoint.py` | build-agent | Created (P1-1); stable |
 | `systems/collectible.py` | build-agent | Open: BUG-024 double-collect guard (P2-0c); extend with HeatCore/SoulShard (P2-6) |
-| `systems/minimap.py` | build-agent | Created (P1-7); stable |
+| `systems/minimap.py` | build-agent | Created (P1-7); extend room-chain to 13 levels in P2-8 |
 | `systems/tutorial_minigame.py` | build-agent (created outside roadmap) | Inline control tutorial for prologues; registered here for tracking |
 | `systems/voice_player.py` | build-agent (created outside roadmap) | Voice-line playback; no MP3 assets yet; blocked on Phase 4 audio pass |
 | `world/tilemap.py` | build-agent | LEVEL_1–5 complete; extend with LEVEL_6–10 in Phase 2 |
