@@ -523,6 +523,14 @@ _Applied by hk-agent 2026-04-12; see `REVIEW_HK.md` for full analysis._
 | Enemy-specific 2-frame hit flash color | ✅ Done | `entities/enemy.py` — red 2-frame flash in draw override |
 | Caller-side `knockback_dir` in enemy touch damage | ✅ Done | `scenes/gameplay.py` — body contact with directional knockback |
 | Particle system (landing dust, nail sparks, camera pan) | ⏳ Phase 4 | New `systems/particles.py` |
+| Architect teleport telegraph (`ARCHITECT_TELEPORT_WARN=20`, lock+distinct pulse before teleport) | ⏳ Pending | `entities/architect.py`, `settings.py` |
+| Architect teleport cadence (`ARCHITECT_TELEPORT_CD` 200→140, `ARCHITECT_MINION_CD` 300→210) | ⏳ Pending | `settings.py` |
+| Upgrade DMG cap (`UPGRADE_DMG_BONUS` 5→6, `UPGRADE_DMG_MAX_STACKS=3`) | ⏳ Pending | `settings.py`, `entities/player.py` |
+| Upgrade RES regen (`UPGRADE_RES_REGEN_BONUS=0.008` per stack, applied to passive regen) | ⏳ Pending | `settings.py`, `entities/player.py` |
+| Faction heal drops (`HEAT_CORE_HEAL`/`SOUL_SHARD_HEAL` 8→12) | ⏳ Pending (P2-6) | `settings.py` |
+| Boss SoulFragment spread (widen from ±20 to ±40 px at drop) | ⏳ Pending | `entities/boss.py` |
+| LEVEL_10 Architect teleport Y floor clamp (prevent landing on mid-arena platform at row 9) | ⏳ Pending | `entities/architect.py` |
+| Minimap room-chain extended to levels 6–10 (FLAG-009) | ⏳ Pending | `systems/minimap.py` |
 | ShieldGuard full block (DEFENSE 0.35→0.0, HP 80→65); fix facing locked to patrol dir | ✅ Done | `settings.py`, `entities/shield_guard.py` — P2-2b |
 | Ranged: reduce cooldown (90→55 frames); add projectile arc (vy from player delta Y, ±4 cap); extract `RANGED_PREFERRED_DIST` constant | ✅ Done | `entities/ranged.py`, `settings.py` — P2-2b |
 | Jumper: reduce cooldown (55→32 frames); add burst pattern (`JUMPER_BURST_COUNT=2`, `JUMPER_BURST_PAUSE=70`) | ✅ Done | `entities/jumper.py`, `settings.py` — P2-2b |
@@ -541,8 +549,9 @@ _Applied by hk-agent 2026-04-12; see `REVIEW_HK.md` for full analysis._
 5. ~~**P2-3 (Warden scripting)**~~ ✅ **DONE (2026-04-18):** 3-beat Warden intro dialogue; phase-differentiated rage flash (orange/red); BOSS_PROJ_SPREAD_VY; BUG-016 fixed. Prior commits had already implemented dash, arena shrink, and projectile spread.
 6. ~~**P2-4 (Architect boss)**~~ ✅ **DONE (2026-04-18):** `entities/architect.py` created; 4-phase AI (teleport/fan/minions); faction-specific intro + defeat dialogue; 'X' tile in LEVEL_10; victory write to save_data.
 7. ~~**P2-5 (upgrade system)**~~ ✅ **DONE (2026-04-21):** Upgrade screen on Warden kill; three choices (HP/DMG/RES); stored in `save_data["upgrades"]`; reapplied on level load.
-8. **P2-6 (enemy drops):** `HeatCore` and `SoulShard` collectibles (extend `systems/collectible.py`) dropped based on enemy faction; faction-matched healing. **← NEXT for build-agent**
-9. **P2-7 (environmental hazards):** Spike tiles (`'s'`), crumbling platforms (`'~'` disappears after 30 standing frames); add parsers to `TileMap` and collision handling to `physics.py`/`gameplay.py`.
+8. **P2-0c (critical bug-fix sprint):** BUG-018 through BUG-025 from the 2026-04-21 review pass — ability-slots feature missing (BUG-019), Architect teleport bound wrong (BUG-020), Architect phase-announce absent (BUG-021), upgrade-while-dead stall (BUG-018). Must be cleared before P2-6. **← NEXT for build-agent**
+9. **P2-6 (enemy drops):** `HeatCore` and `SoulShard` collectibles (extend `systems/collectible.py`) dropped based on enemy faction; faction-matched healing.
+10. **P2-7 (environmental hazards):** Spike tiles (`'s'`), crumbling platforms (`'~'` disappears after 30 standing frames); add parsers to `TileMap` and collision handling to `physics.py`/`gameplay.py`.
 
 ---
 
@@ -712,6 +721,48 @@ JUMPER_KNOCKBACK_Y_AERIAL  =  2.0   # NEW — downward spike when Jumper attacks
 
 ---
 
+### Task P2-0c: Critical Bug-Fix Sprint (2026-04-21 review pass)
+
+_Unblocked by P2-5 completion. Review-agent 2026-04-21 pass found these correctness bugs that must be fixed before P2-6 content work. Critical bugs marked 🔴; minor/deferred marked ⚠️._
+
+**Files to touch:**
+- `scenes/gameplay.py` (BUG-018, BUG-021, BUG-022, BUG-023, BUG-025)
+- `entities/player.py` (BUG-019)
+- `world/tilemap.py` (BUG-019)
+- `entities/architect.py` (BUG-020)
+- `systems/collectible.py` (BUG-024)
+
+**Fixes required:**
+
+- 🔴 **BUG-018** `gameplay.py`: In `_setup_upgrade_choices()` (or at its call site), add `if not self.player.alive: return` to prevent the upgrade screen from activating when the player dies on the same frame as the Warden.
+
+- 🔴 **BUG-019** (three-file fix):
+  1. `entities/player.py`: Add `self.ability_slots: int = ABILITY_SLOTS_DEFAULT` to `__init__`; import `ABILITY_SLOTS_DEFAULT` from settings; add `if self.ability_slots < 1: return` at the top of `_handle_ability()`.
+  2. `scenes/gameplay.py:on_enter()`: After creating the player, add `self.player.ability_slots = save.get("ability_slots", ABILITY_SLOTS_DEFAULT)`. Spawn `AbilityOrb` objects for `tilemap.ability_orb_spawns`.
+  3. `world/tilemap.py`: Add `self.ability_orb_spawns: list = []` to `__init__`; add `'A'` tile handler in `_parse()` appending `(x + TILE_SIZE//2, y - 18)`.
+
+- 🔴 **BUG-020** `architect.py` / `gameplay.py`: Add `level_width: int = SCREEN_WIDTH` constructor parameter to `Architect.__init__`, store as `self._level_width`. In `_update_ai`, replace `arena_max = SCREEN_WIDTH - TILE_SIZE * 4` with `arena_max = self._level_width - TILE_SIZE * 4`. In `gameplay.py`, pass `level_width=self.tilemap.width` when instantiating Architect.
+
+- 🔴 **BUG-021** `gameplay.py`: After the Warden announce block (around line 471), add a parallel block for `self._architect`: check `self._architect.announce_phase`, consume it, show the phase banner, and trigger arena-shrink on phase 4. The shrink should reference `self._architect`, not `self._boss`.
+
+- ⚠️ **BUG-022** `gameplay.py`: Drive the boss-intro banner index from `self._boss_dialogue._index` rather than `active_boss._intro_line_idx`. The entity-level `_intro_line_timer` / `_intro_line_idx` increment in `_tick_boss_intro` can be removed.
+
+- ⚠️ **BUG-023** `gameplay.py`: In `_apply_upgrade_to_player`, remove the `_regen_resource(UPGRADE_RES_BONUS)` call for the `"res"` case so resource is not silently refilled above checkpoint state on every level load.
+
+- ⚠️ **BUG-024** `collectible.py`: Add `if not self.alive: return` as the first line of `AbilityOrb.collect()`.
+
+- ⚠️ **BUG-025** `gameplay.py`: Separate the shrink-wall injection conditions — add the left wall rect only when `self._shrink_left_x > 0`, and add the right wall rect only when `self._shrink_right_x < self.tilemap.width` (independent checks, not coupled via a single condition on `_shrink_left_x`).
+
+**Acceptance criteria — done when:**
+- `python main.py` launches without ImportError.
+- Player ability is locked at game start; picking up an `AbilityOrb` unlocks it and persists across saves.
+- Warden kills player simultaneously → upgrade screen does not appear; death sequence runs normally.
+- Architect teleports freely across the full width of LEVEL_10 (2080 px), not only into the left 1152 px.
+- Architect phase 2/3/4 transitions display the phase-announce banner.
+- `"res"` upgrade does not refill the resource bar above checkpoint state on level reload.
+
+---
+
 ### Task P2-6: Enemy Drops
 
 **Files to touch:**
@@ -867,6 +918,22 @@ _Legend: ✅ Fixed | ⚠️ Flagged / deferred | 🔴 Open_
 
 14. ⚠️ **BUG-017: Boss intro first line shows for 119 frames instead of 120** — Off-by-one in `_tick_boss_intro()` (timer increments before the ≥120 check). Cosmetic only (~16 ms at 60 fps). Fix: change `if self._boss._intro_line_timer >= 120` to `>= 121`, or increment timer after the check. Assign to build-agent as low-priority hotfix.
 
+15. 🔴 **BUG-018: Upgrade screen activates while player is dead** — If the player and Warden die on the same frame, `_upgrade_active = True` blocks the death sequence indefinitely via the early-return guard. Fix: add `if not self.player.alive: return` at the top of `_setup_upgrade_choices()`. Assign to build-agent (P2-0c).
+
+16. 🔴 **BUG-019: P1-8 ability-slots feature entirely absent from live code** — `Player._handle_ability()` has no `ability_slots` guard; `gameplay.py:on_enter()` never restores `ability_slots` from save; `TileMap._parse()` has no `'A'` handler and `ability_orb_spawns` is never populated. Ability is always unlocked from the start regardless of save state. Three-file fix required (see P2-0c spec). Assign to build-agent.
+
+17. 🔴 **BUG-020: Architect teleport uses `SCREEN_WIDTH` as arena bound instead of level width** — `arena_max = SCREEN_WIDTH - TILE_SIZE*4` = 1152 px, but LEVEL_10 is 2080 px wide. Right 928 px of the level is never a valid teleport target; Architect can't reach its own spawn area post-phase-2. Fix: add `level_width` constructor parameter to `Architect`; use `self._level_width - TILE_SIZE*4` as `arena_max`. Assign to build-agent (P2-0c).
+
+18. 🔴 **BUG-021: Architect phase transitions never trigger phase-announce banner or arena-shrink** — `gameplay.py` checks only `self._boss.announce_phase`; no parallel check exists for `self._architect`. Architect transitions through 4 phases silently. Fix: add an announce-and-shrink block for `self._architect` after the Warden block. Assign to build-agent (P2-0c).
+
+19. ⚠️ **BUG-022: Boss intro banner timer desynchronised from DialogueBox** — `_tick_boss_intro` advances `_intro_line_idx` on a 120-frame timer independently of the player pressing SPACE in the DialogueBox. Fix: drive banner index from `DialogueBox._index`. Assign to build-agent (P2-0c).
+
+20. ⚠️ **BUG-023: `"res"` upgrade silently refills resource bar on every level load** — `_apply_upgrade_to_player` calls `_regen_resource(UPGRADE_RES_BONUS)` for `"res"` entries on every `on_enter()`, so the player respawns with more resource than saved. Fix: remove the `_regen_resource` call from that path. Assign to build-agent (P2-0c).
+
+21. ⚠️ **BUG-024: `AbilityOrb.collect()` lacks double-collect guard** — No `if not self.alive: return` guard; will matter once BUG-019 is fixed and orbs are spawned. Fix: add guard at top of `collect()`. Assign to build-agent (P2-0c).
+
+22. ⚠️ **BUG-025: Arena-shrink left/right wall injection coupled via single condition** — `if self._shrink_left_x > 0` gates both walls; right wall not solid on phase-3 frame 1. Fix: separate conditions for each wall. Assign to build-agent (P2-0c).
+
 ---
 
 ## Agent Coordination Notes
@@ -885,13 +952,13 @@ _Legend: ✅ Fixed | ⚠️ Flagged / deferred | 🔴 Open_
 | `scenes/faction_select.py` | build-agent | Stable until Phase 3 |
 | `scenes/marked_prologue.py` | build-agent | Stable until Phase 3 |
 | `scenes/fleshforged_prologue.py` | build-agent | Stable until Phase 3 |
-| `scenes/gameplay.py` | build-agent | All Phase 1 features integrated; open tasks: Tech Debt #4, #5 |
-| `entities/entity.py` | build-agent | Open: iframe fix (Tech Debt #5) |
-| `entities/player.py` | build-agent | Ability slots done; animation draw consolidation deferred to Phase 4 |
-| `entities/enemy.py` | build-agent | Open: `get_drop_fragments()` (Tech Debt #4), iframe fix (Tech Debt #5) |
+| `scenes/gameplay.py` | build-agent | Open: BUG-018, BUG-021, BUG-022, BUG-023, BUG-025 (P2-0c) |
+| `entities/entity.py` | build-agent | Stable (iframe fix done in P2-0) |
+| `entities/player.py` | build-agent | Open: BUG-019 ability-slots gate (P2-0c); animation draw consolidation deferred to Phase 4 |
+| `entities/enemy.py` | build-agent | Stable (get_drop_fragments + ENEMY_IFRAMES done in P2-0) |
 | `entities/crawler.py` | build-agent | Created (P1-1); stable |
 | `entities/boss.py` | build-agent | Warden scripting complete (P2-3); stable |
-| `entities/architect.py` | build-agent | Created (P2-4); Architect final boss; stable |
+| `entities/architect.py` | build-agent | Open: BUG-020 teleport bound, BUG-021 phase-announce (P2-0c) |
 | `entities/shield_guard.py` | build-agent | Created (P2-1); stable |
 | `entities/ranged.py` | build-agent | Created (P2-1); stable |
 | `entities/jumper.py` | build-agent | Created (P2-1); stable |
@@ -900,7 +967,7 @@ _Legend: ✅ Fixed | ⚠️ Flagged / deferred | 🔴 Open_
 | `systems/dialogue.py` | build-agent | Hint text fix done (Tech Debt #8); stable |
 | `systems/animation.py` | build-agent | Stable until sprite replacement (Phase 4) |
 | `systems/checkpoint.py` | build-agent | Created (P1-1); stable |
-| `systems/collectible.py` | build-agent | Created (P1-1, P1-8); extend with HeatCore/SoulShard in Phase 2 |
+| `systems/collectible.py` | build-agent | Open: BUG-024 double-collect guard (P2-0c); extend with HeatCore/SoulShard (P2-6) |
 | `systems/minimap.py` | build-agent | Created (P1-7); stable |
 | `systems/tutorial_minigame.py` | build-agent (created outside roadmap) | Inline control tutorial for prologues; registered here for tracking |
 | `systems/voice_player.py` | build-agent (created outside roadmap) | Voice-line playback; no MP3 assets yet; blocked on Phase 4 audio pass |
