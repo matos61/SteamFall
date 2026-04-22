@@ -315,6 +315,7 @@ class TileMap:
         self.ranged_spawns: list[tuple]       = []
         self.jumper_spawns: list[tuple]       = []
         self.architect_spawn: tuple | None    = None
+        self.ability_orb_spawns: list[tuple]  = []
 
         self._parse(level_data)
 
@@ -365,6 +366,9 @@ class TileMap:
                 elif char == 'X':
                     # Architect (final boss) spawn; feet land 80 px above tile top
                     self.architect_spawn = (x + TILE_SIZE // 2, y - 80)
+
+                elif char == 'A':
+                    self.ability_orb_spawns.append((x + TILE_SIZE // 2, y - 18))
 
     # ------------------------------------------------------------------
 

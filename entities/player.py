@@ -30,6 +30,7 @@ from settings import (
     MARKED_JUMP_MULT,     MARKED_JUMP_CUT,
     FLESHFORGED_GRAVITY_MULT, FLESHFORGED_AIR_CONTROL, FLESHFORGED_FRICTION,
     FLESHFORGED_JUMP_MULT,    FLESHFORGED_JUMP_CUT,
+    ABILITY_SLOTS_DEFAULT,
 )
 
 ATTACK_DAMAGE    = 20
@@ -91,6 +92,9 @@ class Player(Entity):
         # P2-5 upgrade bonuses (additive; set from gameplay.py via save_data)
         self.attack_damage_bonus: int   = 0
         self.max_resource_bonus: float  = 0.0
+
+        # P1-8 / BUG-019: ability gate — restored from save_data by gameplay.py
+        self.ability_slots: int = ABILITY_SLOTS_DEFAULT
 
         # Animation state machine
         self._anim = AnimationController(color, width=30, height=54)
@@ -295,6 +299,8 @@ class Player(Entity):
     # ------------------------------------------------------------------
 
     def _handle_ability(self, keys) -> None:
+        if self.ability_slots < 1:
+            return
         if self._ability_cooldown > 0:
             self._ability_cooldown -= 1
             return

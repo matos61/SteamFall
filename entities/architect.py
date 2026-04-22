@@ -41,8 +41,10 @@ from settings        import (
 class Architect(Boss):
     """Four-phase final boss whose tactics shift with each health threshold."""
 
-    def __init__(self, x: float, y: float, faction: str = FACTION_MARKED):
+    def __init__(self, x: float, y: float, faction: str = FACTION_MARKED,
+                 level_width: int = SCREEN_WIDTH):
         super().__init__(x, y, name="The Architect")
+        self._level_width = level_width
 
         # Resize the rect to Architect proportions
         self.rect       = pygame.Rect(int(x), int(y), 60, 80)
@@ -131,7 +133,7 @@ class Architect(Boss):
             self._teleport_cd      = ARCHITECT_TELEPORT_CD
             self._rage_flash_timer = 15
             arena_min = TILE_SIZE * 4
-            arena_max = SCREEN_WIDTH - TILE_SIZE * 4
+            arena_max = self._level_width - TILE_SIZE * 4
             self.rect.centerx = random.randint(arena_min, arena_max)
             # Keep pixel-precise float position in sync
             self.x = float(self.rect.x)

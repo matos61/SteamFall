@@ -36,7 +36,7 @@ from entities.shield_guard import ShieldGuard
 from entities.ranged       import Ranged
 from entities.jumper       import Jumper
 from systems.checkpoint import Checkpoint
-from systems.collectible import SoulFragment, HeatCore, SoulShard
+from systems.collectible import SoulFragment, HeatCore, SoulShard, AbilityOrb
 from systems.minimap    import MiniMap
 
 
@@ -116,7 +116,6 @@ def _apply_upgrade_to_player(player, upg_id: str) -> None:
         player.attack_damage_bonus   += UPGRADE_DMG_BONUS
     elif upg_id == "res":
         player.max_resource_bonus    += UPGRADE_RES_BONUS
-        player._regen_resource(UPGRADE_RES_BONUS)
 
 
 class GameplayScene(BaseScene):
@@ -152,6 +151,9 @@ class GameplayScene(BaseScene):
         for upg in save.get("upgrades", []):
             _apply_upgrade_to_player(self.player, upg)
 
+        # Restore ability unlock state from save (BUG-019)
+        self.player.ability_slots = save.get("ability_slots", ABILITY_SLOTS_DEFAULT)
+
         if _respawn:
             self.player.health = int(
                 save.get("checkpoint_health_frac", 1.0) * self.player.max_health)
@@ -186,12 +188,19 @@ class GameplayScene(BaseScene):
         if self.tilemap.architect_spawn:
             ax, ay   = self.tilemap.architect_spawn
             _faction = self.game.player_faction or FACTION_MARKED
-            arch     = Architect(ax, ay, faction=_faction)
+            arch     = Architect(ax, ay, faction=_faction,
+                                 level_width=self.tilemap.width)
             self.enemies.append(arch)
             self._architect = arch
 
         # Checkpoints
         self.checkpoints: list[Checkpoint] = list(self.tilemap.checkpoints)
+
+        # Ability orbs (BUG-019)
+        self.ability_orbs: list[AbilityOrb] = [
+            AbilityOrb(ax, ay)
+            for (ax, ay) in self.tilemap.ability_orb_spawns
+        ]
 
         # Soul fragments (neutral resource orbs)
         self.fragments: list[SoulFragment] = []
@@ -393,15 +402,22 @@ class GameplayScene(BaseScene):
         hitstop.tick()
 
         solid = self.tilemap.get_solid_rects()
-        # Inject arena shrink walls into solid rects so physics respects them
-        if self._shrink_active and self._shrink_left_x > 0:
-            solid = list(solid) + [
-                pygame.Rect(0, 0,
-                            int(self._shrink_left_x), self.tilemap.height),
-                pygame.Rect(int(self._shrink_right_x), 0,
-                            self.tilemap.width - int(self._shrink_right_x),
-                            self.tilemap.height),
-            ]
+        # Inject arena shrink walls into solid rects so physics respects them.
+        # BUG-025: left and right walls are injected independently so the right
+        # wall is solid on the first frame of phase transition even when the left
+        # wall hasn't started moving yet.
+        if self._shrink_active:
+            _extra_walls = []
+            if self._shrink_left_x > 0:
+                _extra_walls.append(
+                    pygame.Rect(0, 0, int(self._shrink_left_x), self.tilemap.height))
+            if self._shrink_right_x < self.tilemap.width:
+                _extra_walls.append(
+                    pygame.Rect(int(self._shrink_right_x), 0,
+                                self.tilemap.width - int(self._shrink_right_x),
+                                self.tilemap.height))
+            if _extra_walls:
+                solid = list(solid) + _extra_walls
 
         if not hitstop.is_active():
             prev_iframes = self._prev_iframes
@@ -476,6 +492,16 @@ class GameplayScene(BaseScene):
                 remaining_drops.append(drop)
         self.drops = remaining_drops
 
+        # --- Collect ability orbs (BUG-019) ---
+        remaining_orbs = []
+        for orb in self.ability_orbs:
+            orb.update()
+            if orb.alive and orb.rect.colliderect(self.player.rect):
+                orb.collect(self.player, self.game)
+            if orb.alive:
+                remaining_orbs.append(orb)
+        self.ability_orbs = remaining_orbs
+
         # --- Boss phase announce + arena shrink trigger ---
         if self._boss and self._boss.alive and self._boss.announce_phase:
             phase = self._boss.announce_phase
@@ -486,6 +512,24 @@ class GameplayScene(BaseScene):
             self._boss_phase_timer = BOSS_PHASE_ANNOUNCE_FRAMES
             self._screen_shake     = 10
             if phase == 3:
+                self._shrink_active       = True
+                self._shrink_left_x       = 0.0
+                self._shrink_right_x      = float(self.tilemap.width)
+                self._shrink_target_left  = float(ARENA_SHRINK_AMOUNT)
+                self._shrink_target_right = float(
+                    self.tilemap.width - ARENA_SHRINK_AMOUNT)
+
+        # --- Architect phase announce + arena shrink trigger (BUG-021) ---
+        if self._architect and self._architect.alive and self._architect.announce_phase:
+            phase = self._architect.announce_phase
+            self._architect.announce_phase = 0
+            labels = ("", "I", "II", "III", "IV")
+            suffixes = {2: " \u2014 AWAKENED", 3: " \u2014 UNBOUND", 4: " \u2014 ABSOLUTE"}
+            suffix = suffixes.get(phase, "")
+            self._boss_phase_text  = f"PHASE {labels[phase]}{suffix}"
+            self._boss_phase_timer = BOSS_PHASE_ANNOUNCE_FRAMES
+            self._screen_shake     = 10
+            if phase == 4:
                 self._shrink_active       = True
                 self._shrink_left_x       = 0.0
                 self._shrink_right_x      = float(self.tilemap.width)
@@ -623,19 +667,9 @@ class GameplayScene(BaseScene):
 
     def _tick_boss_intro(self) -> None:
         subject = getattr(self, "_boss_intro_subject", "warden")
-        # Pick the active boss entity so we can tick its line counters
         active_boss = self._architect if subject == "architect" else self._boss
         if self._boss_dialogue:
             self._boss_dialogue.update()
-            # Advance the entity's own intro line timer so _draw_boss_intro
-            # banner stays in sync (P2-3a spec requirement).
-            if active_boss:
-                active_boss._intro_line_timer += 1
-                if active_boss._intro_line_timer >= 120:
-                    active_boss._intro_line_timer = 0
-                    active_boss._intro_line_idx  += 1
-                    if active_boss._intro_line_idx >= len(active_boss._intro_lines):
-                        active_boss._intro_line_idx = len(active_boss._intro_lines) - 1
             if self._boss_dialogue.is_done():
                 self._boss_intro_active = False
                 self._boss_dialogue     = None
@@ -711,6 +745,10 @@ class GameplayScene(BaseScene):
         # Faction drops (HeatCore / SoulShard)
         for drop in self.drops:
             drop.draw(surface, self.camera)
+
+        # Ability orbs
+        for orb in self.ability_orbs:
+            orb.draw(surface, self.camera)
 
         # Entities
         for enemy in self.enemies:
@@ -971,7 +1009,9 @@ class GameplayScene(BaseScene):
         active_boss = self._architect if subject == "architect" else self._boss
         if not active_boss or active_boss._intro_done:
             return
-        line_idx = active_boss._intro_line_idx
+        # BUG-022: drive banner index from DialogueBox so it stays in sync with
+        # the player pressing SPACE to advance, rather than a separate 120-frame timer.
+        line_idx = self._boss_dialogue._index if self._boss_dialogue else 0
         lines    = active_boss._intro_lines
         if line_idx >= len(lines):
             return
@@ -1048,6 +1088,8 @@ class GameplayScene(BaseScene):
     # ------------------------------------------------------------------
 
     def _setup_upgrade_choices(self) -> None:
+        if not self.player.alive:
+            return
         faction   = self.game.player_faction or FACTION_MARKED
         res_label = "Soul" if faction == FACTION_MARKED else "Heat"
         self._upgrade_choices = [

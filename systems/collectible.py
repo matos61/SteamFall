@@ -203,6 +203,8 @@ class AbilityOrb:
                       max(1, sr.width // 4))
 
     def collect(self, player, game) -> None:
+        if not self.alive:
+            return
         player.ability_slots = min(
             getattr(player, "ability_slots", 0) + 1, self._ABILITY_SLOTS_MAX)
         self.alive = False
