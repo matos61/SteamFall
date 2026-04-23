@@ -551,8 +551,8 @@ _Applied by hk-agent 2026-04-12; see `REVIEW_HK.md` for full analysis._
 7. ~~**P2-5 (upgrade system)**~~ ✅ **DONE (2026-04-21):** Upgrade screen on Warden kill; three choices (HP/DMG/RES); stored in `save_data["upgrades"]`; reapplied on level load.
 8. ~~**P2-0c (critical bug-fix sprint)**~~ ✅ **DONE (2026-04-23):** BUG-018 through BUG-025 all fixed — ability-slots gate added (BUG-019), Architect level_width param (BUG-020), Architect phase-announce wired (BUG-021), upgrade-while-dead guard (BUG-018), announce_phase=4 signal (BUG-021 addendum), BUG-022/023/024/025 resolved.
 9. ~~**P2-6 (enemy drops)**~~ ✅ **DONE (2026-04-23):** `HeatCore`/`SoulShard` confirmed in place; `HEAT_CORE_HEAL`/`SOUL_SHARD_HEAL` raised to 12; Boss `get_drop_fragments()` spread widened to ±40 px.
-10. **P2-7 (environmental hazards):** Spike tiles (`'s'`), crumbling platforms (`'~'` disappears after 30 standing frames); add parsers to `TileMap` and collision handling to `physics.py`/`gameplay.py`. **← NEXT for build-agent**
-11. **P2-8 (HK feel sprint — Architect/Upgrades/Minimap):** All outstanding hk-agent 2026-04-21 recommendations — teleport telegraph, minion cap, upgrade DMG/RES, minimap room-chain 6–10.
+10. ~~**P2-7 (environmental hazards)**~~ ✅ **DONE (2026-04-23):** Spike tiles (`'s'`) and crumble platforms (`'~'`) parsed; spike damage, crumble state machine, and hazard draw added to `gameplay.py`; test tiles placed in LEVEL_3 and LEVEL_4.
+11. **P2-8 (HK feel sprint — Architect/Upgrades/Minimap):** All outstanding hk-agent 2026-04-21 recommendations — teleport telegraph, minion cap, upgrade DMG/RES, minimap room-chain 6–10. **← NEXT for build-agent**
 
 ---
 
@@ -839,7 +839,12 @@ DROP_BOB_AMP         = 3       # pixel amplitude of bob
 
 ---
 
-### Task P2-7: Environmental Hazards
+### Task P2-7: Environmental Hazards ✅ DONE (2026-04-23)
+
+**What was built:**
+- `settings.py`: 6 new constants (`SPIKE_DAMAGE`, `CRUMBLE_STAND_FRAMES`, `CRUMBLE_RESPAWN_FRAMES`, `SPIKE_COLOR`, `CRUMBLE_COLOR`, `CRUMBLE_WARNING_COLOR`).
+- `world/tilemap.py`: `spike_tiles` and `crumble_tiles` lists in `__init__`; `'s'` handler (non-solid, appends to `spike_tiles`); `'~'` handler (initially solid + added to `crumble_tiles` dict); test spikes added to LEVEL_3 row 9; LEVEL_4 row 9 left platform converted to crumble tiles.
+- `scenes/gameplay.py`: spike damage check in update loop; full crumble state machine (solid→warning→falling→respawn) that adds/removes rects from `tilemap.tiles`; `_draw_hazards()` method rendering spike triangles and crumble rects with crack overlay in warning state.
 
 **Files to touch:**
 - `world/tilemap.py` (parse `'s'` spike tiles and `'~'` crumble tiles)

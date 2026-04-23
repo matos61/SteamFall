@@ -216,3 +216,11 @@ SOUL_SHARD_HEAL   = 12                 # HP healed when picked up by Marked
 SOUL_SHARD_COLOR  = (130, 80, 220)      # Soft purple (matches SOUL_FRAGMENT_COLOR)
 DROP_BOB_SPEED    = 0.08                # radians/frame for bobbing sinusoid
 DROP_BOB_AMP      = 3                   # pixel amplitude of bob
+
+# --- P2-7: Environmental hazards ---
+SPIKE_DAMAGE           = 20             # HP lost per frame of contact with a spike tile
+CRUMBLE_STAND_FRAMES   = 30            # Frames player must stand on tile before it falls
+CRUMBLE_RESPAWN_FRAMES = 180           # Frames before a crumble tile reappears
+SPIKE_COLOR            = (180, 60, 60)  # Dark red spike pixel color
+CRUMBLE_COLOR          = (110, 90, 60)  # Brownish crumble tile color
+CRUMBLE_WARNING_COLOR  = (160, 120, 40) # Color shift when about to crumble

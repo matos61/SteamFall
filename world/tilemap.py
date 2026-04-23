@@ -13,13 +13,15 @@
 #   'R' = Ranged enemy spawn point
 #   'J' = Jumper enemy spawn point
 #   'X' = Architect (final boss) spawn point
+#   's' = spike hazard tile (non-solid; player takes damage on contact)
+#   '~' = crumble platform (solid until stood on; falls after CRUMBLE_STAND_FRAMES)
 #
 # When you have real tile sprites, replace the pygame.draw calls in
 # draw_tile() with surface.blit(tile_image, screen_rect).
 # =============================================================================
 
 import pygame
-from settings import TILE_SIZE, TILE_COLOR, TILE_EDGE_COLOR
+from settings import TILE_SIZE, TILE_COLOR, TILE_EDGE_COLOR, CRUMBLE_COLOR, CRUMBLE_WARNING_COLOR
 
 
 # ---------------------------------------------------------------------------
@@ -108,7 +110,7 @@ LEVEL_3 = [
     "     E               ###                  E                      ",
     "###########                                         ######       ",
     "                 C               ###                             ",
-    "#################                           E              P     ",
+    "#################   s   s   s               E              P     ",
     "#################################################################",
     "#################################################################",
 ]
@@ -123,7 +125,7 @@ LEVEL_4 = [
     "      #######              #######                  ",
     "                                                    ",
     "         E         C                 E              ",
-    "  ################   ################               ",
+    "  ~~~~~~~~~~~~~~     ################               ",
     "                                          P         ",
     "####################################################",
     "####################################################",
@@ -316,6 +318,8 @@ class TileMap:
         self.jumper_spawns: list[tuple]       = []
         self.architect_spawn: tuple | None    = None
         self.ability_orb_spawns: list[tuple]  = []
+        self.spike_tiles: list                = []   # Non-solid; deal damage on contact
+        self.crumble_tiles: list              = []   # Solid until stood on; fall and respawn
 
         self._parse(level_data)
 
@@ -369,6 +373,17 @@ class TileMap:
 
                 elif char == 'A':
                     self.ability_orb_spawns.append((x + TILE_SIZE // 2, y - 18))
+
+                elif char == 's':
+                    # Spike tile — NOT solid; player takes damage on overlap
+                    self.spike_tiles.append(pygame.Rect(x, y, TILE_SIZE, TILE_SIZE))
+
+                elif char == '~':
+                    # Crumble tile — initially solid; falls after player stands on it
+                    rect = pygame.Rect(x, y, TILE_SIZE, TILE_SIZE)
+                    self.tiles.append(rect)
+                    self.crumble_tiles.append(
+                        {'rect': rect, 'timer': 0, 'state': 'solid'})
 
     # ------------------------------------------------------------------
 

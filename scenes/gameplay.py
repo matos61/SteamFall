@@ -435,6 +435,48 @@ class GameplayScene(BaseScene):
             for enemy in self.enemies:
                 enemy.update(dt, player=self.player, solid_rects=solid)
 
+            # --- Spike damage: player overlapping any spike tile ---
+            if self.player.alive and self.player.iframes == 0:
+                for spike_rect in self.tilemap.spike_tiles:
+                    if self.player.rect.colliderect(spike_rect):
+                        self.player.take_damage(SPIKE_DAMAGE)
+                        break
+
+            # --- Crumble tile logic ---
+            for tile_dict in self.tilemap.crumble_tiles:
+                t_rect = tile_dict['rect']
+                state  = tile_dict['state']
+
+                if state == 'solid':
+                    # Check if player is standing on this tile's top edge
+                    player_on = (
+                        self.player.on_ground
+                        and abs(self.player.rect.bottom - t_rect.top) <= 2
+                        and self.player.rect.right > t_rect.left
+                        and self.player.rect.left  < t_rect.right
+                    )
+                    if player_on:
+                        tile_dict['timer'] += 1
+                        if tile_dict['timer'] >= CRUMBLE_STAND_FRAMES:
+                            # Tile falls: remove from solid set
+                            tile_dict['state'] = 'falling'
+                            tile_dict['timer'] = 0
+                            if t_rect in self.tilemap.tiles:
+                                self.tilemap.tiles.remove(t_rect)
+                    else:
+                        # Reset timer when player steps off
+                        if tile_dict['timer'] > 0:
+                            tile_dict['timer'] = max(0, tile_dict['timer'] - 1)
+
+                elif state == 'falling':
+                    tile_dict['timer'] += 1
+                    if tile_dict['timer'] >= CRUMBLE_RESPAWN_FRAMES:
+                        # Tile respawns: add back to solid set
+                        tile_dict['state'] = 'solid'
+                        tile_dict['timer'] = 0
+                        if t_rect not in self.tilemap.tiles:
+                            self.tilemap.tiles.append(t_rect)
+
             # Soul fragments
             for frag in self.fragments:
                 frag.update()
@@ -730,6 +772,9 @@ class GameplayScene(BaseScene):
         # World
         self.tilemap.draw(surface, self.camera)
 
+        # Environmental hazards
+        self._draw_hazards(surface)
+
         # Arena shrink walls (draw as tiled columns)
         if self._shrink_active:
             self._draw_arena_walls(surface)
@@ -974,6 +1019,52 @@ class GameplayScene(BaseScene):
             "\u2191\u2193 Navigate   ENTER Confirm   ESC Resume", True, (50, 50, 60))
         surface.blit(hint,
                      (cx - hint.get_width() // 2, SCREEN_HEIGHT - 38))
+
+    def _draw_hazards(self, surface: pygame.Surface) -> None:
+        """Draw spike tiles as triangles and crumble tiles as colored rects."""
+        # --- Spike tiles: row of small upward triangles ---
+        for spike_rect in self.tilemap.spike_tiles:
+            sr = self.camera.apply_rect(spike_rect)
+            if (sr.right < 0 or sr.left > SCREEN_WIDTH or
+                    sr.bottom < 0 or sr.top > SCREEN_HEIGHT):
+                continue
+            # Draw 3 triangle spikes evenly spaced across the tile width
+            spike_w = sr.width // 3
+            for i in range(3):
+                tx = sr.left + i * spike_w
+                # Triangle: base across the bottom, tip at the top-centre
+                tip_x   = tx + spike_w // 2
+                base_y  = sr.bottom
+                tip_y   = sr.top + 4
+                left_x  = tx + 2
+                right_x = tx + spike_w - 2
+                pygame.draw.polygon(surface, SPIKE_COLOR,
+                                    [(left_x, base_y), (right_x, base_y),
+                                     (tip_x, tip_y)])
+
+        # --- Crumble tiles: colored rect, crack line in warning state ---
+        for tile_dict in self.tilemap.crumble_tiles:
+            state  = tile_dict['state']
+            if state == 'falling':
+                continue   # Tile is gone; nothing to draw
+            t_rect = tile_dict['rect']
+            sr     = self.camera.apply_rect(t_rect)
+            if (sr.right < 0 or sr.left > SCREEN_WIDTH or
+                    sr.bottom < 0 or sr.top > SCREEN_HEIGHT):
+                continue
+            timer = tile_dict['timer']
+            in_warning = (state == 'solid'
+                          and timer > CRUMBLE_STAND_FRAMES * 0.6)
+            color = CRUMBLE_WARNING_COLOR if in_warning else CRUMBLE_COLOR
+            pygame.draw.rect(surface, color, sr)
+            # Top edge highlight (matches normal tile style)
+            pygame.draw.line(surface, (180, 160, 100),
+                             sr.topleft, sr.topright, 2)
+            if in_warning:
+                # Diagonal crack line across the tile
+                pygame.draw.line(surface, (80, 60, 30),
+                                 (sr.left + 4,  sr.top + 4),
+                                 (sr.right - 4, sr.bottom - 4), 2)
 
     def _draw_arena_walls(self, surface: pygame.Surface) -> None:
         """Draw the closing arena-shrink walls as stacked tile rects."""
