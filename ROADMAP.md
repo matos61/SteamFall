@@ -549,8 +549,8 @@ _Applied by hk-agent 2026-04-12; see `REVIEW_HK.md` for full analysis._
 5. ~~**P2-3 (Warden scripting)**~~ ✅ **DONE (2026-04-18):** 3-beat Warden intro dialogue; phase-differentiated rage flash (orange/red); BOSS_PROJ_SPREAD_VY; BUG-016 fixed. Prior commits had already implemented dash, arena shrink, and projectile spread.
 6. ~~**P2-4 (Architect boss)**~~ ✅ **DONE (2026-04-18):** `entities/architect.py` created; 4-phase AI (teleport/fan/minions); faction-specific intro + defeat dialogue; 'X' tile in LEVEL_10; victory write to save_data.
 7. ~~**P2-5 (upgrade system)**~~ ✅ **DONE (2026-04-21):** Upgrade screen on Warden kill; three choices (HP/DMG/RES); stored in `save_data["upgrades"]`; reapplied on level load.
-8. **P2-0c (critical bug-fix sprint):** BUG-018 through BUG-025 from the 2026-04-21 review pass — ability-slots feature missing (BUG-019), Architect teleport bound wrong (BUG-020), Architect phase-announce absent (BUG-021), upgrade-while-dead stall (BUG-018). Must be cleared before P2-6. **← NEXT for build-agent**
-9. **P2-6 (enemy drops):** `HeatCore` and `SoulShard` collectibles (extend `systems/collectible.py`) dropped based on enemy faction; faction-matched healing.
+8. ~~**P2-0c (critical bug-fix sprint)**~~ ✅ **DONE (2026-04-23):** BUG-018 through BUG-025 all fixed — ability-slots gate added (BUG-019), Architect level_width param (BUG-020), Architect phase-announce wired (BUG-021), upgrade-while-dead guard (BUG-018), announce_phase=4 signal (BUG-021 addendum), BUG-022/023/024/025 resolved.
+9. **P2-6 (enemy drops):** `HeatCore` and `SoulShard` collectibles (extend `systems/collectible.py`) dropped based on enemy faction; faction-matched healing. **← NEXT for build-agent**
 10. **P2-7 (environmental hazards):** Spike tiles (`'s'`), crumbling platforms (`'~'` disappears after 30 standing frames); add parsers to `TileMap` and collision handling to `physics.py`/`gameplay.py`.
 11. **P2-8 (HK feel sprint — Architect/Upgrades/Minimap):** All outstanding hk-agent 2026-04-21 recommendations — teleport telegraph, minion cap, upgrade DMG/RES, minimap room-chain 6–10.
 
@@ -722,7 +722,14 @@ JUMPER_KNOCKBACK_Y_AERIAL  =  2.0   # NEW — downward spike when Jumper attacks
 
 ---
 
-### Task P2-0c: Critical Bug-Fix Sprint (2026-04-21 review pass)
+### Task P2-0c: Critical Bug-Fix Sprint ✅ DONE (2026-04-23)
+
+**What was built:**
+- `entities/player.py`: `self.ability_slots = ABILITY_SLOTS_DEFAULT` in `__init__`; `if self.ability_slots < 1: return` gate in `_handle_ability()`.
+- `scenes/gameplay.py`: Slot restore from save in `on_enter()`; `AbilityOrb` spawn/collect/draw loops; `_setup_upgrade_choices()` early-return on dead player; Architect `announce_phase` block with phase-4 arena-shrink; banner index driven by `_boss_dialogue._index`; `"res"` upgrade no longer calls `_regen_resource`; shrink-wall injection uses independent left/right conditions.
+- `world/tilemap.py`: `ability_orb_spawns` list in `__init__`; `'A'` tile handler in `_parse()`.
+- `entities/architect.py`: `level_width` constructor param; `arena_max` uses `self._level_width`; `announce_phase = 4` on phase-4 entry.
+- `systems/collectible.py`: `if not self.alive: return` guard in `AbilityOrb.collect()`.
 
 _Unblocked by P2-5 completion. Review-agent 2026-04-21 pass found these correctness bugs that must be fixed before P2-6 content work. Critical bugs marked 🔴; minor/deferred marked ⚠️._
 
