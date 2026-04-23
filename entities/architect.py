@@ -114,6 +114,7 @@ class Architect(Boss):
         if not self._phase4_entered and self.phase >= 4:
             self._phase4_entered   = True
             self._rage_flash_timer = 30
+            self.announce_phase    = 4   # BUG-021: signal gameplay.py to show banner + arena-shrink
 
         # Delegate to Boss.update which calls super chain, ticks projectiles, etc.
         super().update(dt, player=player, solid_rects=solid_rects)
