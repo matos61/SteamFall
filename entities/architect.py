@@ -28,12 +28,14 @@ from settings        import (
     ARCHITECT_PHASE3_THRESH,
     ARCHITECT_PHASE4_THRESH,
     ARCHITECT_TELEPORT_CD,
+    ARCHITECT_TELEPORT_WARN,
     ARCHITECT_FAN_CD,
     ARCHITECT_MINION_CD,
     FACTION_MARKED,
     FACTION_FLESHFORGED,
     ENEMY_ATTACK_DAMAGE,
     SCREEN_WIDTH,
+    SCREEN_HEIGHT,
     TILE_SIZE,
 )
 
@@ -42,9 +44,11 @@ class Architect(Boss):
     """Four-phase final boss whose tactics shift with each health threshold."""
 
     def __init__(self, x: float, y: float, faction: str = FACTION_MARKED,
-                 level_width: int = SCREEN_WIDTH):
+                 level_width: int = SCREEN_WIDTH,
+                 level_floor_y: int = SCREEN_HEIGHT - TILE_SIZE * 2):
         super().__init__(x, y, name="The Architect")
-        self._level_width = level_width
+        self._level_width   = level_width
+        self._level_floor_y = level_floor_y
 
         # Resize the rect to Architect proportions
         self.rect       = pygame.Rect(int(x), int(y), 60, 80)
@@ -56,10 +60,12 @@ class Architect(Boss):
         self.faction = faction
 
         # Phase-4 state
-        self._phase4_entered   = False
-        self._teleport_cd      = 0
-        self._fan_cd           = 0
-        self._minion_cd        = 0
+        self._phase4_entered    = False
+        self._teleport_cd       = 0
+        self._teleport_warn_timer = 0   # P2-8: pre-teleport warning countdown
+        self._warn_flash        = False  # P2-8: distinct from _rage_flash_timer
+        self._fan_cd            = 0
+        self._minion_cd         = 0
         self._spawned_minions: list = []
 
         # Defeat dialogue state
@@ -110,6 +116,23 @@ class Architect(Boss):
         if self._minion_cd > 0:
             self._minion_cd -= 1
 
+        # P2-8: Tick teleport warning countdown — execute teleport when it reaches 0
+        if self._teleport_warn_timer > 0:
+            self._teleport_warn_timer -= 1
+            self._warn_flash = True
+            self.vx = 0   # keep locked during warning
+            if self._teleport_warn_timer == 0:
+                # Execute the actual position change now
+                self._warn_flash = False
+                arena_min = TILE_SIZE * 4
+                arena_max = self._level_width - TILE_SIZE * 4
+                self.rect.centerx = random.randint(arena_min, arena_max)
+                self.rect.bottom  = self._level_floor_y   # Y floor clamp
+                self.x = float(self.rect.x)
+                self.y = float(self.rect.y)
+        else:
+            self._warn_flash = False
+
         # Phase-4 entrance (fires exactly once)
         if not self._phase4_entered and self.phase >= 4:
             self._phase4_entered   = True
@@ -129,15 +152,11 @@ class Architect(Boss):
 
         ph = self.phase
 
-        # Phase 2+: periodic teleport
-        if ph >= 2 and self._teleport_cd == 0:
-            self._teleport_cd      = ARCHITECT_TELEPORT_CD
-            self._rage_flash_timer = 15
-            arena_min = TILE_SIZE * 4
-            arena_max = self._level_width - TILE_SIZE * 4
-            self.rect.centerx = random.randint(arena_min, arena_max)
-            # Keep pixel-precise float position in sync
-            self.x = float(self.rect.x)
+        # Phase 2+: periodic teleport — start warning phase first, teleport fires in update()
+        if ph >= 2 and self._teleport_cd == 0 and self._teleport_warn_timer == 0:
+            self._teleport_cd         = ARCHITECT_TELEPORT_CD
+            self._teleport_warn_timer = ARCHITECT_TELEPORT_WARN
+            self.vx = 0   # lock movement during warn window
 
         # Phase 3+: periodic 5-projectile fan spread
         if ph >= 3 and self._fan_cd == 0:
@@ -210,3 +229,16 @@ class Architect(Boss):
             self.color = (180, 0,  40)    # blood-red
 
         super().draw(surface, camera)
+
+        # P2-8: Pre-teleport warning flash — draw a distinct white-blue tint overlay
+        # Uses a separate _warn_flash attribute so it doesn't interfere with _rage_flash_timer.
+        if self._warn_flash:
+            screen_rect = camera.apply(self)
+            pulse_alpha = 80 + int(100 * abs(
+                (self._teleport_warn_timer % 6) / 6.0 - 0.5) * 2)
+            warn_surf = pygame.Surface(
+                (screen_rect.width, screen_rect.height), pygame.SRCALPHA)
+            warn_surf.fill((200, 230, 255, pulse_alpha))   # white-blue pulse
+            surface.blit(warn_surf, screen_rect.topleft)
+            # Also draw a bright border
+            pygame.draw.rect(surface, (180, 220, 255), screen_rect, 3)

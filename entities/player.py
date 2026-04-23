@@ -92,6 +92,7 @@ class Player(Entity):
         # P2-5 upgrade bonuses (additive; set from gameplay.py via save_data)
         self.attack_damage_bonus: int   = 0
         self.max_resource_bonus: float  = 0.0
+        self._res_regen_bonus: float    = 0.0   # P2-8: per-"res"-upgrade additive regen boost
 
         # P1-8 / BUG-019: ability gate — restored from save_data by gameplay.py
         self.ability_slots: int = ABILITY_SLOTS_DEFAULT
@@ -193,7 +194,7 @@ class Player(Entity):
         self._handle_attack(keys)
         self._handle_ability(keys)
         self._tick_ability()
-        self._regen_resource(0.05)   # Slow passive regen
+        self._regen_resource(0.05 + self._res_regen_bonus)   # Slow passive regen
         self._update_animation()
 
     # ------------------------------------------------------------------

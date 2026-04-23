@@ -538,7 +538,9 @@ _Applied by hk-agent 2026-04-12; see `REVIEW_HK.md` for full analysis._
 
 ---
 
-## Phase 2 — Content Expansion
+## Phase 2 — Content Expansion ✅ COMPLETE (2026-04-23)
+
+All Phase 2 tasks are done. The game has 10 levels (with faction branches at 6–8), three enemy varieties, a two-boss climax, an upgrade system, environmental hazards, enemy drops, and a full minimap. Phase 3 (Story Integration) is next.
 
 **Priority order for build-agent** (tackle in this order):
 
@@ -552,7 +554,7 @@ _Applied by hk-agent 2026-04-12; see `REVIEW_HK.md` for full analysis._
 8. ~~**P2-0c (critical bug-fix sprint)**~~ ✅ **DONE (2026-04-23):** BUG-018 through BUG-025 all fixed — ability-slots gate added (BUG-019), Architect level_width param (BUG-020), Architect phase-announce wired (BUG-021), upgrade-while-dead guard (BUG-018), announce_phase=4 signal (BUG-021 addendum), BUG-022/023/024/025 resolved.
 9. ~~**P2-6 (enemy drops)**~~ ✅ **DONE (2026-04-23):** `HeatCore`/`SoulShard` confirmed in place; `HEAT_CORE_HEAL`/`SOUL_SHARD_HEAL` raised to 12; Boss `get_drop_fragments()` spread widened to ±40 px.
 10. ~~**P2-7 (environmental hazards)**~~ ✅ **DONE (2026-04-23):** Spike tiles (`'s'`) and crumble platforms (`'~'`) parsed; spike damage, crumble state machine, and hazard draw added to `gameplay.py`; test tiles placed in LEVEL_3 and LEVEL_4.
-11. **P2-8 (HK feel sprint — Architect/Upgrades/Minimap):** All outstanding hk-agent 2026-04-21 recommendations — teleport telegraph, minion cap, upgrade DMG/RES, minimap room-chain 6–10. **← NEXT for build-agent**
+11. ~~**P2-8 (HK feel sprint — Architect/Upgrades/Minimap)**~~ ✅ **DONE (2026-04-23):** Teleport warn (20-frame white-blue pulse + Y-floor clamp); crawler cap (≤2 live); `UPGRADE_DMG_MAX_STACKS=3`; `_res_regen_bonus` additive regen; minimap 2-row layout covering all 13 level nodes.
 
 ---
 
@@ -884,7 +886,14 @@ CRUMBLE_WARNING_COLOR = (160, 120, 40)  # Color shift when about to crumble
 
 ---
 
-### Task P2-8: HK Feel Sprint — Architect / Upgrades / Minimap
+### Task P2-8: HK Feel Sprint — Architect / Upgrades / Minimap ✅ DONE (2026-04-23)
+
+**What was built:**
+- `settings.py`: `ARCHITECT_TELEPORT_CD` 200→140; `ARCHITECT_TELEPORT_WARN=20`; `ARCHITECT_MINION_CD` 300→210; `UPGRADE_DMG_BONUS` 5→6; `UPGRADE_DMG_MAX_STACKS=3`; `UPGRADE_RES_REGEN_BONUS=0.008`.
+- `entities/architect.py`: `level_floor_y` constructor param + Y-floor clamp on teleport; 20-frame white-blue warn timer before position change; `vx=0` lock during warning; warn flash overlay in `draw()`.
+- `entities/player.py`: `_res_regen_bonus: float = 0.0`; passive regen uses `0.05 + self._res_regen_bonus`.
+- `scenes/gameplay.py`: "dmg" upgrade capped at `UPGRADE_DMG_MAX_STACKS`; "res" upgrade adds `UPGRADE_RES_REGEN_BONUS` to player; live-Crawler count check discards excess beyond cap of 2; `level_floor_y` passed to Architect constructor.
+- `systems/minimap.py`: `_LEVEL_ORDER` extended to 13 keys; two-row layout (levels 1–5 top, levels 6–10 bottom with faction-pair columns and single nodes for 9/10).
 
 _Blocked until P2-7 is complete. Implements all outstanding hk-agent recommendations from the 2026-04-21 pass._
 

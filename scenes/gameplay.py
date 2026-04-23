@@ -106,16 +106,26 @@ def _faction_next_level(current_level: str, faction: str) -> str | None:
     return _LEVEL_CHAIN.get(current_level)
 
 
-def _apply_upgrade_to_player(player, upg_id: str) -> None:
-    """Apply a single upgrade to a Player instance. Called on collection and on level load."""
+def _apply_upgrade_to_player(player, upg_id: str,
+                             save_upgrades: list | None = None) -> None:
+    """Apply a single upgrade to a Player instance. Called on collection and on level load.
+
+    save_upgrades is the full list from save_data["upgrades"]; used to enforce stack caps.
+    """
     if upg_id == "hp":
         player.max_health            += UPGRADE_HP_BONUS
         player.health                 = min(player.health + UPGRADE_HP_BONUS,
                                             player.max_health)
     elif upg_id == "dmg":
+        # P2-8: skip if already at max stacks
+        if save_upgrades is not None:
+            existing = sum(1 for u in save_upgrades if u == "dmg")
+            if existing > UPGRADE_DMG_MAX_STACKS:
+                return
         player.attack_damage_bonus   += UPGRADE_DMG_BONUS
     elif upg_id == "res":
         player.max_resource_bonus    += UPGRADE_RES_BONUS
+        player._res_regen_bonus      += UPGRADE_RES_REGEN_BONUS   # P2-8: speed up passive regen
 
 
 class GameplayScene(BaseScene):
@@ -148,8 +158,9 @@ class GameplayScene(BaseScene):
             self.player = Player(px, py, faction=faction)
 
         # Apply saved upgrades before setting respawn health so max_health is correct
-        for upg in save.get("upgrades", []):
-            _apply_upgrade_to_player(self.player, upg)
+        _saved_upgrades = save.get("upgrades", [])
+        for upg in _saved_upgrades:
+            _apply_upgrade_to_player(self.player, upg, save_upgrades=_saved_upgrades)
 
         # Restore ability unlock state from save (BUG-019)
         self.player.ability_slots = save.get("ability_slots", ABILITY_SLOTS_DEFAULT)
@@ -189,7 +200,8 @@ class GameplayScene(BaseScene):
             ax, ay   = self.tilemap.architect_spawn
             _faction = self.game.player_faction or FACTION_MARKED
             arch     = Architect(ax, ay, faction=_faction,
-                                 level_width=self.tilemap.width)
+                                 level_width=self.tilemap.width,
+                                 level_floor_y=self.tilemap.height - TILE_SIZE * 2)
             self.enemies.append(arch)
             self._architect = arch
 
@@ -580,13 +592,24 @@ class GameplayScene(BaseScene):
                     self.tilemap.width - ARENA_SHRINK_AMOUNT)
 
         # --- Flush Architect-spawned minions into the main enemy list ---
+        # P2-8: enforce crawler cap of 2 live Crawlers in the arena at once.
         # Collect additions first so we never modify the list we're iterating.
         minion_additions = []
         for e in self.enemies:
             if isinstance(e, Architect) and hasattr(e, '_spawned_minions'):
                 minion_additions.extend(e._spawned_minions)
                 e._spawned_minions.clear()
-        self.enemies.extend(minion_additions)
+        if minion_additions:
+            live_crawlers = sum(1 for e in self.enemies
+                                if isinstance(e, Crawler) and e.alive)
+            for minion in minion_additions:
+                if isinstance(minion, Crawler):
+                    if live_crawlers < 2:
+                        self.enemies.append(minion)
+                        live_crawlers += 1
+                    # else: cap reached; discard this minion
+                else:
+                    self.enemies.append(minion)
 
         # --- Spawn drops from newly dead enemies + prune enemy list ---
         # Guard with hitstop check so drops spawn exactly once per kill,
@@ -1193,9 +1216,15 @@ class GameplayScene(BaseScene):
 
     def _confirm_upgrade(self, upg_id: str) -> None:
         upgs = self.game.save_data.setdefault("upgrades", [])
+        # P2-8: enforce DMG stack cap — silently skip if already at max stacks
+        if upg_id == "dmg":
+            existing = sum(1 for u in upgs if u == "dmg")
+            if existing >= UPGRADE_DMG_MAX_STACKS:
+                self._upgrade_active = False
+                return
         upgs.append(upg_id)
         self.game.save_to_disk()
-        _apply_upgrade_to_player(self.player, upg_id)
+        _apply_upgrade_to_player(self.player, upg_id, save_upgrades=upgs)
         self._upgrade_active = False
 
     def _draw_upgrade_screen(self, surface: pygame.Surface) -> None:

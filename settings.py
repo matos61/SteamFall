@@ -198,14 +198,17 @@ ARCHITECT_MAX_HEALTH    = 600
 ARCHITECT_PHASE2_THRESH = 0.75   # 75% HP — adds teleport
 ARCHITECT_PHASE3_THRESH = 0.50   # 50% HP — adds 5-projectile fan
 ARCHITECT_PHASE4_THRESH = 0.25   # 25% HP — adds Crawler spawns
-ARCHITECT_TELEPORT_CD   = 200    # frames between teleports
+ARCHITECT_TELEPORT_CD   = 140    # frames between teleports (was 200)
+ARCHITECT_TELEPORT_WARN = 20     # NEW — pre-teleport lock+pulse frames before position jump
 ARCHITECT_FAN_CD        = 90     # frames between fan spread shots
-ARCHITECT_MINION_CD     = 300    # frames between Crawler spawns
+ARCHITECT_MINION_CD     = 210    # frames between Crawler spawns (was 300)
 
 # --- P2-5: Upgrade system ---
-UPGRADE_HP_BONUS   = 25    # Max HP increase per upgrade selection
-UPGRADE_DMG_BONUS  = 5     # Attack damage bonus per upgrade selection
-UPGRADE_RES_BONUS  = 20    # Max resource increase per upgrade selection
+UPGRADE_HP_BONUS        = 25     # Max HP increase per upgrade selection
+UPGRADE_DMG_BONUS       = 6      # Attack damage bonus per upgrade selection (was 5)
+UPGRADE_DMG_MAX_STACKS  = 3      # NEW — max times "dmg" upgrade can be applied
+UPGRADE_RES_BONUS       = 20     # Max resource increase per upgrade selection
+UPGRADE_RES_REGEN_BONUS = 0.008  # NEW — additive boost to 0.05/frame passive regen per stack
 
 # --- P2-6: Enemy drops ---
 HEAT_CORE_SIZE    = 10                  # px square
