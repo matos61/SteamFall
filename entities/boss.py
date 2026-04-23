@@ -246,13 +246,13 @@ class Boss(Enemy):
     # ------------------------------------------------------------------
 
     def get_drop_fragments(self) -> list:
-        """Return three SoulFragments spread around the boss centre."""
+        """Return three SoulFragments spread around the boss centre (±40 px)."""
         from systems.collectible import SoulFragment
         cx, cy = self.rect.centerx, self.rect.centery
         return [
-            SoulFragment(cx - 20, cy),
+            SoulFragment(cx - 40, cy),
             SoulFragment(cx,       cy),
-            SoulFragment(cx + 20,  cy),
+            SoulFragment(cx + 40,  cy),
         ]
 
     # ------------------------------------------------------------------

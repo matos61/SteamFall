@@ -209,10 +209,10 @@ UPGRADE_RES_BONUS  = 20    # Max resource increase per upgrade selection
 
 # --- P2-6: Enemy drops ---
 HEAT_CORE_SIZE    = 10                  # px square
-HEAT_CORE_HEAL    = 8                   # HP healed when picked up by Fleshforged
+HEAT_CORE_HEAL    = 12                  # HP healed when picked up by Fleshforged
 HEAT_CORE_COLOR   = (220, 100, 20)      # Burnt orange
 SOUL_SHARD_SIZE   = 10
-SOUL_SHARD_HEAL   = 8                   # HP healed when picked up by Marked
+SOUL_SHARD_HEAL   = 12                 # HP healed when picked up by Marked
 SOUL_SHARD_COLOR  = (130, 80, 220)      # Soft purple (matches SOUL_FRAGMENT_COLOR)
 DROP_BOB_SPEED    = 0.08                # radians/frame for bobbing sinusoid
 DROP_BOB_AMP      = 3                   # pixel amplitude of bob
