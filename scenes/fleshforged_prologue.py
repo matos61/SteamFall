@@ -122,19 +122,35 @@ FLESHFORGED_BEATS = [
 
     ((22, 12,  5), "",
         "You said nothing. You stood. The floor was cold beneath your new feet. You were not."),
+
+    # ==========================================================================
+    # MID-GAME LORE BEATS (indices 30-33) — triggered by leaving level 3.
+    # ==========================================================================
+    ((60, 30, 10), "Sera's Datalog",
+        "The Forgemaster's schematics. Sera copied them before the ambush. The Marked sabotaged the Rite deliberately."),
+
+    ((70, 25, 10), "Sera's Datalog",
+        "Soul energy is not mystical. It is thermodynamic — latent chemical potential extracted by augment cores. The Marked know this and call it heresy."),
+
+    ((80, 30, 10), "Sera's Datalog",
+        "The Architect is a weapons system. Whoever activates it first controls the city's energy supply. The Marked want it silent. You cannot let that happen."),
+
+    ((50, 20, 10), "???",
+        "Sera built this into your augments. Find the Architect before they do."),
 ]
 
 
 class FleshforgedPrologueScene(BaseScene):
     def __init__(self, game):
         super().__init__(game)
-        self._beat_index = 0
-        self._dialogue   = DialogueBox(faction=FACTION_FLESHFORGED)
-        self._tutorial   = None
-        self._voice      = VoicePlayer()
-        self._font_skip  = pygame.font.SysFont("monospace", 13)
-        self._fade_alpha = 255
-        self._fade_surf  = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT))
+        self._beat_index    = 0
+        self._return_level  = None
+        self._dialogue      = DialogueBox(faction=FACTION_FLESHFORGED)
+        self._tutorial      = None
+        self._voice         = VoicePlayer()
+        self._font_skip     = pygame.font.SysFont("monospace", 13)
+        self._fade_alpha    = 255
+        self._fade_surf     = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT))
         self._fade_surf.fill(BLACK)
         r, g, b = FLESHFORGED_BEATS[0][0]
         self._bg = [float(r), float(g), float(b)]
@@ -142,12 +158,14 @@ class FleshforgedPrologueScene(BaseScene):
     # ------------------------------------------------------------------
 
     def on_enter(self, **kwargs):
-        self._beat_index = 0
-        r, g, b = FLESHFORGED_BEATS[0][0]
+        beat_start          = kwargs.get("beat_start", 0)
+        self._return_level  = kwargs.get("return_level", None)
+        self._beat_index    = beat_start
+        r, g, b = FLESHFORGED_BEATS[beat_start][0]
         self._bg         = [float(r), float(g), float(b)]
         self._fade_alpha = 255
         self._tutorial   = None
-        self._load_beat(0)
+        self._load_beat(beat_start)
 
     def _load_beat(self, index: int):
         _, speaker, data = FLESHFORGED_BEATS[index]
@@ -173,7 +191,10 @@ class FleshforgedPrologueScene(BaseScene):
         if event.type == pygame.KEYDOWN:
             if event.key == pygame.K_ESCAPE:
                 self._voice.stop()
-                self.game.change_scene(SCENE_GAMEPLAY)
+                if self._return_level:
+                    self.game.change_scene(SCENE_GAMEPLAY, level=self._return_level)
+                else:
+                    self.game.change_scene(SCENE_GAMEPLAY)
                 return
             if self._tutorial is not None:
                 self._tutorial.handle_event(event)
@@ -192,7 +213,10 @@ class FleshforgedPrologueScene(BaseScene):
     def _next_beat(self):
         self._beat_index += 1
         if self._beat_index >= len(FLESHFORGED_BEATS):
-            self.game.change_scene(SCENE_GAMEPLAY)
+            if self._return_level:
+                self.game.change_scene(SCENE_GAMEPLAY, level=self._return_level)
+            else:
+                self.game.change_scene(SCENE_GAMEPLAY)
         else:
             self._load_beat(self._beat_index)
 

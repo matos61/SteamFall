@@ -49,16 +49,21 @@ class Game:
         from scenes.marked_prologue      import MarkedPrologueScene
         from scenes.fleshforged_prologue import FleshforgedPrologueScene
         from scenes.gameplay             import GameplayScene
+        from scenes.marked_ending        import MarkedEndingScene
+        from scenes.fleshforged_ending   import FleshforgedEndingScene
 
         from settings import (SCENE_FACTION_SELECT, SCENE_MARKED_PROLOGUE,
-                               SCENE_FLESHFORGED_PROLOGUE, SCENE_GAMEPLAY)
+                               SCENE_FLESHFORGED_PROLOGUE, SCENE_GAMEPLAY,
+                               SCENE_MARKED_ENDING, SCENE_FLESHFORGED_ENDING)
 
         self._scenes = {
-            SCENE_MAIN_MENU:            MainMenuScene(self),
-            SCENE_FACTION_SELECT:       FactionSelectScene(self),
-            SCENE_MARKED_PROLOGUE:      MarkedPrologueScene(self),
-            SCENE_FLESHFORGED_PROLOGUE: FleshforgedPrologueScene(self),
-            SCENE_GAMEPLAY:             GameplayScene(self),
+            SCENE_MAIN_MENU:             MainMenuScene(self),
+            SCENE_FACTION_SELECT:        FactionSelectScene(self),
+            SCENE_MARKED_PROLOGUE:       MarkedPrologueScene(self),
+            SCENE_FLESHFORGED_PROLOGUE:  FleshforgedPrologueScene(self),
+            SCENE_GAMEPLAY:              GameplayScene(self),
+            SCENE_MARKED_ENDING:         MarkedEndingScene(self),
+            SCENE_FLESHFORGED_ENDING:    FleshforgedEndingScene(self),
         }
 
     # ------------------------------------------------------------------

@@ -139,19 +139,35 @@ MARKED_BEATS = [
 
     ((20, 10, 50), "",
         "You rose. For the first time in your life, you were not afraid of what came next."),
+
+    # ==========================================================================
+    # MID-GAME LORE BEATS (indices 33-36) — triggered by leaving level 3.
+    # ==========================================================================
+    ((30, 20, 50), "Rune-Archivist",
+        "The Runed Archives. Hidden beneath the Foundry. Kael knew it was here."),
+
+    ((40, 15, 60), "Rune-Archivist",
+        "The Fleshforged do not transcend. They consume. Every augment is a theft — soul energy harvested from the Marked."),
+
+    ((50, 20, 70), "Rune-Archivist",
+        "The Architect was not built. It was summoned. It is what remains of the Founder after the first Rite failed."),
+
+    ((20, 10, 40), "???",
+        "Kael gave you this knowledge. Use it."),
 ]
 
 
 class MarkedPrologueScene(BaseScene):
     def __init__(self, game):
         super().__init__(game)
-        self._beat_index = 0
-        self._dialogue   = DialogueBox(faction=FACTION_MARKED)
-        self._tutorial   = None
-        self._voice      = VoicePlayer()
-        self._font_skip  = pygame.font.SysFont("monospace", 13)
-        self._fade_alpha = 255
-        self._fade_surf  = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT))
+        self._beat_index    = 0
+        self._return_level  = None
+        self._dialogue      = DialogueBox(faction=FACTION_MARKED)
+        self._tutorial      = None
+        self._voice         = VoicePlayer()
+        self._font_skip     = pygame.font.SysFont("monospace", 13)
+        self._fade_alpha    = 255
+        self._fade_surf     = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT))
         self._fade_surf.fill(BLACK)
         r, g, b = MARKED_BEATS[0][0]
         self._bg = [float(r), float(g), float(b)]
@@ -159,12 +175,14 @@ class MarkedPrologueScene(BaseScene):
     # ------------------------------------------------------------------
 
     def on_enter(self, **kwargs):
-        self._beat_index = 0
-        r, g, b = MARKED_BEATS[0][0]
+        beat_start          = kwargs.get("beat_start", 0)
+        self._return_level  = kwargs.get("return_level", None)
+        self._beat_index    = beat_start
+        r, g, b = MARKED_BEATS[beat_start][0]
         self._bg         = [float(r), float(g), float(b)]
         self._fade_alpha = 255
         self._tutorial   = None
-        self._load_beat(0)
+        self._load_beat(beat_start)
 
     def _load_beat(self, index: int):
         _, speaker, data = MARKED_BEATS[index]
@@ -188,10 +206,13 @@ class MarkedPrologueScene(BaseScene):
 
     def handle_event(self, event):
         if event.type == pygame.KEYDOWN:
-            # ESC always skips to gameplay
+            # ESC always skips to gameplay (or returns to return_level if mid-game)
             if event.key == pygame.K_ESCAPE:
                 self._voice.stop()
-                self.game.change_scene(SCENE_GAMEPLAY)
+                if self._return_level:
+                    self.game.change_scene(SCENE_GAMEPLAY, level=self._return_level)
+                else:
+                    self.game.change_scene(SCENE_GAMEPLAY)
                 return
             # While a tutorial is running, delegate ALL input to it
             if self._tutorial is not None:
@@ -213,7 +234,10 @@ class MarkedPrologueScene(BaseScene):
     def _next_beat(self):
         self._beat_index += 1
         if self._beat_index >= len(MARKED_BEATS):
-            self.game.change_scene(SCENE_GAMEPLAY)
+            if self._return_level:
+                self.game.change_scene(SCENE_GAMEPLAY, level=self._return_level)
+            else:
+                self.game.change_scene(SCENE_GAMEPLAY)
         else:
             self._load_beat(self._beat_index)
 

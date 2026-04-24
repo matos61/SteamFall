@@ -47,6 +47,10 @@ class Enemy(Entity):
         # "" → neutral SoulFragment; FACTION_FLESHFORGED → HeatCore; FACTION_MARKED → SoulShard
         self.faction_drop: str = ""
 
+        # Visual tint applied in levels with strong faction theming (P3-2)
+        # "" → no tint; FACTION_FLESHFORGED → iron-orange blend; FACTION_MARKED → acolyte purple blend
+        self.faction_tint: str = ""
+
     # ------------------------------------------------------------------
 
     def update(self, dt: int, player=None, solid_rects=None) -> None:
@@ -150,7 +154,18 @@ class Enemy(Entity):
     def draw(self, surface: pygame.Surface, camera) -> None:
         screen_rect = camera.apply(self)
         # 2-frame red hit-flash instead of the white player flash
-        color = RED if (self.iframes > 0 and self.iframes % 4 < 2) else self.color
+        base_color = RED if (self.iframes > 0 and self.iframes % 4 < 2) else self.color
+        # P3-2: 50/50 blend toward faction tint for themed levels
+        if self.faction_tint == FACTION_FLESHFORGED:
+            tint = (160, 130, 100)
+            color = tuple(int(a * 0.5 + b * 0.5)
+                          for a, b in zip(base_color, tint))
+        elif self.faction_tint == FACTION_MARKED:
+            tint = (100, 60, 160)
+            color = tuple(int(a * 0.5 + b * 0.5)
+                          for a, b in zip(base_color, tint))
+        else:
+            color = base_color
         pygame.draw.rect(surface, color, screen_rect)
         if self.health < self.max_health and self.max_health > 0:
             bw = self.rect.width

@@ -227,3 +227,22 @@ CRUMBLE_RESPAWN_FRAMES = 180           # Frames before a crumble tile reappears
 SPIKE_COLOR            = (180, 60, 60)  # Dark red spike pixel color
 CRUMBLE_COLOR          = (110, 90, 60)  # Brownish crumble tile color
 CRUMBLE_WARNING_COLOR  = (160, 120, 40) # Color shift when about to crumble
+
+# --- P3-1: Mid-game lore beat start indices ---
+MARKED_LORE_BEAT_START      = 33   # Index of first mid-game Marked lore beat in MARKED_BEATS
+FLESHFORGED_LORE_BEAT_START = 30   # Index of first mid-game Fleshforged lore beat in FLESHFORGED_BEATS
+
+# --- P3-3: Ending scenes ---
+SCENE_MARKED_ENDING      = "marked_ending"
+SCENE_FLESHFORGED_ENDING = "fleshforged_ending"
+
+# --- P3-4: NPC encounters ---
+NPC_WIDTH         = 24
+NPC_HEIGHT        = 40
+NPC_INTERACT_DIST = 60      # Pixels — E-key trigger range
+NPC_COLOR         = (140, 160, 140)
+
+# --- P3-5: Collectible lore items ---
+LORE_ITEM_SIZE      = 16
+LORE_ITEM_COLOR     = (160, 140, 100)    # Parchment tone
+LORE_DISPLAY_FRAMES = 300                # 5 seconds at 60 FPS

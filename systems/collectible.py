@@ -18,7 +18,8 @@ from settings import (SOUL_FRAGMENT_COLOR, SOUL_FRAGMENT_SIZE,
                       HEAT_CORE_SIZE, HEAT_CORE_HEAL, HEAT_CORE_COLOR,
                       SOUL_SHARD_SIZE, SOUL_SHARD_HEAL, SOUL_SHARD_COLOR,
                       DROP_BOB_SPEED, DROP_BOB_AMP,
-                      FACTION_FLESHFORGED, FACTION_MARKED)
+                      FACTION_FLESHFORGED, FACTION_MARKED,
+                      LORE_ITEM_SIZE, LORE_ITEM_COLOR)
 
 
 class SoulFragment:
@@ -210,3 +211,55 @@ class AbilityOrb:
         self.alive = False
         game.save_data["ability_slots"] = player.ability_slots
         game.save_to_disk()
+
+
+# ---------------------------------------------------------------------------
+
+
+class LoreItem:
+    """Parchment-coloured collectible that reveals a lore text blurb on pickup.
+
+    Parameters
+    ----------
+    x, y     : World-space centre position.
+    lore_id  : Unique string key stored in save_data["lore_found"].
+    text     : The text string displayed when collected.
+    """
+
+    def __init__(self, x: float, y: float, lore_id: str, text: str):
+        self._x       = float(x)
+        self._y       = float(y)
+        self._lore_id = lore_id
+        self._text    = text
+        self._glow    = 0
+        self.alive    = True
+        s = LORE_ITEM_SIZE
+        self.rect = pygame.Rect(int(x) - s // 2, int(y) - s // 2, s, s)
+
+    def update(self) -> None:
+        self._glow = (self._glow + 1) % 60
+        # Gentle bob
+        self._y_disp = self._y + math.sin(self._glow / 60 * 2 * math.pi) * 3
+        self.rect.centery = int(self._y_disp)
+        self.rect.centerx = int(self._x)
+
+    def draw(self, surface: pygame.Surface, camera) -> None:
+        sr = camera.apply_rect(self.rect)
+        if sr.right < 0 or sr.left > surface.get_width():
+            return
+        brightness = int(math.sin(self._glow / 60 * 2 * math.pi) * 15)
+        r = min(255, max(0, LORE_ITEM_COLOR[0] + brightness))
+        g = min(255, max(0, LORE_ITEM_COLOR[1] + brightness))
+        b = min(255, max(0, LORE_ITEM_COLOR[2] + brightness))
+        _draw_diamond(surface, (r, g, b), sr.centerx, sr.centery, sr.width // 2)
+
+    def collect(self, player, game) -> str | None:
+        """Mark as collected, save, and return the lore text (or None if already collected)."""
+        lore_found = game.save_data.setdefault("lore_found", [])
+        if self._lore_id not in lore_found:
+            lore_found.append(self._lore_id)
+            game.save_to_disk()
+            self.alive = False
+            return self._text
+        self.alive = False
+        return None

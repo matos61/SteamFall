@@ -15,6 +15,8 @@
 #   'X' = Architect (final boss) spawn point
 #   's' = spike hazard tile (non-solid; player takes damage on contact)
 #   '~' = crumble platform (solid until stood on; falls after CRUMBLE_STAND_FRAMES)
+#   'N' = NPC spawn point
+#   'L' = collectible lore item spawn point
 #
 # When you have real tile sprites, replace the pygame.draw calls in
 # draw_tile() with surface.blit(tile_image, screen_rect).
@@ -84,7 +86,7 @@ LEVEL_2 = [
     "  ###                ###                    ###              ###        ",
     "                                                                        ",
     # Row 11: ground entities P=player spawn (comes from left)
-    "P     E          c               E            c           E             ",
+    "P  L  E          c               E            c      L    E             ",
     # Row 12-13: solid floor
     "########################################################################",
     "########################################################################",
@@ -109,7 +111,7 @@ LEVEL_3 = [
     "                                                                 ",
     "     E               ###                  E                      ",
     "###########                                         ######       ",
-    "                 C               ###                             ",
+    "                 C               ###           N                 ",
     "#################   s   s   s               E              P     ",
     "#################################################################",
     "#################################################################",
@@ -123,7 +125,7 @@ LEVEL_4 = [
     "         ###                   ###                  ",
     "  E                  c                        E     ",
     "      #######              #######                  ",
-    "                                                    ",
+    "          L                          L              ",
     "         E         C                 E              ",
     "  ~~~~~~~~~~~~~~     ################               ",
     "                                          P         ",
@@ -135,9 +137,9 @@ LEVEL_5 = [
     "                                                     ",
     "                                                     ",
     "  ###                                          ###   ",
+    "                                L                    ",
     "                                                     ",
-    "                                                     ",
-    "           C                                         ",
+    "     N     C                                         ",
     "   P    ########                      ########       ",
     "                                                     ",
     "                        B                            ",
@@ -276,7 +278,7 @@ LEVEL_9 = [
     "      #########                  #########                       ",
     "                  J      ###           G                         ",
     "   ###                                         J          ###    ",
-    "          C                    ###                               ",
+    "          C         L          ###                L              ",
     "   ################                         c              P     ",
     "#################################################################",
     "#################################################################",
@@ -320,6 +322,8 @@ class TileMap:
         self.ability_orb_spawns: list[tuple]  = []
         self.spike_tiles: list                = []   # Non-solid; deal damage on contact
         self.crumble_tiles: list              = []   # Solid until stood on; fall and respawn
+        self.npc_spawns: list[tuple]          = []   # (x, y) feet positions for NPCs
+        self.lore_spawns: list[tuple]         = []   # (x, y) centre positions for lore items
 
         self._parse(level_data)
 
@@ -384,6 +388,14 @@ class TileMap:
                     self.tiles.append(rect)
                     self.crumble_tiles.append(
                         {'rect': rect, 'timer': 0, 'state': 'solid'})
+
+                elif char == 'N':
+                    # NPC spawn — feet at bottom of tile
+                    self.npc_spawns.append((x + TILE_SIZE // 2, y + TILE_SIZE))
+
+                elif char == 'L':
+                    # Lore item spawn — centred on tile
+                    self.lore_spawns.append((x + TILE_SIZE // 2, y + TILE_SIZE // 2))
 
     # ------------------------------------------------------------------
 

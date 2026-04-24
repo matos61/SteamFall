@@ -36,8 +36,9 @@ from entities.shield_guard import ShieldGuard
 from entities.ranged       import Ranged
 from entities.jumper       import Jumper
 from systems.checkpoint import Checkpoint
-from systems.collectible import SoulFragment, HeatCore, SoulShard, AbilityOrb
+from systems.collectible import SoulFragment, HeatCore, SoulShard, AbilityOrb, LoreItem
 from systems.minimap    import MiniMap
+from entities.npc       import NPC
 
 
 # Scripted dialogue for The Warden boss encounter
@@ -90,6 +91,54 @@ _LEVEL_CHAIN = {
     "level_4":             "level_5",
     "level_9":             "level_10",
 }
+
+
+# Lore item text indexed by (level_name, lore_index).  Index matches the order
+# 'L' tiles appear in each level string (top-to-bottom, left-to-right).
+_LORE_TEXT: dict[tuple, tuple[str, str]] = {
+    ("level_2", 0): ("lore_foundry_plaque",
+                     "'YIELD PER SOUL: 0.04 KW-hr. DAILY EXTRACTION QUOTA: 400 SOULS. — FORGEMASTER DIRECTORATE'"),
+    ("level_2", 1): ("lore_marked_inscription",
+                     "'The second Rite requires a willing vessel. Kael volunteered before we could ask.'"),
+    ("level_4", 0): ("lore_warden_sigil",
+                     "'THRESHOLD GUARDIAN — UNIT 01. COMMAND: HOLD. OVERRIDE: NONE.'"),
+    ("level_4", 1): ("lore_architects_note",
+                     "'If the fanatics reach the vault, kill the lattice. Better silence than their Rite. — The Architect'"),
+    ("level_5", 0): ("lore_miners_diary",
+                     "'Day 47. The ink spreads up my left arm now. Foreman says I'm lucky. Lucky.'"),
+    ("level_9", 0): ("lore_convergence_wall",
+                     "'THEY MEET HERE. THEY ALWAYS MEET HERE. DO NOT STAY.'"),
+    ("level_9", 1): ("lore_final_door",
+                     "'The Founder passed through this door 200 years ago. No one followed. Something came out.'"),
+}
+
+
+# NPC dialogue lines keyed by (level_name, npc_index).
+# Each value is a list of (speaker, text) tuples shown when the player talks to that NPC.
+_NPC_DIALOGUE = {
+    ("level_3", 0): [
+        ("Survivor", "I've been hiding here since the Rite went wrong. The Marked sealed the tunnels."),
+        ("Survivor", "I heard the machines stop last night. Haven't heard that in years."),
+    ],
+    ("level_5", 0): [
+        ("Warden's Herald", "The Warden protects the threshold. It does not reason. It does not tire."),
+        ("Warden's Herald", "Turn back, or be unmade."),
+    ],
+}
+
+
+def _level_faction_tint(level_name: str) -> str:
+    """Return the faction tint string for enemies in the given level (P3-2).
+
+    Marked-branch levels 6-8 are infested with Fleshforged enemies (iron-orange).
+    Fleshforged-branch levels 6-8 are infested with Marked enemies (acolyte purple).
+    All other levels use no tint.
+    """
+    if level_name in ("level_6_marked", "level_7_marked", "level_8_marked"):
+        return FACTION_FLESHFORGED
+    if level_name in ("level_6_fleshforged", "level_7_fleshforged", "level_8_fleshforged"):
+        return FACTION_MARKED
+    return ""
 
 
 def _faction_next_level(current_level: str, faction: str) -> str | None:
@@ -205,6 +254,12 @@ class GameplayScene(BaseScene):
             self.enemies.append(arch)
             self._architect = arch
 
+        # P3-2: Apply faction tint to all spawned enemies for themed levels
+        _tint = _level_faction_tint(level_name)
+        if _tint:
+            for e in self.enemies:
+                e.faction_tint = _tint
+
         # Checkpoints
         self.checkpoints: list[Checkpoint] = list(self.tilemap.checkpoints)
 
@@ -240,6 +295,27 @@ class GameplayScene(BaseScene):
         self._paused        = False
         self._pause_options = ["Resume", "Return to Main Menu", "Settings (soon)"]
         self._pause_sel     = 0
+
+        # --- NPCs (P3-4) ---
+        self.npcs: list[NPC] = []
+        for idx, (nx, ny) in enumerate(self.tilemap.npc_spawns):
+            lines = _NPC_DIALOGUE.get((level_name, idx), [])
+            self.npcs.append(NPC(nx, ny, lines=lines))
+        self._npc_dialogue: DialogueBox | None = None
+
+        # --- Lore items (P3-5) ---
+        lore_found = self.game.save_data.get("lore_found", [])
+        self.lore_items: list[LoreItem] = []
+        for idx, (lx, ly) in enumerate(self.tilemap.lore_spawns):
+            entry = _LORE_TEXT.get((level_name, idx))
+            if entry is None:
+                continue
+            lore_id, text = entry
+            if lore_id not in lore_found:
+                self.lore_items.append(LoreItem(lx, ly, lore_id, text))
+        self._lore_text   = ""
+        self._lore_timer  = 0
+        self._lore_font   = pygame.font.SysFont("georgia", 22)
 
         # --- Map ---
         self._map_open = False
@@ -320,6 +396,14 @@ class GameplayScene(BaseScene):
                     self._boss_dialogue.advance()
             return
 
+        # NPC dialogue intercepts SPACE/RETURN until the box is dismissed
+        if self._npc_dialogue is not None:
+            if event.key in (pygame.K_SPACE, pygame.K_RETURN):
+                self._npc_dialogue.advance()
+                if self._npc_dialogue.is_done():
+                    self._npc_dialogue = None
+            return
+
         if self._paused:
             if event.key == pygame.K_ESCAPE:
                 self._paused = False
@@ -338,6 +422,14 @@ class GameplayScene(BaseScene):
                 self.game.change_scene(SCENE_MAIN_MENU)
             if event.key == pygame.K_m:
                 self._map_open = not self._map_open
+            # E key: interact with nearest in-range NPC (P3-4)
+            if event.key == pygame.K_e:
+                for npc in self.npcs:
+                    if npc._show_hint and npc.lines:
+                        faction = self.game.player_faction or FACTION_MARKED
+                        self._npc_dialogue = DialogueBox(faction=faction)
+                        self._npc_dialogue.queue(npc.lines)
+                        break
 
     def _activate_pause_option(self) -> None:
         opt = self._pause_options[self._pause_sel]
@@ -363,6 +455,11 @@ class GameplayScene(BaseScene):
 
         # --- Map and pause freeze game logic ---
         if self._map_open or self._paused:
+            return
+
+        # --- NPC dialogue freezes game logic; tick the dialogue box ---
+        if self._npc_dialogue is not None:
+            self._npc_dialogue.update()
             return
 
         # --- Upgrade selection screen freezes game logic ---
@@ -556,6 +653,21 @@ class GameplayScene(BaseScene):
                 remaining_orbs.append(orb)
         self.ability_orbs = remaining_orbs
 
+        # --- Lore item collection (P3-5) ---
+        remaining_lore = []
+        for item in self.lore_items:
+            item.update()
+            if item.alive and item.rect.colliderect(self.player.rect):
+                result = item.collect(self.player, self.game)
+                if result:
+                    self._lore_text  = result
+                    self._lore_timer = LORE_DISPLAY_FRAMES
+            if item.alive:
+                remaining_lore.append(item)
+        self.lore_items = remaining_lore
+        if self._lore_timer > 0:
+            self._lore_timer -= 1
+
         # --- Boss phase announce + arena shrink trigger ---
         if self._boss and self._boss.alive and self._boss.announce_phase:
             phase = self._boss.announce_phase
@@ -652,14 +764,24 @@ class GameplayScene(BaseScene):
                         self._architect_defeat_timer = 0
                         arch._defeat_line_idx += 1
                 else:
-                    # All lines shown; wait 2 seconds (120 frames) then write victory
+                    # All lines shown; wait 2 seconds (120 frames) then trigger ending
                     self._architect_defeat_timer += 1
                     if self._architect_defeat_timer >= 120:
                         self._architect_victory_done = True
                         self.game.save_data["victory"] = True
                         self.game.save_data["faction"] = arch.faction
                         self.game.save_to_disk()
-                        self._begin_transition(SCENE_MAIN_MENU)
+                        # P3-3: go to faction-specific ending scene
+                        ending = (SCENE_MARKED_ENDING
+                                  if (self.game.player_faction or FACTION_MARKED)
+                                  == FACTION_MARKED
+                                  else SCENE_FLESHFORGED_ENDING)
+                        self._begin_transition(ending)
+
+        # --- NPC proximity hints (P3-4) ---
+        for npc in self.npcs:
+            dist = abs(self.player.rect.centerx - npc.rect.centerx)
+            npc._show_hint = dist < NPC_INTERACT_DIST
 
         # --- Checkpoints ---
         faction = self.game.player_faction or FACTION_MARKED
@@ -682,7 +804,19 @@ class GameplayScene(BaseScene):
         next_level = _faction_next_level(self._level_name, _faction)
         if self.player.alive and self.player.rect.right >= self.tilemap.width - 64:
             if next_level:
-                self._begin_transition(SCENE_GAMEPLAY, level=next_level)
+                # P3-1: leaving level_3 triggers a faction mid-game lore cutscene
+                if self._level_name == "level_3":
+                    faction_scene = (SCENE_MARKED_PROLOGUE
+                                     if _faction == FACTION_MARKED
+                                     else SCENE_FLESHFORGED_PROLOGUE)
+                    beat = (MARKED_LORE_BEAT_START
+                            if _faction == FACTION_MARKED
+                            else FLESHFORGED_LORE_BEAT_START)
+                    self._begin_transition(faction_scene,
+                                           beat_start=beat,
+                                           return_level="level_4")
+                else:
+                    self._begin_transition(SCENE_GAMEPLAY, level=next_level)
                 return
             elif self._level_name == "level_10":
                 # Architect defeated / level 10 right-edge reached: Victory!
@@ -818,9 +952,16 @@ class GameplayScene(BaseScene):
         for orb in self.ability_orbs:
             orb.draw(surface, self.camera)
 
+        # Lore items (P3-5)
+        for item in self.lore_items:
+            item.draw(surface, self.camera)
+
         # Entities
         for enemy in self.enemies:
             enemy.draw(surface, self.camera)
+        # NPCs (P3-4)
+        for npc in self.npcs:
+            npc.draw(surface, self.camera)
         self.player.draw(surface, self.camera)
 
         # Restore shake offset before HUD (HUD is in screen space)
@@ -864,6 +1005,14 @@ class GameplayScene(BaseScene):
 
         # Architect defeat dialogue overlay
         self._draw_architect_defeat(surface)
+
+        # NPC dialogue overlay (P3-4)
+        if self._npc_dialogue is not None:
+            self._npc_dialogue.draw(surface)
+
+        # Lore text overlay (P3-5)
+        if self._lore_timer > 0:
+            self._draw_lore_overlay(surface)
 
         # Upgrade selection overlay
         if self._upgrade_active:
@@ -1163,6 +1312,44 @@ class GameplayScene(BaseScene):
         by = SCREEN_HEIGHT // 2 - bg.get_height() // 2
         surface.blit(bg, (bx, by))
         surface.blit(text, (bx + 16, by + 8))
+
+    def _draw_lore_overlay(self, surface: pygame.Surface) -> None:
+        """Draw the collected lore text as a fading centred text box (P3-5)."""
+        if self._lore_timer <= 0 or not self._lore_text:
+            return
+        # Fade out over the last 60 frames
+        if self._lore_timer <= 60:
+            alpha = int(255 * self._lore_timer / 60)
+        else:
+            alpha = 200
+        max_w  = SCREEN_WIDTH * 3 // 4
+        words  = self._lore_text.split()
+        lines  = []
+        line   = ""
+        for word in words:
+            test = (line + " " + word).strip()
+            if self._lore_font.size(test)[0] <= max_w:
+                line = test
+            else:
+                if line:
+                    lines.append(line)
+                line = word
+        if line:
+            lines.append(line)
+        line_h  = self._lore_font.get_height() + 4
+        pad     = 16
+        box_w   = max_w + pad * 2
+        box_h   = len(lines) * line_h + pad * 2
+        box_x   = (SCREEN_WIDTH  - box_w) // 2
+        box_y   = SCREEN_HEIGHT  // 2 - box_h // 2
+        bg_surf = pygame.Surface((box_w, box_h), pygame.SRCALPHA)
+        bg_surf.fill((10, 8, 5, min(200, alpha)))
+        surface.blit(bg_surf, (box_x, box_y))
+        color = LORE_ITEM_COLOR
+        for i, ln in enumerate(lines):
+            rendered = self._lore_font.render(ln, True, color)
+            rendered.set_alpha(alpha)
+            surface.blit(rendered, (box_x + pad, box_y + pad + i * line_h))
 
     def _draw_phase_announce(self, surface: pygame.Surface) -> None:
         """Draw the phase-transition banner centred on screen."""
