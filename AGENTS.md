@@ -13,6 +13,8 @@ All agents must read `ROADMAP.md` before starting any work session.
 - `world/tilemap.py`
 - `scenes/gameplay.py`
 - `scenes/main_menu.py` (for "Continue" feature in P1-3)
+- `scenes/marked_ending.py` (Phase 3 — create in P3-3)
+- `scenes/fleshforged_ending.py` (Phase 3 — create in P3-3)
 - `core/game.py` (for save/load in P1-3)
 - `core/hitstop.py` (for tech debt fix)
 - `entities/entity.py` (for iframe fix)

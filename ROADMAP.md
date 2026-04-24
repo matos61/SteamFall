@@ -944,11 +944,261 @@ UPGRADE_RES_REGEN_BONUS = 0.008 # NEW — per-upgrade additive boost to 0.05/fra
 
 ## Phase 3 — Story Integration
 
-- **Mid-game lore beats**: After completing level 3, trigger a short dialogue cutscene (same DialogueBox system as prologue) revealing a faction-specific secret. Use `game.change_scene(SCENE_MARKED_PROLOGUE)` with a `beat_start` kwarg to replay from a specific beat index.
-- **Faction enemy design**: Marked levels feature Fleshforged enemies (iron-color); Fleshforged levels feature Marked acolytes (purple-tinted). Midgame levels have both.
-- **Ending branches**: Two ending scenes (`scenes/marked_ending.py`, `scenes/fleshforged_ending.py`), each with 8–10 story beats, triggered after defeating The Architect depending on `game.player_faction`.
-- **NPC encounters**: Friendly NPCs with dialogue trees appear in "safe room" tiles (`'N'`). Press `E` near them to talk. Dialogue advances the lore without cutscenes.
-- **Collectible lore items**: Books / inscriptions (`'L'` tile) reveal a single paragraph of world-building when collected. Stored in `save_data["lore_found"]`; accessible from pause menu "Lore" tab.
+**Priority order for build-agent** (tackle in this order):
+
+1. **P3-1 (Mid-game lore beats)** — story flow unblock
+2. **P3-2 (Faction enemy design)** — cosmetic but reinforces narrative; low-risk
+3. **P3-3 (Ending branches)** — capstone story delivery
+4. **P3-4 (NPC encounters)** — world-building layer
+5. **P3-5 (Collectible lore items)** — deepest lore layer; MVP-optional
+
+---
+
+### Task P3-1: Mid-Game Lore Beats
+
+**Files to touch:**
+- `scenes/marked_prologue.py` (add `beat_start` kwarg + 4 new beats at indices 21–24)
+- `scenes/fleshforged_prologue.py` (add `beat_start` kwarg + 4 new beats at indices 22–25)
+- `scenes/gameplay.py` (trigger cutscene on level 3 → level 4 transition)
+- `settings.py` (add `MARKED_LORE_BEAT_START`, `FLESHFORGED_LORE_BEAT_START`)
+
+**What to build:**
+
+`settings.py`:
+```python
+MARKED_LORE_BEAT_START      = 21
+FLESHFORGED_LORE_BEAT_START = 22
+```
+
+`scenes/marked_prologue.py` and `scenes/fleshforged_prologue.py`:
+- In `on_enter(**kwargs)`, read `beat_start = kwargs.get("beat_start", 0)` and initialise the beat index to that value.
+- After the final beat, check `kwargs.get("return_level")`. If set, call `game.change_scene(SCENE_GAMEPLAY, level=kwargs["return_level"])`. Otherwise continue to the normal next scene (existing behavior unchanged when `beat_start=0`).
+
+`scenes/marked_prologue.py` — append 4 beats at the end:
+- Beat 21: bg `(30, 20, 50)`, speaker `"Rune-Archivist"`, text `"The Runed Archives. Hidden beneath the Foundry. Kael knew it was here."`
+- Beat 22: bg `(40, 15, 60)`, speaker `"Rune-Archivist"`, text `"The Fleshforged do not transcend. They consume. Every augment is a theft — soul energy harvested from the Marked."`
+- Beat 23: bg `(50, 20, 70)`, speaker `"Rune-Archivist"`, text `"The Architect was not built. It was summoned. It is what remains of the Founder after the first Rite failed."`
+- Beat 24: bg `(20, 10, 40)`, speaker `"???"`, text `"Kael gave you this knowledge. Use it."`
+
+`scenes/fleshforged_prologue.py` — append 4 beats at the end:
+- Beat 22: bg `(60, 30, 10)`, speaker `"Sera's Datalog"`, text `"The Forgemaster's schematics. Sera copied them before the ambush. The Marked sabotaged the Rite deliberately."`
+- Beat 23: bg `(70, 25, 10)`, speaker `"Sera's Datalog"`, text `"Soul energy is not mystical. It is thermodynamic — latent chemical potential extracted by augment cores. The Marked know this and call it heresy."`
+- Beat 24: bg `(80, 30, 10)`, speaker `"Sera's Datalog"`, text `"The Architect is a weapons system. Whoever activates it first controls the city's energy supply. The Marked want it silent. You cannot let that happen."`
+- Beat 25: bg `(50, 20, 10)`, speaker `"???"`, text `"Sera built this into your augments. Find the Architect before they do."`
+
+`scenes/gameplay.py`:
+- In `_check_level_transition()` (or `_begin_transition()`), when leaving level_3 for level_4, replace the direct `_begin_transition(SCENE_GAMEPLAY, level="level_4")` with a cutscene trigger:
+  ```python
+  if self._level_name == "level_3":
+      faction_scene = SCENE_MARKED_PROLOGUE if self.game.player_faction == FACTION_MARKED \
+                      else SCENE_FLESHFORGED_PROLOGUE
+      beat = MARKED_LORE_BEAT_START if self.game.player_faction == FACTION_MARKED \
+             else FLESHFORGED_LORE_BEAT_START
+      self._begin_transition(faction_scene, beat_start=beat, return_level="level_4")
+  ```
+
+**Acceptance criteria — done when:**
+- Completing level 3 triggers the faction cutscene before level 4 loads.
+- Marked players see 4 new beats from the Rune-Archivist.
+- Fleshforged players see 4 new beats from Sera's Datalog.
+- After the cutscene, level 4 loads and play resumes normally.
+- Starting a new game still plays prologues from beat 0 (default behavior unbroken).
+- `python main.py` launches without ImportError.
+
+---
+
+### Task P3-2: Faction Enemy Design
+
+**Files to touch:**
+- `entities/enemy.py` (add `faction_tint` attribute, blend in draw)
+- `scenes/gameplay.py` (assign tint when spawning enemies based on level name)
+
+**What to build:**
+
+`entities/enemy.py`:
+- Add `self.faction_tint: str = ""` to `Enemy.__init__`.
+- In `draw(surface, camera)`, after computing the base draw color, blend it 50/50 toward a tint target if `faction_tint` is set:
+  - `FACTION_FLESHFORGED` tint target: `(160, 130, 100)` (iron-orange).
+  - `FACTION_MARKED` tint target: `(100, 60, 160)` (acolyte purple).
+  - Blend formula: `blended = tuple(int(a * 0.5 + b * 0.5) for a, b in zip(base_color, tint))`.
+  - Apply the blended color for the entity rect draw only (not the health bar).
+
+`scenes/gameplay.py`:
+- Add module-level helper `_level_faction_tint(level_name: str) -> str`:
+  - `"level_6_marked"`, `"level_7_marked"`, `"level_8_marked"` → `FACTION_FLESHFORGED` (Fleshforged enemies appear in Marked zones).
+  - `"level_6_fleshforged"`, `"level_7_fleshforged"`, `"level_8_fleshforged"` → `FACTION_MARKED`.
+  - All other levels → `""` (no tint).
+- After spawning all enemies in `on_enter()`, set `e.faction_tint = _level_faction_tint(level_name)` for each enemy `e`.
+
+**Acceptance criteria — done when:**
+- Enemies in Marked faction levels (6M/7M/8M) appear iron-orange blended.
+- Enemies in Fleshforged faction levels (6F/7F/8F) appear purple blended.
+- Enemies in neutral levels (1–5, 9, 10) are unaffected.
+- `python main.py` launches without ImportError.
+
+---
+
+### Task P3-3: Ending Branches
+
+**Files to touch:**
+- `scenes/marked_ending.py` (create)
+- `scenes/fleshforged_ending.py` (create)
+- `core/game.py` (register new scenes)
+- `scenes/gameplay.py` (trigger ending after Architect defeat)
+- `settings.py` (add `SCENE_MARKED_ENDING`, `SCENE_FLESHFORGED_ENDING`)
+
+**What to build:**
+
+`settings.py`:
+```python
+SCENE_MARKED_ENDING      = "marked_ending"
+SCENE_FLESHFORGED_ENDING = "fleshforged_ending"
+```
+
+`scenes/marked_ending.py`: `MarkedEnding(BaseScene)` — structured identically to `MarkedPrologue` (scrolling DialogueBox, per-beat background, fade-in transitions, ESC to skip). 8 beats:
+1. bg `(20, 10, 40)`, speaker `"???"`: `"The Rite is complete. The ink holds."`
+2. bg `(30, 15, 50)`, speaker `"Narrator"`: `"The Architect's collapse unseals the Archive vault. Ancient rune-scripts flood the surface for the first time in centuries."`
+3. bg `(40, 20, 60)`, speaker `"Narrator"`: `"The Fleshforged machinery grinds to silence. Without the stolen soul-current, the augments go cold."`
+4. bg `(50, 25, 70)`, speaker `"Rune-Archivist"`: `"You are the first Transcendent. What was taken from Kael was not wasted."`
+5. bg `(30, 15, 55)`, speaker `"Narrator"`: `"The city does not forget its debts. The Marked rebuild in the silence."`
+6. bg `(20, 10, 45)`, speaker `"Narrator"`: `"You do not return to the mines. The ink does not allow it."`
+7. bg `(15, 8, 40)`, speaker `"Narrator"`: `"Somewhere beneath the Foundry, a new Rite is already being prepared."`
+8. bg `(10, 5, 30)`, speaker `"???"`: `"The cycle endures."`
+- After beat 8: set `game.save_data["ending"] = "marked"`, call `game.save_to_disk()`, call `game.change_scene(SCENE_MAIN_MENU)`.
+
+`scenes/fleshforged_ending.py`: `FleshforgedEnding(BaseScene)` — same structure. 8 beats:
+1. bg `(60, 25, 5)`, speaker `"???"`: `"The Architect is yours. Sera would call this victory."`
+2. bg `(70, 30, 5)`, speaker `"Narrator"`: `"The energy lattice snaps into place. The city's heat-grid flickers back to life under Fleshforged control."`
+3. bg `(60, 25, 5)`, speaker `"Narrator"`: `"The Marked flee underground. Without the Architect's amplification, their Rites are limited to single practitioners."`
+4. bg `(50, 20, 5)`, speaker `"Sera's Datalog"`: `"Addendum — final entry. Power source secured. City access: 100%. Soul-drain reversed."`
+5. bg `(40, 15, 5)`, speaker `"Narrator"`: `"The augments remember her work. Every Fleshforged operative carries a piece of what Sera built."`
+6. bg `(30, 12, 5)`, speaker `"Narrator"`: `"The Foundry rebuilds. It does not sleep."`
+7. bg `(20, 10, 5)`, speaker `"Narrator"`: `"Somewhere beneath the old Archive, something ancient did not die."`
+8. bg `(10, 5, 5)`, speaker `"???"`: `"The cycle endures."`
+- After beat 8: set `game.save_data["ending"] = "fleshforged"`, call `game.save_to_disk()`, call `game.change_scene(SCENE_MAIN_MENU)`.
+
+`core/game.py`:
+- Import `MarkedEnding`, `FleshforgedEnding` from their respective modules.
+- Register both scenes at startup using the same pattern as existing scenes.
+
+`scenes/gameplay.py`:
+- In the Architect defeat handler (where `game.save_data["victory"] = True` is set), add:
+  ```python
+  ending = SCENE_MARKED_ENDING if self.game.player_faction == FACTION_MARKED \
+           else SCENE_FLESHFORGED_ENDING
+  self._begin_transition(ending)
+  ```
+
+**Acceptance criteria — done when:**
+- Defeating the Architect as Marked triggers the Marked ending (purple beats).
+- Defeating the Architect as Fleshforged triggers the Fleshforged ending (orange beats).
+- All 8 beats play through; after the last beat the game returns to main menu.
+- `save_data["ending"]` is written correctly and persists.
+- `python main.py` launches without ImportError.
+
+---
+
+### Task P3-4: NPC Encounters
+
+**Files to touch:**
+- `entities/npc.py` (create)
+- `world/tilemap.py` (add `'N'` tile handler, `npc_spawns` list)
+- `scenes/gameplay.py` (spawn NPCs, `E` key interaction, proximity hint)
+- `settings.py` (add NPC constants)
+
+**What to build:**
+
+`settings.py`:
+```python
+NPC_WIDTH         = 24
+NPC_HEIGHT        = 40
+NPC_INTERACT_DIST = 60      # pixels — E-key trigger range
+NPC_COLOR         = (140, 160, 140)
+```
+
+`entities/npc.py`: `NPC` class (not an Entity — cannot take damage).
+- `__init__(x, y, name="???", lines=None)`: stores `rect` (NPC_WIDTH × NPC_HEIGHT, feet at `y`), `name`, `lines: list[tuple[str, str]]` (default `[]`). `_show_hint = False`.
+- `draw(surface, camera)`: draw colored rect using `NPC_COLOR`; if `_show_hint`, draw a small `"E"` label centered 8 px above the rect.
+
+`world/tilemap.py`:
+- Add `self.npc_spawns: list = []` to `__init__`.
+- In `_parse()`: `'N'` → append `(x + TILE_SIZE//2, y)` to `npc_spawns`.
+- Place one `'N'` tile in LEVEL_3 (row 8, near the center) and one in LEVEL_5 (row 5, left of the checkpoint).
+
+`scenes/gameplay.py`:
+- Define a module-level dict `_NPC_DIALOGUE` mapping `(level_name, npc_index)` keys to `list[tuple[str, str]]`:
+  ```python
+  _NPC_DIALOGUE = {
+      ("level_3", 0): [
+          ("Survivor", "I've been hiding here since the Rite went wrong. The Marked sealed the tunnels."),
+          ("Survivor", "I heard the machines stop last night. Haven't heard that in years."),
+      ],
+      ("level_5", 0): [
+          ("Warden's Herald", "The Warden protects the threshold. It does not reason. It does not tire."),
+          ("Warden's Herald", "Turn back, or be unmade."),
+      ],
+  }
+  ```
+- In `on_enter()`: import `NPC`; spawn `NPC` objects for `tilemap.npc_spawns`; assign lines from `_NPC_DIALOGUE`.
+- In `update()`: for each NPC, set `npc._show_hint = (dist_to_player < NPC_INTERACT_DIST)`.
+- In `handle_event()`: on `K_e`, if any NPC is in hint range and no dialogue is active, open a `DialogueBox` with that NPC's `lines`.
+- In `draw()`: draw all NPCs (after tiles, before HUD).
+
+**Acceptance criteria — done when:**
+- An NPC appears in level 3 and level 5.
+- Walking within 60 px shows a `"E"` label above the NPC.
+- Pressing `E` opens dialogue; SPACE advances it; last line dismisses the box.
+- `python main.py` launches without ImportError.
+
+---
+
+### Task P3-5: Collectible Lore Items
+
+**Files to touch:**
+- `systems/collectible.py` (add `LoreItem` class)
+- `world/tilemap.py` (add `'L'` tile handler, `lore_spawns` list)
+- `scenes/gameplay.py` (spawn lore items, collect, show text overlay)
+- `settings.py` (add lore constants)
+
+**What to build:**
+
+`settings.py`:
+```python
+LORE_ITEM_SIZE       = 16
+LORE_ITEM_COLOR      = (160, 140, 100)    # Parchment tone
+LORE_DISPLAY_FRAMES  = 300   # 5 seconds at 60 FPS
+```
+
+`systems/collectible.py` — add `LoreItem(x, y, lore_id, text)`:
+- `rect` (LORE_ITEM_SIZE × LORE_ITEM_SIZE, centered on x, y), `alive=True`, `_glow=0`.
+- `update()`: `_glow = (_glow + 1) % 60`.
+- `draw(surface, camera)`: draw a rect with `LORE_ITEM_COLOR`; brightness pulses by ±15 with `sin(_glow / 60 * 2π)`.
+- `collect(player, game)`: if `lore_id` not in `game.save_data.setdefault("lore_found", [])`, append it; call `game.save_to_disk()`; set `alive = False`; return `self._text` for the caller to display. If already collected, just set `alive = False` and return `None`.
+
+`world/tilemap.py`:
+- Add `self.lore_spawns: list = []` to `__init__`.
+- `'L'` → append `(x + TILE_SIZE//2, y)` to `lore_spawns`.
+- Place `'L'` tiles: 2 in LEVEL_2, 2 in LEVEL_4, 1 in LEVEL_5, 2 in LEVEL_9.
+
+`scenes/gameplay.py`:
+- Define module-level `_LORE_TEXT: list[tuple[str, str]]` pairing lore IDs with text strings (one entry per `'L'` tile across all levels, indexed positionally). Example entries:
+  - `("lore_foundry_plaque", "'YIELD PER SOUL: 0.04 KW-hr. DAILY EXTRACTION QUOTA: 400 SOULS. — FORGEMASTER DIRECTORATE'")`
+  - `("lore_marked_inscription", "'The second Rite requires a willing vessel. Kael volunteered before we could ask.'")`
+  - `("lore_warden_sigil", "'THRESHOLD GUARDIAN — UNIT 01. COMMAND: HOLD. OVERRIDE: NONE.'")`
+  - `("lore_architects_note", "'If the fanatics reach the vault, kill the lattice. Better silence than their Rite. — The Architect'")`
+  - `("lore_miners_diary", "'Day 47. The ink spreads up my left arm now. Foreman says I'm lucky. Lucky.'")`
+  - `("lore_convergence_wall", "'THEY MEET HERE. THEY ALWAYS MEET HERE. DO NOT STAY.'")`
+  - `("lore_final_door", "'The Founder passed through this door 200 years ago. No one followed. Something came out.'")`
+- In `on_enter()`: spawn `LoreItem(x, y, lore_id, text)` for each entry in `tilemap.lore_spawns`; skip if `lore_id` already in `save_data["lore_found"]` (item stays collected across sessions).
+- In `update()`: on pickup, store returned `text` in `self._lore_text`, set `self._lore_timer = LORE_DISPLAY_FRAMES`.
+- In `draw()`: if `_lore_timer > 0`, draw a centered semi-transparent text box with `self._lore_text` (georgia 22, faded parchment color); alpha fades over last 60 frames; decrement `_lore_timer`.
+
+**Acceptance criteria — done when:**
+- Lore items appear as glowing parchment-colored squares at `'L'` positions.
+- Collecting one shows its text for 5 seconds then fades.
+- `save_data["lore_found"]` grows on each unique collect and persists.
+- Items already collected do not respawn after save/load.
+- `python main.py` launches without ImportError.
 
 ## Phase 4 — Polish
 
@@ -994,21 +1244,21 @@ _Legend: ✅ Fixed | ⚠️ Flagged / deferred | 🔴 Open_
 
 14. ⚠️ **BUG-017: Boss intro first line shows for 119 frames instead of 120** — Off-by-one in `_tick_boss_intro()` (timer increments before the ≥120 check). Cosmetic only (~16 ms at 60 fps). Fix: change `if self._boss._intro_line_timer >= 120` to `>= 121`, or increment timer after the check. Assign to build-agent as low-priority hotfix.
 
-15. 🔴 **BUG-018: Upgrade screen activates while player is dead** — If the player and Warden die on the same frame, `_upgrade_active = True` blocks the death sequence indefinitely via the early-return guard. Fix: add `if not self.player.alive: return` at the top of `_setup_upgrade_choices()`. Assign to build-agent (P2-0c).
+15. ✅ **BUG-018: Upgrade screen activates while player is dead** — Fixed by P2-0c (2026-04-23). `if not self.player.alive: return` guard added to `_setup_upgrade_choices()`.
 
-16. 🔴 **BUG-019: P1-8 ability-slots feature entirely absent from live code** — `Player._handle_ability()` has no `ability_slots` guard; `gameplay.py:on_enter()` never restores `ability_slots` from save; `TileMap._parse()` has no `'A'` handler and `ability_orb_spawns` is never populated. Ability is always unlocked from the start regardless of save state. Three-file fix required (see P2-0c spec). Assign to build-agent.
+16. ✅ **BUG-019: P1-8 ability-slots feature entirely absent from live code** — Fixed by P2-0c (2026-04-23). `ability_slots` guard in `Player._handle_ability()`; slot restore in `gameplay.py:on_enter()`; `'A'` tile handler and `ability_orb_spawns` in `tilemap.py`.
 
-17. 🔴 **BUG-020: Architect teleport uses `SCREEN_WIDTH` as arena bound instead of level width** — `arena_max = SCREEN_WIDTH - TILE_SIZE*4` = 1152 px, but LEVEL_10 is 2080 px wide. Right 928 px of the level is never a valid teleport target; Architect can't reach its own spawn area post-phase-2. Fix: add `level_width` constructor parameter to `Architect`; use `self._level_width - TILE_SIZE*4` as `arena_max`. Assign to build-agent (P2-0c).
+17. ✅ **BUG-020: Architect teleport uses `SCREEN_WIDTH` as arena bound instead of level width** — Fixed by P2-0c (2026-04-23). `level_width` constructor parameter added to `Architect`; `arena_max = self._level_width - TILE_SIZE*4`; `level_width=self.tilemap.width` passed from `gameplay.py`.
 
-18. 🔴 **BUG-021: Architect phase transitions never trigger phase-announce banner or arena-shrink** — `gameplay.py` checks only `self._boss.announce_phase`; no parallel check exists for `self._architect`. Architect transitions through 4 phases silently. Fix: add an announce-and-shrink block for `self._architect` after the Warden block. Assign to build-agent (P2-0c).
+18. ✅ **BUG-021: Architect phase transitions never trigger phase-announce banner or arena-shrink** — Fixed by P2-0c (2026-04-23). Parallel announce-and-shrink block added for `self._architect` in `gameplay.py`; `announce_phase = 4` signal wired.
 
-19. ⚠️ **BUG-022: Boss intro banner timer desynchronised from DialogueBox** — `_tick_boss_intro` advances `_intro_line_idx` on a 120-frame timer independently of the player pressing SPACE in the DialogueBox. Fix: drive banner index from `DialogueBox._index`. Assign to build-agent (P2-0c).
+19. ✅ **BUG-022: Boss intro banner timer desynchronised from DialogueBox** — Fixed by P2-0c (2026-04-23). Banner index now driven from `self._boss_dialogue._index`.
 
-20. ⚠️ **BUG-023: `"res"` upgrade silently refills resource bar on every level load** — `_apply_upgrade_to_player` calls `_regen_resource(UPGRADE_RES_BONUS)` for `"res"` entries on every `on_enter()`, so the player respawns with more resource than saved. Fix: remove the `_regen_resource` call from that path. Assign to build-agent (P2-0c).
+20. ✅ **BUG-023: `"res"` upgrade silently refills resource bar on every level load** — Fixed by P2-0c (2026-04-23). `_regen_resource` call removed from `_apply_upgrade_to_player` for `"res"` case.
 
-21. ⚠️ **BUG-024: `AbilityOrb.collect()` lacks double-collect guard** — No `if not self.alive: return` guard; will matter once BUG-019 is fixed and orbs are spawned. Fix: add guard at top of `collect()`. Assign to build-agent (P2-0c).
+21. ✅ **BUG-024: `AbilityOrb.collect()` lacks double-collect guard** — Fixed by P2-0c (2026-04-23). `if not self.alive: return` guard added at top of `collect()`.
 
-22. ⚠️ **BUG-025: Arena-shrink left/right wall injection coupled via single condition** — `if self._shrink_left_x > 0` gates both walls; right wall not solid on phase-3 frame 1. Fix: separate conditions for each wall. Assign to build-agent (P2-0c).
+22. ✅ **BUG-025: Arena-shrink left/right wall injection coupled via single condition** — Fixed by P2-0c (2026-04-23). Left wall injected only when `_shrink_left_x > 0`; right wall injected independently when `_shrink_right_x < self.tilemap.width`.
 
 ---
 
@@ -1028,13 +1278,13 @@ _Legend: ✅ Fixed | ⚠️ Flagged / deferred | 🔴 Open_
 | `scenes/faction_select.py` | build-agent | Stable until Phase 3 |
 | `scenes/marked_prologue.py` | build-agent | Stable until Phase 3 |
 | `scenes/fleshforged_prologue.py` | build-agent | Stable until Phase 3 |
-| `scenes/gameplay.py` | build-agent | Open: BUG-018, BUG-021, BUG-022, BUG-023, BUG-025 (P2-0c) |
+| `scenes/gameplay.py` | build-agent | Stable (P2-0c + P2-6 + P2-7 + P2-8 complete); Phase 3 tasks will touch this file |
 | `entities/entity.py` | build-agent | Stable (iframe fix done in P2-0) |
-| `entities/player.py` | build-agent | Open: BUG-019 ability-slots gate (P2-0c); animation draw consolidation deferred to Phase 4 |
+| `entities/player.py` | build-agent | Animation draw consolidation deferred to Phase 4 |
 | `entities/enemy.py` | build-agent | Stable (get_drop_fragments + ENEMY_IFRAMES done in P2-0) |
 | `entities/crawler.py` | build-agent | Created (P1-1); stable |
 | `entities/boss.py` | build-agent | Warden scripting complete (P2-3); stable |
-| `entities/architect.py` | build-agent | Open: BUG-020 teleport bound, BUG-021 phase-announce (P2-0c) |
+| `entities/architect.py` | build-agent | Stable (BUG-020 + BUG-021 fixed in P2-0c; P2-8 warn/clamp complete) |
 | `entities/shield_guard.py` | build-agent | Created (P2-1); stable |
 | `entities/ranged.py` | build-agent | Created (P2-1); stable |
 | `entities/jumper.py` | build-agent | Created (P2-1); stable |
@@ -1043,8 +1293,11 @@ _Legend: ✅ Fixed | ⚠️ Flagged / deferred | 🔴 Open_
 | `systems/dialogue.py` | build-agent | Hint text fix done (Tech Debt #8); stable |
 | `systems/animation.py` | build-agent | Stable until sprite replacement (Phase 4) |
 | `systems/checkpoint.py` | build-agent | Created (P1-1); stable |
-| `systems/collectible.py` | build-agent | Open: BUG-024 double-collect guard (P2-0c); extend with HeatCore/SoulShard (P2-6) |
+| `systems/collectible.py` | build-agent | Stable (P2-0c + P2-6 complete); Phase 3 P3-5 adds `LoreItem` here |
 | `systems/minimap.py` | build-agent | Created (P1-7); extend room-chain to 13 levels in P2-8 |
+| `scenes/marked_ending.py` | build-agent | Create in P3-3 |
+| `scenes/fleshforged_ending.py` | build-agent | Create in P3-3 |
+| `entities/npc.py` | build-agent | Create in P3-4 |
 | `systems/tutorial_minigame.py` | build-agent (created outside roadmap) | Inline control tutorial for prologues; registered here for tracking |
 | `systems/voice_player.py` | build-agent (created outside roadmap) | Voice-line playback; no MP3 assets yet; blocked on Phase 4 audio pass |
 | `world/tilemap.py` | build-agent | LEVEL_1–5 complete; extend with LEVEL_6–10 in Phase 2 |
