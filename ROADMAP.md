@@ -942,19 +942,57 @@ UPGRADE_RES_REGEN_BONUS = 0.008 # NEW — per-upgrade additive boost to 0.05/fra
 
 ---
 
-## Phase 3 — Story Integration
+## Phase 3 — Story Integration ✅ COMPLETE (2026-04-25)
+
+All Phase 3 tasks are done. The game has mid-game lore cutscenes, faction-tinted enemies, two ending branches, NPC encounters, and collectible lore items. Phase 4 (Polish) is next.
 
 **Priority order for build-agent** (tackle in this order):
 
-1. **P3-1 (Mid-game lore beats)** — story flow unblock
-2. **P3-2 (Faction enemy design)** — cosmetic but reinforces narrative; low-risk
-3. **P3-3 (Ending branches)** — capstone story delivery
-4. **P3-4 (NPC encounters)** — world-building layer
-5. **P3-5 (Collectible lore items)** — deepest lore layer; MVP-optional
+1. **P3-0b (critical bug-fix sprint)** — BUG-026 through BUG-031; must fix before Phase 4 begins
+2. ~~**P3-1 (Mid-game lore beats)**~~ ✅ **DONE (2026-04-25)**
+3. ~~**P3-2 (Faction enemy design)**~~ ✅ **DONE (2026-04-25)**
+4. ~~**P3-3 (Ending branches)**~~ ✅ **DONE (2026-04-25)**
+5. ~~**P3-4 (NPC encounters)**~~ ✅ **DONE (2026-04-25)**
+6. ~~**P3-5 (Collectible lore items)**~~ ✅ **DONE (2026-04-25)**
 
 ---
 
-### Task P3-1: Mid-Game Lore Beats
+### Task P3-0b: Critical Bug-Fix Sprint (Phase 3 review pass)
+
+_Review-agent 2026-04-25 pass found these bugs in Phase 3 code. All must be fixed before Phase 4 work begins._
+
+**Files to touch:**
+- `scenes/marked_ending.py` (BUG-026)
+- `scenes/fleshforged_ending.py` (BUG-026)
+- `scenes/gameplay.py` (BUG-027, BUG-028, BUG-029, BUG-031)
+- `world/tilemap.py` (BUG-030)
+
+**Fixes required:**
+
+- 🔴 **BUG-026** `marked_ending.py:82–85` / `fleshforged_ending.py:82–85`: Rapid double-press on SPACE skips two beats in ending scenes because `_advance()` does not guard against being called when `DialogueBox` is already done. Fix: add `if self._dialogue.is_done(): return` as the first line of `_advance()` in both files.
+
+- 🔴 **BUG-027** `gameplay.py:1360`: `_draw_phase_announce` color check only tests for `"UNLEASHED"` (Warden-specific), so all Architect phase banners (`"AWAKENED"`, `"UNBOUND"`, `"ABSOLUTE"`) always render in amber. Phase 4 `"ABSOLUTE"` should escalate to deep red. Fix: extend the condition to `("UNLEASHED" in self._boss_phase_text or "ABSOLUTE" in self._boss_phase_text)`.
+
+- 🔴 **BUG-028** `gameplay.py:257–261`: `_level_faction_tint` loop applies `faction_tint` to every entry in `self.enemies` including `Boss` and `Architect`, washing out their phase-scaling colors in levels 6–8. Fix: skip boss types — `if not isinstance(e, (Boss, Architect)): e.faction_tint = _tint`.
+
+- 🔴 **BUG-029** `gameplay.py:757–779`: Architect defeat dialogue auto-advances on 120-frame timers with no player SPACE shortcut and no hint text, locking the player out for up to 8 seconds silently. Fix: intercept SPACE/RETURN in `handle_event` when `self._architect and not self._architect.alive and not self._architect_victory_done` to advance `_defeat_line_idx` immediately; also render a `"SPACE — continue"` hint in `_draw_architect_defeat`.
+
+- ⚠️ **BUG-030** `tilemap.py` `LEVEL_2`: Row 16 contains a `'C'` checkpoint inside the sealed sub-floor chamber (below the solid ground at rows 12–13), which is permanently unreachable. Fix: remove the `'C'` from row 16 or relocate it to a reachable platform row (3–10) in LEVEL_2.
+
+- ⚠️ **BUG-031** `gameplay.py:461–463`: When NPC dialogue is active the update() early-return skips the proximity hint loop, leaving `_show_hint = True` so the "E" badge renders on top of an open dialogue box. Fix: add `for npc in self.npcs: npc._show_hint = False` inside the `_npc_dialogue is not None` early-return block before returning.
+
+**Acceptance criteria — done when:**
+- Rapid double-tapping SPACE in an ending scene advances exactly one beat per press.
+- Architect `"ABSOLUTE"` phase banner renders in deep red, not amber.
+- Boss and Architect entity colors are unaffected by faction tinting in levels 6–8.
+- Architect defeat dialogue can be advanced by pressing SPACE; a hint is visible.
+- LEVEL_2 has no checkpoint inside the solid sub-floor.
+- NPC "E" badge disappears while a dialogue box is open.
+- `python main.py` launches without ImportError.
+
+---
+
+### Task P3-1: Mid-Game Lore Beats ✅ DONE (2026-04-25)
 
 **Files to touch:**
 - `scenes/marked_prologue.py` (add `beat_start` kwarg + 4 new beats at indices 21–24)
@@ -1007,7 +1045,7 @@ FLESHFORGED_LORE_BEAT_START = 22
 
 ---
 
-### Task P3-2: Faction Enemy Design
+### Task P3-2: Faction Enemy Design ✅ DONE (2026-04-25)
 
 **Files to touch:**
 - `entities/enemy.py` (add `faction_tint` attribute, blend in draw)
@@ -1038,7 +1076,7 @@ FLESHFORGED_LORE_BEAT_START = 22
 
 ---
 
-### Task P3-3: Ending Branches
+### Task P3-3: Ending Branches ✅ DONE (2026-04-25)
 
 **Files to touch:**
 - `scenes/marked_ending.py` (create)
@@ -1098,7 +1136,7 @@ SCENE_FLESHFORGED_ENDING = "fleshforged_ending"
 
 ---
 
-### Task P3-4: NPC Encounters
+### Task P3-4: NPC Encounters ✅ DONE (2026-04-25)
 
 **Files to touch:**
 - `entities/npc.py` (create)
@@ -1152,7 +1190,7 @@ NPC_COLOR         = (140, 160, 140)
 
 ---
 
-### Task P3-5: Collectible Lore Items
+### Task P3-5: Collectible Lore Items ✅ DONE (2026-04-25)
 
 **Files to touch:**
 - `systems/collectible.py` (add `LoreItem` class)
@@ -1260,6 +1298,20 @@ _Legend: ✅ Fixed | ⚠️ Flagged / deferred | 🔴 Open_
 
 22. ✅ **BUG-025: Arena-shrink left/right wall injection coupled via single condition** — Fixed by P2-0c (2026-04-23). Left wall injected only when `_shrink_left_x > 0`; right wall injected independently when `_shrink_right_x < self.tilemap.width`.
 
+23. 🔴 **BUG-026: Ending scenes skip two beats on rapid double-press** — `_advance()` in `marked_ending.py` and `fleshforged_ending.py` does not guard against calling `_next_beat()` twice when `DialogueBox` is already done. Assign to build-agent in P3-0b.
+
+24. 🔴 **BUG-027: Architect phase banners always render amber — `"UNLEASHED"` color check never matches** — `_draw_phase_announce` at `gameplay.py:1360` tests only for `"UNLEASHED"`, so `"ABSOLUTE"` (phase 4) never gets the deep-red escalation color. Assign to build-agent in P3-0b.
+
+25. 🔴 **BUG-028: Faction tint applied to Boss / Architect in levels 6–8** — `_level_faction_tint` loop at `gameplay.py:257–261` sets `faction_tint` on every enemy including bosses, overriding phase-shifting colors. Assign to build-agent in P3-0b.
+
+26. 🔴 **BUG-029: Architect defeat dialogue has no SPACE shortcut — player silently locked out up to 8 s** — 120-frame auto-advance with no input path and no hint text. Assign to build-agent in P3-0b.
+
+27. ⚠️ **BUG-030: Unreachable checkpoint in LEVEL_2 sub-floor** — `'C'` tile at row 16 is below the solid ground layer (rows 12–13) and can never be activated. Assign to build-agent in P3-0b.
+
+28. ⚠️ **BUG-031: NPC "E" hint badge persists while dialogue box is open** — `_show_hint` is not cleared during the `_npc_dialogue is not None` early-return. Assign to build-agent in P3-0b.
+
+29. ⚠️ **FLAG-010: `game/story.py` `StoryState` class is dead code** — defined but never imported or used. Either wire into `core/game.py` or remove. Low-priority; defer to Phase 4 cleanup.
+
 ---
 
 ## Agent Coordination Notes
@@ -1278,7 +1330,7 @@ _Legend: ✅ Fixed | ⚠️ Flagged / deferred | 🔴 Open_
 | `scenes/faction_select.py` | build-agent | Stable until Phase 3 |
 | `scenes/marked_prologue.py` | build-agent | Stable until Phase 3 |
 | `scenes/fleshforged_prologue.py` | build-agent | Stable until Phase 3 |
-| `scenes/gameplay.py` | build-agent | Stable (P2-0c + P2-6 + P2-7 + P2-8 complete); Phase 3 tasks will touch this file |
+| `scenes/gameplay.py` | build-agent | Phase 3 complete; BUG-027/028/029/031 fixes pending in P3-0b |
 | `entities/entity.py` | build-agent | Stable (iframe fix done in P2-0) |
 | `entities/player.py` | build-agent | Animation draw consolidation deferred to Phase 4 |
 | `entities/enemy.py` | build-agent | Stable (get_drop_fragments + ENEMY_IFRAMES done in P2-0) |
@@ -1295,11 +1347,11 @@ _Legend: ✅ Fixed | ⚠️ Flagged / deferred | 🔴 Open_
 | `systems/checkpoint.py` | build-agent | Created (P1-1); stable |
 | `systems/collectible.py` | build-agent | Stable (P2-0c + P2-6 complete); Phase 3 P3-5 adds `LoreItem` here |
 | `systems/minimap.py` | build-agent | Created (P1-7); extend room-chain to 13 levels in P2-8 |
-| `scenes/marked_ending.py` | build-agent | Create in P3-3 |
-| `scenes/fleshforged_ending.py` | build-agent | Create in P3-3 |
-| `entities/npc.py` | build-agent | Create in P3-4 |
+| `scenes/marked_ending.py` | build-agent | Created (P3-3); BUG-026 fix pending in P3-0b |
+| `scenes/fleshforged_ending.py` | build-agent | Created (P3-3); BUG-026 fix pending in P3-0b |
+| `entities/npc.py` | build-agent | Created (P3-4); stable |
 | `systems/tutorial_minigame.py` | build-agent (created outside roadmap) | Inline control tutorial for prologues; registered here for tracking |
 | `systems/voice_player.py` | build-agent (created outside roadmap) | Voice-line playback; no MP3 assets yet; blocked on Phase 4 audio pass |
-| `world/tilemap.py` | build-agent | LEVEL_1–5 complete; extend with LEVEL_6–10 in Phase 2 |
+| `world/tilemap.py` | build-agent | All levels complete (Phase 2); BUG-030 LEVEL_2 checkpoint fix pending in P3-0b |
 | `REVIEW_BUGS.md` | review-agent (own) | Never modifies .py files |
 | `REVIEW_HK.md` | hk-agent (own) | Never modifies .py files |

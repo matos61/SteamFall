@@ -380,3 +380,152 @@ No blocking issues found.
 - **Problem:** `_LEVEL_ORDER = ["level_1", ..., "level_5"]`. When `current_level_name` is `"level_6_marked"` or `"level_9"`, no rectangle in the chain matches, so none is highlighted with `MARKED_COLOR`. The player's current room appears unvisited-gray (or not in the chain at all). The `_LEVEL_LABELS` dict also lacks keys for levels 6–10, which would cause a `KeyError` at line 81 (`_LEVEL_LABELS[lname]`) if these levels were added to `_LEVEL_ORDER`.
 - **Suggestion:** Extend `_LEVEL_ORDER` to include all 13 level keys and add corresponding `_LEVEL_LABELS` entries. Lay them out in two rows (1–5 top, 6–10 bottom) or abbreviate the display names to fit the panel width.
 
+---
+
+# Bug Review — 2026-04-25
+
+**Scope:** Phase 3 (Story Integration) code — `entities/npc.py`, `scenes/marked_ending.py`, `scenes/fleshforged_ending.py`, plus Phase 3 additions to `scenes/gameplay.py`, `scenes/marked_prologue.py`, `scenes/fleshforged_prologue.py`, `systems/collectible.py`, and `world/tilemap.py`. All .py files re-read before writing this section. Prior reviews confirmed BUG-001 through BUG-025 and FLAG-001 through FLAG-009 are recorded; this pass starts at BUG-026.
+
+---
+
+## New Bugs
+
+---
+
+### BUG-026: Ending scenes skip two beats per rapid double-press — `_advance` called when `DialogueBox` is already done
+
+- **Files:** `scenes/marked_ending.py`, lines 82–85; `scenes/fleshforged_ending.py`, lines 82–85
+- **Problem:** Both ending scenes share this `_advance` pattern:
+  ```python
+  def _advance(self):
+      self._dialogue.advance()
+      if self._dialogue.is_done():
+          self._next_beat()
+  ```
+  `DialogueBox.queue()` loads a single `(speaker, text)` tuple per beat, so after one SPACE press the box is in the `_done = True` state. On the *next* frame before `_next_beat()` loads fresh content, if the player presses SPACE again, `_advance()` is called a second time. `DialogueBox.advance()` internally calls `_next_line()` which increments `_index` from 1 to 2, sees `2 >= len(queue)` (queue has 1 item), and sets `_done = True` — harmlessly, since it was already True. Then `is_done()` returns True and `_next_beat()` is called **again**, bumping `self._beat_index` by 2 total. Two narrative beats are consumed by a single impatient double-tap.
+  - The bug is worst at beat 6 (the second-to-last beat): a fast double-press skips the final beat entirely and calls `_finish()` without showing it.
+- **Fix:** Guard `_advance` so it only calls `_next_beat()` once per dialogue completion cycle. Simplest fix: check `_dialogue.is_done()` **before** calling `advance()` and do nothing when already done:
+  ```python
+  def _advance(self):
+      if self._dialogue.is_done():
+          return   # wait for _next_beat() to load the next line
+      self._dialogue.advance()
+      if self._dialogue.is_done():
+          self._next_beat()
+  ```
+
+---
+
+### BUG-027: `_draw_phase_announce` always uses amber color for Architect phase banners — `"UNLEASHED"` check never matches Architect suffixes
+
+- **File:** `scenes/gameplay.py`, line 1360
+- **Problem:**
+  ```python
+  color = (220, 60, 60) if "UNLEASHED" in self._boss_phase_text else (220, 140, 40)
+  ```
+  The Architect's phase announce suffixes are `"AWAKENED"`, `"UNBOUND"`, and `"ABSOLUTE"` (set at lines 693–694). None of these contains the string `"UNLEASHED"`, so the `if` branch is never taken for the Architect. All four Architect phase banners render in amber `(220, 140, 40)`. The deep-red color `(220, 60, 60)` is only ever shown for the Warden's `"UNLEASHED"` phase 3 banner. Phase 4 `"ABSOLUTE"` (the most intense state) should visually escalate to deep red.
+- **Fix:** Extend the color check to cover the Architect's most intense suffix, e.g.:
+  ```python
+  intense = ("UNLEASHED" in self._boss_phase_text or
+             "ABSOLUTE"  in self._boss_phase_text)
+  color = (220, 60, 60) if intense else (220, 140, 40)
+  ```
+  Or use a dict lookup keyed by the banner text to allow per-phase color tuning.
+
+---
+
+### BUG-028: `_level_faction_tint` applies `faction_tint` to all enemies including Boss and Architect — bosses take on enemy faction color blending
+
+- **File:** `scenes/gameplay.py`, lines 257–261
+- **Problem:**
+  ```python
+  _tint = _level_faction_tint(level_name)
+  if _tint:
+      for e in self.enemies:
+          e.faction_tint = _tint
+  ```
+  `self.enemies` includes the `Boss` and `Architect` instances (added at lines 243 and 254). `Enemy.draw()` (which `Boss.draw()` and `Architect.draw()` both ultimately call via `super().draw()`) blends `base_color` 50/50 with the tint color when `faction_tint` is set. Levels 6–8 always have `_tint != ""`, so any Boss present in those levels (LEVEL_8_MARKED and LEVEL_8_FLESHFORGED both have `'B'`) gets its distinctive phase-shifting color washed out by the faction blend. The Architect in LEVEL_10 is not affected (level 10 has no tint), but any future boss added to a tinted level would be.
+- **Fix:** Skip bosses and the Architect when applying the tint:
+  ```python
+  if _tint:
+      for e in self.enemies:
+          if not isinstance(e, (Boss, Architect)):
+              e.faction_tint = _tint
+  ```
+
+---
+
+### BUG-029: Architect defeat dialogue is fully automatic (120-frame auto-advance) with no player input path — player is silently locked out for up to 8 seconds with no explanation
+
+- **File:** `scenes/gameplay.py`, lines 757–779
+- **Problem:** After the Architect dies, `arch._defeat_dialogue_active` is True. The gameplay `update` loop at lines 761–765 auto-advances `arch._defeat_line_idx` by 1 every 120 frames (2 seconds), then waits another 120 frames before triggering the ending transition. The total locked duration is `(3 lines × 120 frames) + 120 frames = 480 frames = 8 seconds`. During this entire window:
+  - No hint text tells the player why nothing is happening.
+  - The `handle_event` path does not intercept SPACE/RETURN to speed up the lines (the boss intro check fires on `_boss_intro_active`, which is already False by this point, so SPACE falls through to the NPC/pause handlers and is silently ignored).
+  - The player cannot pause or open the map, because the transition guard at line 452 does not block (transition is not active until `_begin_transition` fires), but the death/alive checks prevent attack, movement is still enabled (the player can move freely during these 8 seconds, which looks wrong).
+- **Fix:** Add a SPACE/RETURN handler in `handle_event` that fires when `self._architect and not self._architect.alive and not self._architect_victory_done`: advance `_defeat_line_idx` immediately when the player presses SPACE, and also add a small "SPACE — continue" hint to `_draw_architect_defeat`. Minimally: in the `_defeat_line_idx < len(_defeat_lines)` branch, set `self._architect_defeat_timer = 120` (trigger immediately) when SPACE is pressed.
+
+---
+
+### BUG-030: `LEVEL_2` has an unreachable checkpoint in the sub-floor (row 16) — the `'C'` tile is placed below the solid ground layer and can never be activated
+
+- **File:** `world/tilemap.py`, line 96 (the `LEVEL_2` definition)
+- **Problem:** `LEVEL_2` row index 16 (zero-based) contains:
+  ```
+  "#          C                                                           #"
+  ```
+  The solid ground is at rows 12–13 (`"####..."`) and the sub-floor walls are at rows 14–20. Row 16 is inside the sealed underground chamber. The player spawn is at row 11 (ground level) and cannot pass through the solid ground rows 12–13. The checkpoint at row 16 is therefore permanently inaccessible — `Checkpoint._activate` will never be called, `save_data["checkpoint_pos"]` will never reflect this CP, and the CP icon on the minimap will appear inside the solid floor tile region.
+- **Fix:** Move the row 16 `'C'` to a reachable location — either to an accessible platform row (rows 3–10) in LEVEL_2, or remove it if the sub-floor CP was mistakenly added.
+
+---
+
+### BUG-031: `NPC` has no `update` method — `_show_hint` is set from outside via direct attribute assignment, bypassing any future per-frame NPC state logic; also, NPC `draw` can be called during the `_npc_dialogue` active frame without a prior proximity check
+
+- **File:** `entities/npc.py` (entire class); `scenes/gameplay.py`, lines 781–784
+- **Problem:** In gameplay's `update()`, NPC proximity hints are set with:
+  ```python
+  for npc in self.npcs:
+      dist = abs(self.player.rect.centerx - npc.rect.centerx)
+      npc._show_hint = dist < NPC_INTERACT_DIST
+  ```
+  This runs **after** the NPC dialogue and transition guards. Specifically, when `self._npc_dialogue is not None` (lines 461–463), `update()` returns early after ticking the dialogue, skipping the proximity hint block entirely. This means `_show_hint` retains its last value from the previous frame — which was `True` (the player was close enough to open dialogue). While the dialogue is active, the "E" hint badge continues to render on the NPC because `_show_hint` is still True. The hint badge persisting during the dialogue conversation is a minor visual artifact (the NPC already has an open dialogue box; the badge is redundant and confusing).
+  - Additionally, once `_npc_dialogue` is dismissed (`is_done()` → `self._npc_dialogue = None`), on that same frame the proximity check does NOT run (returns early happened before it), so `_show_hint` stays True for one extra frame even if the player moved away.
+- **Fix:** Add `npc._show_hint = False` inside the `_npc_dialogue is not None` early-return block (before returning), so the badge clears while a dialogue is active:
+  ```python
+  if self._npc_dialogue is not None:
+      self._npc_dialogue.update()
+      for npc in self.npcs:
+          npc._show_hint = False   # hide badge during open conversation
+      return
+  ```
+
+---
+
+## Flags (not crashes, but worth tracking)
+
+---
+
+### FLAG-010: `game/story.py` `StoryState` class is defined but never imported or used anywhere in the codebase
+
+- **File:** `game/story.py` (entire file)
+- **Problem:** `StoryState` exposes `has()`, `set()`, and `clear()` flag operations, but no scene, system, or entity file imports or instantiates it. All story-state tracking in the game goes through `game.save_data` (a plain dict) directly. This class is dead code — presumably scaffolded for a future system.
+- **Why not a crash:** It is never reached at runtime. No observable effect.
+- **Suggestion:** Either wire `StoryState` into `core/game.py` as `self.story = StoryState()` and use it for flag-based story checks, or remove the file until it is needed to reduce maintenance confusion.
+
+---
+
+### FLAG-011: `_draw_lore_overlay` word-wrap computes `box_w = max_w + pad * 2` but the word-wrap itself constrains to `max_w` — the box is always wider than the text by `pad * 2` on each side, but the rendered lines are placed at `box_x + pad`, so text is contained correctly; however, if a single word is wider than `max_w`, the word is added as its own line even though it overflows the box
+
+- **File:** `scenes/gameplay.py`, lines 1325–1352
+- **Problem:** The word-wrap loop at line 1330:
+  ```python
+  if self._lore_font.size(test)[0] <= max_w:
+      line = test
+  else:
+      if line:
+          lines.append(line)
+      line = word
+  ```
+  If a single `word` is wider than `max_w` (e.g. a very long continuous string without spaces), it is appended as-is in the next iteration. This does not crash but causes the word to overflow the right edge of the `box_w` rect and bleed into the HUD area.
+- **Why not fixed:** All current lore text strings in `_LORE_TEXT` use natural-language phrasing with spaces, so no single word exceeds `max_w = SCREEN_WIDTH * 3 // 4 = 960 px`. Only a future lore entry with an extremely long unspaced token would trigger this.
+- **Suggestion:** After `line = word`, add `if self._lore_font.size(word)[0] > max_w: lines.append(word); line = ""` to truncate overflowing words.
+
