@@ -437,3 +437,182 @@ SOUL_SHARD_HEAL = 12   # was 8 — match Marked/Fleshforged heal parity
 | Resource upgrade feel | Minor | Pool increase alone feels passive | Add per-upgrade regen bonus constant |
 | Faction heal drops | Gap | 8 HP heal is less than half a hit of boss damage — not impactful | Raise `HEAT_CORE_HEAL` and `SOUL_SHARD_HEAL` to `12` |
 | Boss SoulFragment drop | Good | 3 fragments, spread 40 px — clear reward moment | Consider widening spread to 80 px (`cx±40`) to avoid stacking |
+
+---
+
+# HK Feel Review — Phase 3 Story Integration (2026-04-25)
+
+_Focus: ending scene pacing, lore item display, NPC interaction feedback, mid-game cutscene trigger, faction tint intensity._
+
+---
+
+## 1. Ending Scene Pacing
+
+**Files:** `scenes/marked_ending.py` lines 17–41; `scenes/fleshforged_ending.py` lines 17–41.
+
+Both endings use exactly 8 beats. The beat list is player-advanced (SPACE/RETURN) with no auto-timer, which is the correct approach — HK's own ending slides (e.g. the Pure Vessel / Hollow Knight endings) are player-paced. The structural concern is **quantity and internal rhythm, not the advance mechanic**.
+
+Eight beats is two too many for this register. HK endings peak at 5–6 title cards for their darkest routes (e.g. the Grimm Troupe banishment, the Dream No More sequence). Both Steamfall endings contain two consecutive "Narrator" beats that carry the same emotional register — the Marked path at beats 4–5 ("The city does not forget..." / "You do not return...") and the Fleshforged path at beats 5–6 ("The augments remember..." / "The Foundry rebuilds...") — which read as padding. The final `"???"` beat ("The cycle endures.") is the correct punctuation mark; its power is diluted by the two preceding beats drawing out the same theme.
+
+Additionally, the background colour interpolation speed (`spd = 0.07` per frame — `marked_ending.py` line 108, `fleshforged_ending.py` line 108) means the colour lerp lags behind the beat advance by roughly 60–90 frames when a player advances quickly. On a fast read-through the background is still transitioning from beat 3's colour when beat 5 is already on screen — the tonal shift that the background colours are intended to provide is lost. HK's equivalent effect (screen colour fades) are beat-synchronous, not async.
+
+**Recommended changes:**
+
+- Collapse each pair of same-register Narrator beats into one line. For Marked: merge beats index 4 and 5 into `"The city does not forget its debts. You do not return to the mines — the ink does not allow it."` (6 beats total). For Fleshforged: merge beats index 4 and 5 into `"The augments remember her work. The Foundry does not sleep."` (6 beats total). This removes the padding without losing any narrative content.
+- Raise `spd` from `0.07` to `0.18` in both ending files (lines 108) so the background colour change resolves within ~18 frames of a beat load — beat-synchronous in practice. At 0.07 it takes ~100 frames (1.7 s) to reach 50% of the target, which outlasts a fast reader's time on any single beat.
+
+---
+
+## 2. Lore Item Display
+
+**File:** `settings.py` line 248; `scenes/gameplay.py` lines 663–669.
+
+```python
+LORE_DISPLAY_FRAMES = 300   # 5 seconds at 60 FPS
+```
+
+The auto-dismiss timer of 5 seconds is fundamentally the wrong model for lore text in a HK-inspired game. In Hollow Knight, lore tablets stay on screen until the player presses the interact button to dismiss them — the player is never interrupted by an auto-dismiss. The current implementation in `gameplay.py` lines 663–664 sets `self._lore_timer = LORE_DISPLAY_FRAMES` on collect and counts it down at line 669; gameplay continues during this countdown (the player keeps moving while the text is displayed). This means:
+
+1. A player who collects a lore item mid-combat will have the text disappear from their peripheral vision before they have had a chance to read it.
+2. A slow reader on longer entries (e.g. `'YIELD PER SOUL: 0.04 KW-hr...'` or the Architect's note — both in `_LORE_TEXT` at `gameplay.py` lines 99–113) has 5 seconds of on-screen time while also fighting enemies, which is insufficient for deliberate reading.
+
+The current value of 300 frames is a reasonable floor if the timer model is kept, but the model itself conflicts with HK's "lore is a pause moment" philosophy. The LoreItem collect path at `collectible.py` lines 256–265 returns the text string; the display and dismiss logic is entirely in `gameplay.py` and can be changed without touching `collectible.py`.
+
+**Recommended change:** Replace the frame-count auto-dismiss with a player-acknowledge model. In `gameplay.py`, when `self._lore_text` is set, also set a `self._lore_waiting_dismiss = True` flag and pause enemy AI updates (or at minimum halt the player's ability to pick up further items) until the player presses SPACE/RETURN to dismiss. If an auto-timer fallback is required for accessibility, raise `LORE_DISPLAY_FRAMES` from `300` to `480` (8 s) as the floor:
+
+```python
+# settings.py
+LORE_DISPLAY_FRAMES = 480   # was 300 — 8 s floor; prefer player-dismiss model
+```
+
+---
+
+## 3. NPC Interaction Feedback
+
+**Files:** `settings.py` lines 240–242; `entities/npc.py` lines 40–44; `scenes/gameplay.py` lines 781–784.
+
+```python
+NPC_WIDTH         = 24    # settings.py line 240
+NPC_INTERACT_DIST = 60    # settings.py line 242
+```
+
+The proximity check at `gameplay.py` line 784 is centre-to-centre horizontal distance only:
+
+```python
+dist = abs(self.player.rect.centerx - npc.rect.centerx)
+npc._show_hint = dist < NPC_INTERACT_DIST
+```
+
+At `NPC_INTERACT_DIST = 60` px on a 24 px wide NPC sprite, the effective trigger radius extends 60 px from the NPC centre — approximately 2.5 sprite-widths to either side. This is generous and does not create a feel problem in isolation. The feel problem is elsewhere: the hint letter `"E"` (rendered bold monospace 14pt at `npc.py` line 41) snaps on and off with no transition. In HK, the interaction indicator (the glowing lore tablet symbol) fades in over ~10 frames when the player enters range. The snap-on `"E"` is jarring by contrast and gives no sense of "entering range" — it simply appears.
+
+Additionally, the proximity check uses only the X axis (`centerx` delta) with no Y component. If an NPC is on a platform 80 px above the player, the hint will trigger when the player walks beneath it, which looks broken — the player has no way to interact from below but the `"E"` is showing. HK's interaction indicators are suppressed when the NPC is not on the same platform level.
+
+The 60 px interaction distance itself is slightly tight relative to the 24-wide sprite for a player who approaches at a running pace (5 px/frame): the hint will have appeared only 12 frames before the player reaches the NPC edge at full speed. That is approximately 0.2 seconds — not enough time to register, stop, and press E before overshooting. A value of 80 px gives 0.33 s of lead time at full run, which is more readable.
+
+**Recommended changes:**
+
+- Raise `NPC_INTERACT_DIST` from `60` to `80` in `settings.py` line 242 to provide adequate hint lead time at full player speed.
+- In `npc.py`, replace the instant alpha toggle with a frame counter: add `self._hint_alpha = 0` in `__init__`, ramp it toward 255 when `_show_hint` is True and toward 0 when False (`delta = 25` per frame gives a 10-frame fade). Render the `"E"` label through a surface with `set_alpha(self._hint_alpha)`.
+- Extend the proximity check in `gameplay.py` to also gate on vertical proximity (`abs(player.rect.centery - npc.rect.centery) < NPC_HEIGHT * 2`) so off-platform NPCs do not falsely trigger the hint.
+
+```python
+# settings.py
+NPC_INTERACT_DIST = 80   # was 60 — 0.33 s lead time at full sprint (5 px/frame)
+```
+
+---
+
+## 4. Mid-Game Cutscene Trigger
+
+**Files:** `scenes/gameplay.py` lines 806–819; `settings.py` lines 232–233; `scenes/marked_prologue.py` lines 143–157 (comment + beats 33–36); `scenes/fleshforged_prologue.py` lines 126–139 (comment + beats 30–33).
+
+```python
+# settings.py lines 232–233
+MARKED_LORE_BEAT_START      = 33
+FLESHFORGED_LORE_BEAT_START = 30
+
+# gameplay.py lines 806–817
+if self._level_name == "level_3":
+    ...
+    self._begin_transition(faction_scene, beat_start=beat, return_level="level_4")
+```
+
+The cutscene fires unconditionally when the player exits Level 3's right edge. This is the core design tension. In HK, mid-game lore is almost never triggered by a mandatory threshold crossing — it is unlocked by finding an optional NPC, acquiring a specific item, or entering an opt-in zone. The Dreamers' lore cutscenes, the White Lady dialogue, and the Seer sequences are all player-initiated. Forcing a cutscene on a level-exit is closer to a Metroidvania checkpoint interrupt, which breaks the exploratory feel.
+
+The content of the cutscene (the Rune-Archivist and Sera's Datalog beats) is correctly characterised as "faction perspective lore" — it is expository, not an emotional climax. In HK, expository beats are delivered through NPCs or optional map areas, not through mandatory transition interrupts. Placing this same content in an optional zone within level 4 (a hidden room, or an NPC placed early in level 4 with `_NPC_DIALOGUE[("level_4", N)]`) would preserve the information while honouring player agency.
+
+If the forced trigger is kept for Phase 3 (acceptable as a placeholder), the `return_level="level_4"` parameter at `gameplay.py` line 817 correctly returns the player to level 4 after the cutscene — the transition is not disorienting. However there is a secondary pacing issue: the Fleshforged mid-game beats (30–33 in `fleshforged_prologue.py`) include Sera's Datalog entries that use a bureaucratic, technical register (`"Soul energy is not mystical. It is thermodynamic..."`) — this reads well in isolation but immediately follows what is likely the player's most intense combat section (level 3 is a Foundry gauntlet). The tonal whiplash from intense combat to dry datalog is abrupt. The Marked equivalent (Rune-Archivist lines) shares the same beat register and the same pacing problem, though the more dramatic phrasing (`"The Architect was not built. It was summoned."`) lands harder.
+
+**Recommended changes:**
+
+- Preferred: convert the forced trigger to an optional trigger. Replace the `gameplay.py` lines 806–817 level-exit check with an NPC encounter placed at the beginning of level 4 (`_NPC_DIALOGUE[("level_4", 1)]`) that fires the same prologue scene when interacted with. This keeps the content accessible to all players without interrupting the exit flow.
+- If the forced trigger is retained: add a 1-level delay — fire the cutscene on exit from level 4 instead of level 3, after the player has had a natural rest at the level 4 checkpoint. This eliminates the mid-combat tonal whiplash. Change `gameplay.py` line 808 from `"level_3"` to `"level_4"` and update `return_level` to `"level_5"`. Update `settings.py` comment at line 231 accordingly.
+
+---
+
+## 5. Faction Tint Intensity
+
+**File:** `entities/enemy.py` lines 158–168.
+
+```python
+# enemy.py lines 158–166
+# P3-2: 50/50 blend toward faction tint for themed levels
+if self.faction_tint == FACTION_FLESHFORGED:
+    tint = (160, 130, 100)
+    color = tuple(int(a * 0.5 + b * 0.5)
+                  for a, b in zip(base_color, tint))
+elif self.faction_tint == FACTION_MARKED:
+    tint = (100, 60, 160)
+    color = tuple(int(a * 0.5 + b * 0.5)
+                  for a, b in zip(base_color, tint))
+```
+
+The 50/50 blend is a readable midpoint on paper, but the tint colours chosen are low-saturation. Fleshforged tint `(160, 130, 100)` is a desaturated tan — blended 50/50 with a base enemy colour of e.g. `(140, 60, 60)` (a typical dark-red enemy) it produces `(150, 95, 80)`, a muddy brownish-rust that reads as a dirty version of the original colour rather than a clear faction signal. Marked tint `(100, 60, 160)` is more saturated and will shift enemy colours more visibly toward purple — this is the stronger of the two tints.
+
+In HK, palette contamination in enemy-dense levels is aggressive: Husk enemies in fungal areas have visible green tinting, Deepnest enemies have a dark-grey shift. The signal is readable at a glance because the tint channels are high-contrast against the base colour. For Steamfall, the Fleshforged tint especially needs more saturation — raising the red channel and dropping the green would make it read as fire-orange rather than tan.
+
+Additionally, a 50/50 blend applied to the render colour only (not to the health bar or any outline) means that on small sprites (enemies are 24×28 px per the general enemy rect) the colour shift may be difficult to distinguish from normal colour variation between enemy types, especially at distance.
+
+**Recommended changes:**
+
+- Raise the Fleshforged tint from `(160, 130, 100)` to `(200, 110, 50)` — a clearer fire-orange — and raise the blend weight from 0.5 to 0.65 (enemy 35%, tint 65%) so the tint dominates. This makes the tint read as a deliberate faction marking rather than a dirty overlay.
+- Keep the Marked tint at `(100, 60, 160)` but also raise its blend weight to 0.65 for consistency.
+- The blend weight is currently a magic number in the draw method. Extract it to `settings.py` as `FACTION_TINT_BLEND = 0.65` and reference it from `enemy.py`, so it can be tuned from one location.
+
+```python
+# settings.py — recommended additions
+FACTION_TINT_BLEND        = 0.65          # was implicit 0.5 in enemy.py — raises tint dominance
+FLESHFORGED_TINT_COLOR    = (200, 110, 50)  # was (160, 130, 100) — clearer fire-orange
+MARKED_TINT_COLOR         = (100,  60, 160) # unchanged — already saturated enough
+```
+
+In `enemy.py` lines 160–166, replace:
+```python
+tint = (160, 130, 100)
+color = tuple(int(a * 0.5 + b * 0.5) for a, b in zip(base_color, tint))
+```
+with:
+```python
+from settings import FLESHFORGED_TINT_COLOR, FACTION_TINT_BLEND
+tint  = FLESHFORGED_TINT_COLOR
+blend = FACTION_TINT_BLEND
+color = tuple(int(a * (1 - blend) + b * blend) for a, b in zip(base_color, tint))
+```
+(and equivalently for the Marked branch using `MARKED_TINT_COLOR`).
+
+---
+
+## Summary Table (2026-04-25)
+
+| Topic | File(s) | Key Issue | Recommended Change |
+|---|---|---|---|
+| Ending beat count | `marked_ending.py` L17–41; `fleshforged_ending.py` L17–41 | 8 beats — two same-register Narrator beats dilute the final `"???"` punch | Merge duplicate-register pairs; reduce to 6 beats per ending |
+| Background lerp speed | `marked_ending.py` L108; `fleshforged_ending.py` L108 | `spd = 0.07` — colour lags ~90 frames behind beat advance on fast read | Raise `spd` to `0.18` for near-beat-synchronous colour |
+| Lore auto-dismiss | `settings.py` L248; `gameplay.py` L663–669 | `LORE_DISPLAY_FRAMES = 300` — auto-dismiss during active gameplay interrupts reading | Prefer player-dismiss model; raise floor to `480` if timer kept |
+| NPC hint snap-on | `npc.py` L40–44 | `"E"` hint appears instantly — no range-entry feel | Add 10-frame fade-in alpha ramp on `_hint_alpha` |
+| NPC interact distance | `settings.py` L242 | `NPC_INTERACT_DIST = 60` — only 12 frames of hint lead at full sprint | Raise to `80` (0.33 s lead at 5 px/frame) |
+| NPC hint Y-gating | `gameplay.py` L783–784 | Centre-X only check — off-platform NPCs falsely trigger hint | Add vertical proximity gate (`abs(dy) < NPC_HEIGHT * 2`) |
+| Cutscene trigger model | `gameplay.py` L806–817 | Forced exit trigger violates HK's player-agency lore philosophy | Convert to optional NPC in level 4, or delay to level-4 exit |
+| Mid-game tonal whiplash | `fleshforged_prologue.py` L129–139 | Dry Datalog register immediately follows intense combat | Delay trigger one level (4 → 5) to allow checkpoint rest |
+| Faction tint visibility | `enemy.py` L158–168 | Fleshforged tint `(160,130,100)` is desaturated tan — reads as dirty, not faction-marked | Raise to `(200,110,50)`; increase blend to `FACTION_TINT_BLEND = 0.65` |
+| Tint as magic number | `enemy.py` L160–166 | Blend weight `0.5` and tint colours are hardcoded inline | Extract to `settings.py` as `FACTION_TINT_BLEND`, `FLESHFORGED_TINT_COLOR`, `MARKED_TINT_COLOR` |

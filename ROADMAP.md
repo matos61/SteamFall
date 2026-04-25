@@ -962,10 +962,12 @@ All Phase 3 tasks are done. The game has mid-game lore cutscenes, faction-tinted
 _Review-agent 2026-04-25 pass found these bugs in Phase 3 code. All must be fixed before Phase 4 work begins._
 
 **Files to touch:**
-- `scenes/marked_ending.py` (BUG-026)
-- `scenes/fleshforged_ending.py` (BUG-026)
-- `scenes/gameplay.py` (BUG-027, BUG-028, BUG-029, BUG-031)
+- `scenes/marked_ending.py` (BUG-026, HK-P3-B)
+- `scenes/fleshforged_ending.py` (BUG-026, HK-P3-B)
+- `scenes/gameplay.py` (BUG-027, BUG-028, BUG-029, BUG-031, HK-P3-A)
 - `world/tilemap.py` (BUG-030)
+- `settings.py` (HK-P3-A, HK-P3-C)
+- `entities/enemy.py` (HK-P3-C)
 
 **Fixes required:**
 
@@ -981,6 +983,12 @@ _Review-agent 2026-04-25 pass found these bugs in Phase 3 code. All must be fixe
 
 - ⚠️ **BUG-031** `gameplay.py:461–463`: When NPC dialogue is active the update() early-return skips the proximity hint loop, leaving `_show_hint = True` so the "E" badge renders on top of an open dialogue box. Fix: add `for npc in self.npcs: npc._show_hint = False` inside the `_npc_dialogue is not None` early-return block before returning.
 
+**HK feel (fold in, low-risk):**
+
+- **HK-P3-A** `settings.py`: Raise `NPC_INTERACT_DIST` from 60 → 80 px; also add a vertical proximity gate in `gameplay.py:783–784` (`abs(player.rect.centery - npc.rect.centery) < NPC_INTERACT_DIST`).
+- **HK-P3-B** `scenes/marked_ending.py` and `scenes/fleshforged_ending.py`: Change the background lerp speed constant `spd = 0.07` to `spd = 0.18` so color shifts are beat-synchronous.
+- **HK-P3-C** `settings.py`: Add `FACTION_TINT_BLEND = 0.65`, `FLESHFORGED_TINT_COLOR = (200, 110, 50)`, `MARKED_TINT_COLOR = (100, 60, 160)`. Update `entities/enemy.py` faction tint blend to use these constants (was hardcoded `0.5` and `(160, 130, 100)`).
+
 **Acceptance criteria — done when:**
 - Rapid double-tapping SPACE in an ending scene advances exactly one beat per press.
 - Architect `"ABSOLUTE"` phase banner renders in deep red, not amber.
@@ -988,6 +996,9 @@ _Review-agent 2026-04-25 pass found these bugs in Phase 3 code. All must be fixe
 - Architect defeat dialogue can be advanced by pressing SPACE; a hint is visible.
 - LEVEL_2 has no checkpoint inside the solid sub-floor.
 - NPC "E" badge disappears while a dialogue box is open.
+- NPC "E" hint triggers at 80 px (not 60); vertical proximity gate active.
+- Ending scene background color shifts track beat advances (lerp speed 0.18).
+- Faction tint uses `FLESHFORGED_TINT_COLOR`/`MARKED_TINT_COLOR` constants; blend weight is `FACTION_TINT_BLEND = 0.65`.
 - `python main.py` launches without ImportError.
 
 ---
@@ -1237,6 +1248,23 @@ LORE_DISPLAY_FRAMES  = 300   # 5 seconds at 60 FPS
 - `save_data["lore_found"]` grows on each unique collect and persists.
 - Items already collected do not respawn after save/load.
 - `python main.py` launches without ImportError.
+
+## HK Feel Improvements — Phase 3 (reviewed 2026-04-25)
+
+_Evaluated by hk-agent 2026-04-25; see `REVIEW_HK.md` for full analysis._
+
+| Improvement | Status | Effort | Files |
+|---|---|---|---|
+| Raise `NPC_INTERACT_DIST` 60 → 80 px; add vertical proximity gate | ⏳ P3-0b | Trivial | `settings.py`, `scenes/gameplay.py` |
+| Background lerp speed `0.07` → `0.18` in ending scenes (beat-synchronous color) | ⏳ P3-0b | Trivial | `scenes/marked_ending.py`, `scenes/fleshforged_ending.py` |
+| Extract faction tint constants (`FACTION_TINT_BLEND=0.65`, `FLESHFORGED_TINT_COLOR=(200,110,50)`, `MARKED_TINT_COLOR=(100,60,160)`); remove magic numbers from `enemy.py` | ⏳ P3-0b | Minor | `settings.py`, `entities/enemy.py` |
+| Lore item display: add player-dismiss flag; raise floor to `LORE_DISPLAY_FRAMES=480` (8 s) if timer kept | ⏳ Phase 4 | Moderate | `settings.py`, `scenes/gameplay.py` |
+| Ending scenes: merge consecutive same-register Narrator beats (8 → 6 beats each) for tighter closing weight | ⏳ Phase 4 | Design | `scenes/marked_ending.py`, `scenes/fleshforged_ending.py` |
+| Mid-game cutscene: remove forced level-3 exit trigger; move lore to optional NPC in level 4 (HK agency principle) | ⏳ Phase 4 | Design | `scenes/gameplay.py`, `world/tilemap.py` |
+
+**Items marked P3-0b** should be folded into the P3-0b bug-fix sprint (constants and tint extraction are low-risk alongside the bug fixes).
+
+---
 
 ## Phase 4 — Polish
 
