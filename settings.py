@@ -239,8 +239,13 @@ SCENE_FLESHFORGED_ENDING = "fleshforged_ending"
 # --- P3-4: NPC encounters ---
 NPC_WIDTH         = 24
 NPC_HEIGHT        = 40
-NPC_INTERACT_DIST = 60      # Pixels — E-key trigger range
+NPC_INTERACT_DIST = 80      # Pixels — E-key trigger range
 NPC_COLOR         = (140, 160, 140)
+
+# --- P3-0b: Faction tint constants (extracted from enemy.py magic numbers) ---
+FACTION_TINT_BLEND     = 0.65                 # Blend weight toward tint color
+FLESHFORGED_TINT_COLOR = (200, 110, 50)       # Iron-orange enemy tint
+MARKED_TINT_COLOR      = (100, 60, 160)       # Acolyte-purple enemy tint
 
 # --- P3-5: Collectible lore items ---
 LORE_ITEM_SIZE      = 16

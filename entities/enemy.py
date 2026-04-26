@@ -17,7 +17,9 @@ from settings          import (ENEMY_PATROL_SPEED, ENEMY_CHASE_SPEED,
                                 ENEMY_SIGHT_RANGE, ENEMY_ATTACK_RANGE,
                                 ENEMY_ATTACK_DAMAGE, FLESHFORGED_COLOR, RED,
                                 ENEMY_IFRAMES,
-                                FACTION_FLESHFORGED, FACTION_MARKED)
+                                FACTION_FLESHFORGED, FACTION_MARKED,
+                                FACTION_TINT_BLEND, FLESHFORGED_TINT_COLOR,
+                                MARKED_TINT_COLOR)
 
 # AI states
 _PATROL = "patrol"
@@ -155,14 +157,16 @@ class Enemy(Entity):
         screen_rect = camera.apply(self)
         # 2-frame red hit-flash instead of the white player flash
         base_color = RED if (self.iframes > 0 and self.iframes % 4 < 2) else self.color
-        # P3-2: 50/50 blend toward faction tint for themed levels
+        # P3-2: blend toward faction tint for themed levels
         if self.faction_tint == FACTION_FLESHFORGED:
-            tint = (160, 130, 100)
-            color = tuple(int(a * 0.5 + b * 0.5)
+            tint = FLESHFORGED_TINT_COLOR
+            w = FACTION_TINT_BLEND
+            color = tuple(int(a * (1 - w) + b * w)
                           for a, b in zip(base_color, tint))
         elif self.faction_tint == FACTION_MARKED:
-            tint = (100, 60, 160)
-            color = tuple(int(a * 0.5 + b * 0.5)
+            tint = MARKED_TINT_COLOR
+            w = FACTION_TINT_BLEND
+            color = tuple(int(a * (1 - w) + b * w)
                           for a, b in zip(base_color, tint))
         else:
             color = base_color

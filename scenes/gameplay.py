@@ -254,11 +254,12 @@ class GameplayScene(BaseScene):
             self.enemies.append(arch)
             self._architect = arch
 
-        # P3-2: Apply faction tint to all spawned enemies for themed levels
+        # P3-2: Apply faction tint to spawned enemies for themed levels (skip bosses)
         _tint = _level_faction_tint(level_name)
         if _tint:
             for e in self.enemies:
-                e.faction_tint = _tint
+                if not isinstance(e, (Boss, Architect)):
+                    e.faction_tint = _tint
 
         # Checkpoints
         self.checkpoints: list[Checkpoint] = list(self.tilemap.checkpoints)
@@ -396,6 +397,17 @@ class GameplayScene(BaseScene):
                     self._boss_dialogue.advance()
             return
 
+        # Architect defeat dialogue: SPACE/RETURN advances the line immediately
+        if (self._architect and not self._architect.alive
+                and not self._architect_victory_done
+                and self._architect._defeat_dialogue_active):
+            if event.key in (pygame.K_SPACE, pygame.K_RETURN):
+                arch = self._architect
+                if arch._defeat_line_idx < len(arch._defeat_lines):
+                    arch._defeat_line_idx += 1
+                    self._architect_defeat_timer = 0
+            return
+
         # NPC dialogue intercepts SPACE/RETURN until the box is dismissed
         if self._npc_dialogue is not None:
             if event.key in (pygame.K_SPACE, pygame.K_RETURN):
@@ -460,6 +472,8 @@ class GameplayScene(BaseScene):
         # --- NPC dialogue freezes game logic; tick the dialogue box ---
         if self._npc_dialogue is not None:
             self._npc_dialogue.update()
+            for npc in self.npcs:
+                npc._show_hint = False
             return
 
         # --- Upgrade selection screen freezes game logic ---
@@ -780,8 +794,9 @@ class GameplayScene(BaseScene):
 
         # --- NPC proximity hints (P3-4) ---
         for npc in self.npcs:
-            dist = abs(self.player.rect.centerx - npc.rect.centerx)
-            npc._show_hint = dist < NPC_INTERACT_DIST
+            dist_x = abs(self.player.rect.centerx - npc.rect.centerx)
+            dist_y = abs(self.player.rect.centery - npc.rect.centery)
+            npc._show_hint = dist_x < NPC_INTERACT_DIST and dist_y < NPC_INTERACT_DIST
 
         # --- Checkpoints ---
         faction = self.game.player_faction or FACTION_MARKED
@@ -1312,6 +1327,10 @@ class GameplayScene(BaseScene):
         by = SCREEN_HEIGHT // 2 - bg.get_height() // 2
         surface.blit(bg, (bx, by))
         surface.blit(text, (bx + 16, by + 8))
+        hint_font = pygame.font.SysFont("monospace", 13)
+        hint = hint_font.render("SPACE — continue", True, (180, 160, 100))
+        surface.blit(hint, (SCREEN_WIDTH // 2 - hint.get_width() // 2,
+                            by + bg.get_height() + 6))
 
     def _draw_lore_overlay(self, surface: pygame.Surface) -> None:
         """Draw the collected lore text as a fading centred text box (P3-5)."""
@@ -1357,7 +1376,7 @@ class GameplayScene(BaseScene):
         alpha = min(255, int(frac * 510))   # fade in fast, fade out slow
         if alpha <= 0:
             return
-        color = (220, 60, 60) if "UNLEASHED" in self._boss_phase_text else (220, 140, 40)
+        color = (220, 60, 60) if ("UNLEASHED" in self._boss_phase_text or "ABSOLUTE" in self._boss_phase_text) else (220, 140, 40)
         txt   = self.font_phase_ann.render(self._boss_phase_text, True, color)
         txt.set_alpha(alpha)
         surface.blit(txt, (SCREEN_WIDTH // 2 - txt.get_width() // 2,

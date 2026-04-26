@@ -80,6 +80,8 @@ class MarkedEndingScene(BaseScene):
                 self._advance()
 
     def _advance(self):
+        if self._dialogue.is_done():
+            return
         self._dialogue.advance()
         if self._dialogue.is_done():
             self._next_beat()
@@ -105,7 +107,7 @@ class MarkedEndingScene(BaseScene):
             self._fade_alpha = max(0, self._fade_alpha - 5)
 
         tr, tg, tb = self._bg_target()
-        spd = 0.07
+        spd = 0.18
         self._bg[0] += (tr - self._bg[0]) * spd
         self._bg[1] += (tg - self._bg[1]) * spd
         self._bg[2] += (tb - self._bg[2]) * spd
