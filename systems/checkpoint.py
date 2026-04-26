@@ -55,6 +55,8 @@ class Checkpoint:
         game.save_data["faction"]                 = game.player_faction
         game.save_data["respawn"]                 = False
         game.save_to_disk()
+        from systems.particles import particles
+        particles.emit_checkpoint(self.rect.centerx, self.rect.top)
 
     # ------------------------------------------------------------------
 

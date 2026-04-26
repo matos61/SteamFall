@@ -38,6 +38,7 @@ from entities.jumper       import Jumper
 from systems.checkpoint import Checkpoint
 from systems.collectible import SoulFragment, HeatCore, SoulShard, AbilityOrb, LoreItem
 from systems.minimap    import MiniMap
+from systems.particles  import particles
 from entities.npc       import NPC
 
 
@@ -276,6 +277,9 @@ class GameplayScene(BaseScene):
         # Faction-specific drops: HeatCore (Fleshforged) or SoulShard (Marked)
         # Kept separate from fragments because their collect() takes (player, game).
         self.drops: list = []
+
+        # Clear lingering particles from previous level
+        particles.clear()
 
         # --- Transition state ---
         _fade_in = kwargs.get("_fade_in", False)
@@ -607,6 +611,9 @@ class GameplayScene(BaseScene):
             # Faction drops (HeatCore / SoulShard)
             for drop in self.drops:
                 drop.update()
+
+            # Particle system (frozen during hitstop, matching HK freeze-frame feel)
+            particles.update()
 
         # --- Combat: player hits enemies ---
         living_enemies = [e for e in self.enemies if e.alive]
@@ -978,6 +985,9 @@ class GameplayScene(BaseScene):
         for npc in self.npcs:
             npc.draw(surface, self.camera)
         self.player.draw(surface, self.camera)
+
+        # Particles (drawn after all entities, still in world-space with shake)
+        particles.draw(surface, self.camera)
 
         # Restore shake offset before HUD (HUD is in screen space)
         if shake_x or shake_y:

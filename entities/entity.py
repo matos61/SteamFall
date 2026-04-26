@@ -70,6 +70,8 @@ class Entity:
 
     def die(self) -> None:
         self.alive = False
+        from systems.particles import particles
+        particles.emit_death(self.rect.centerx, self.rect.centery, self.color)
 
     # ------------------------------------------------------------------
 

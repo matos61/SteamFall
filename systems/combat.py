@@ -12,6 +12,7 @@
 import pygame
 from core.hitstop import hitstop
 from settings import FACTION_MARKED
+from systems.particles import particles
 
 
 class AttackHitbox:
@@ -66,6 +67,11 @@ class AttackHitbox:
         if (hasattr(self, 'owner') and hasattr(self.owner, 'faction')
                 and self.owner.faction == FACTION_MARKED):
             self.owner._regen_resource(3)
+
+        # Nail sparks fly from the point of contact
+        hit_x = (self.rect.centerx + target.rect.centerx) // 2
+        hit_y = target.rect.centery
+        particles.emit_hit(hit_x, hit_y, target.color, direction)
 
         # Hit-stop: freeze game for 4 frames so hits feel punchy
         hitstop.trigger(4)

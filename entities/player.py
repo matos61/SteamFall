@@ -175,6 +175,8 @@ class Player(Entity):
         # Landing detection — set dust timer on the frame we first touch ground
         if not was_on_ground and self.on_ground:
             self._land_timer = 10
+            from systems.particles import particles
+            particles.emit_landing(self.rect.centerx, self.rect.bottom)
         if self._land_timer > 0:
             self._land_timer -= 1
 
@@ -319,6 +321,8 @@ class Player(Entity):
         if not self._spend_resource(ABILITY_COST):
             return
         self._ability_cooldown = 90
+        from systems.particles import particles
+        particles.emit_soul_surge(self.rect.centerx, self.rect.centery)
         # Create four outward hitboxes (up, down, left, right)
         cx, cy = self.rect.center
         size   = 80
@@ -335,6 +339,8 @@ class Player(Entity):
         """Fleshforged ability: speed + damage boost for 3 seconds."""
         if not self._spend_resource(ABILITY_COST):
             return
+        from systems.particles import particles
+        particles.emit_overdrive(self.rect.centerx, self.rect.centery)
         self._overdrive        = True
         self._ability_active   = True
         self._ability_timer    = 180   # 3 seconds at 60 fps

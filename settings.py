@@ -251,3 +251,13 @@ MARKED_TINT_COLOR      = (100, 60, 160)       # Acolyte-purple enemy tint
 LORE_ITEM_SIZE      = 16
 LORE_ITEM_COLOR     = (160, 140, 100)    # Parchment tone
 LORE_DISPLAY_FRAMES = 300                # 5 seconds at 60 FPS
+
+# --- Phase 4: Particle system ---
+PARTICLE_GRAVITY          = 0.25   # px/frame² downward acceleration
+PARTICLE_DRAG             = 0.92   # horizontal velocity multiplier per frame
+PARTICLE_HIT_COUNT        = 5      # sparks emitted per hit connection
+PARTICLE_DEATH_COUNT      = 12     # particles per entity death burst
+PARTICLE_LAND_COUNT       = 6      # dust puffs emitted on landing
+PARTICLE_ABILITY_COUNT    = 8      # particles per ability activation
+PARTICLE_CHECKPOINT_COUNT = 14     # golden embers per checkpoint activation
+PARTICLE_DUST_COLOR       = (160, 140, 110)   # warm tan for landing dust
