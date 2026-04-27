@@ -948,7 +948,7 @@ All Phase 3 tasks are done. The game has mid-game lore cutscenes, faction-tinted
 
 **Priority order for build-agent** (tackle in this order):
 
-1. **P3-0b (critical bug-fix sprint)** — BUG-026 through BUG-031; must fix before Phase 4 begins
+1. ~~**P3-0b (critical bug-fix sprint)**~~ ✅ **DONE (2026-04-27)** — BUG-026 through BUG-031 and HK-P3-A/B/C all verified in code.
 2. ~~**P3-1 (Mid-game lore beats)**~~ ✅ **DONE (2026-04-25)**
 3. ~~**P3-2 (Faction enemy design)**~~ ✅ **DONE (2026-04-25)**
 4. ~~**P3-3 (Ending branches)**~~ ✅ **DONE (2026-04-25)**
@@ -957,9 +957,9 @@ All Phase 3 tasks are done. The game has mid-game lore cutscenes, faction-tinted
 
 ---
 
-### Task P3-0b: Critical Bug-Fix Sprint (Phase 3 review pass)
+### Task P3-0b: Critical Bug-Fix Sprint (Phase 3 review pass) ✅ DONE (2026-04-27)
 
-_Review-agent 2026-04-25 pass found these bugs in Phase 3 code. All must be fixed before Phase 4 work begins._
+_Review-agent 2026-04-25 pass found these bugs in Phase 3 code. All verified fixed in code as of 2026-04-27 orchestrator check._
 
 **Files to touch:**
 - `scenes/marked_ending.py` (BUG-026, HK-P3-B)
@@ -1268,13 +1268,255 @@ _Evaluated by hk-agent 2026-04-25; see `REVIEW_HK.md` for full analysis._
 
 ## Phase 4 — Polish
 
-- **Sprite replacement**: Replace all placeholder colored-rect entity renders with sprite sheets loaded via `pygame.image.load`. `AnimationController` already supports frame lists — swap `_make_frames()` to load from asset files.
-- **Tile sprites**: Replace `pygame.draw.rect` tile rendering with a 32×32 tile sprite sheet (one image per biome: Outer District, Foundry, Spire, Sanctum).
-- **Particle system**: Add a `systems/particles.py` module. Emit particles on: hit (blood/sparks), death (burst), Soul Surge (purple shards), Overdrive activation (heat shimmer), checkpoint activation (golden embers).
-- **Sound**: Add `systems/audio.py` wrapping `pygame.mixer`. Sounds needed: attack swing, hit land, jump, death, checkpoint activate, ability use, boss phase transition, ambient level music (one track per biome).
-- **Settings screen**: Implement the "Settings (soon)" pause menu stub from P1-5 as a real scene (`scenes/settings.py`) with: volume sliders (music, SFX), fullscreen toggle, key rebinding stubs.
-- **Main menu polish**: Add background parallax scroll, animated logo, "Credits" option listing contributors.
-- **Death screen polish**: Replace "you perished" text with faction-specific message ("The ink fades..." / "The forge goes cold...") with subtle particle decay effect.
+_Phase 4 begins 2026-04-27. Pre-phase review by review-agent and hk-agent is recommended before build-agent starts P4-1._
+
+**Priority order for build-agent** (tackle in this order):
+
+1. **P4-0b (pre-phase review)** — review-agent does a full code pass; hk-agent evaluates feel for Phase 4 targets. Unblock P4-1 through P4-7.
+2. **P4-1 (particle system)** — highest gameplay impact; no art assets needed.
+3. **P4-2 (death screen polish)** — small scope; unlocks faction flavour in the death loop.
+4. **P4-3 (sound system)** — `systems/audio.py`; blocked on audio asset availability.
+5. **P4-4 (settings screen)** — implement the "Settings (soon)" stub as a real scene.
+6. **P4-5 (main menu polish)** — parallax, animated logo, Credits option.
+7. **P4-6 (sprite replacement)** — blocked on art assets; largest scope.
+8. **P4-7 (tile sprites)** — blocked on art assets; pairs with P4-6.
+
+---
+
+### Task P4-0b: Pre-Phase Review
+
+**What to do:**
+- review-agent: full pass on all .py files added or modified since 2026-04-25 (Phase 3 content); write findings to `REVIEW_BUGS.md`.
+- hk-agent: evaluate particle, sound, and feel targets for Phase 4; write recommendations to `REVIEW_HK.md`.
+- orchestrator: update this section once both reviews are complete, before unlocking P4-1.
+
+---
+
+### Task P4-1: Particle System
+
+**Files to touch:**
+- `systems/particles.py` (create)
+- `scenes/gameplay.py` (emit particles at key events)
+- `settings.py` (particle constants)
+
+**What to build:**
+
+`settings.py`:
+```python
+PARTICLE_GRAVITY      = 0.3    # px/frame² downward pull on particles
+PARTICLE_FRICTION     = 0.88   # per-frame vx damping
+HIT_PARTICLE_COUNT    = 6      # sparks per hit
+HIT_PARTICLE_SPEED    = 4.0    # initial speed
+HIT_PARTICLE_LIFE     = 18     # frames
+DEATH_PARTICLE_COUNT  = 14     # burst on enemy death
+DEATH_PARTICLE_LIFE   = 30
+SOUL_SURGE_PARTICLE_COUNT = 10
+SOUL_SURGE_PARTICLE_COLOR = (140, 80, 220)
+OVERDRIVE_PARTICLE_COUNT  = 8
+OVERDRIVE_PARTICLE_COLOR  = (220, 120, 20)
+CHECKPOINT_PARTICLE_COUNT = 12
+CHECKPOINT_PARTICLE_COLOR = (200, 180, 80)
+LANDING_PARTICLE_COUNT    = 4
+LANDING_PARTICLE_COLOR    = (120, 100, 70)
+```
+
+`systems/particles.py`: `Particle` and `ParticleSystem` classes.
+- `Particle(x, y, vx, vy, color, life)`: rect (3×3), updates vx/vy with gravity/friction, alive when `life > 0`.
+- `ParticleSystem`: maintains a list of `Particle`. Methods:
+  - `emit(x, y, count, speed, color, life, spread=360)` — spawn particles in random directions within `spread` degrees.
+  - `update()` — tick all particles, prune dead ones.
+  - `draw(surface, camera)` — draw each particle rect with alpha proportional to remaining life.
+
+`scenes/gameplay.py` emit sites:
+- Player hit → `self._particles.emit(player center, HIT_PARTICLE_COUNT, ..., color=RED)`
+- Enemy hit → emit at hit point (from AttackHitbox or on `take_damage`) using `HIT_PARTICLE_COUNT` sparks.
+- Enemy death → `DEATH_PARTICLE_COUNT` burst, color = enemy base color.
+- Soul Surge activation → `SOUL_SURGE_PARTICLE_COUNT` outward burst.
+- Overdrive activation → `OVERDRIVE_PARTICLE_COUNT` heat shimmer upward.
+- Checkpoint activation → `CHECKPOINT_PARTICLE_COUNT` golden embers upward.
+- Player landing (on_ground transition False→True) → `LANDING_PARTICLE_COUNT` dust sideways.
+
+**Acceptance criteria — done when:**
+- Hitting an enemy emits 6 spark particles that arc outward and fade.
+- Enemy death emits a 14-particle burst.
+- Soul Surge and Overdrive emit faction-colored particles on activation.
+- Checkpoint activation emits golden embers.
+- Landing from a jump emits 4 dust particles.
+- `python main.py` launches without ImportError.
+
+---
+
+### Task P4-2: Death Screen Polish
+
+**Files to touch:**
+- `scenes/gameplay.py` (replace death text with faction-specific variant)
+- `settings.py` (add death text constants)
+
+**What to build:**
+
+`settings.py`:
+```python
+DEATH_TEXT_MARKED      = "The ink fades..."
+DEATH_TEXT_FLESHFORGED = "The forge goes cold..."
+DEATH_TEXT_NEUTRAL     = "You perished."
+```
+
+`scenes/gameplay.py`:
+- In `_draw_death_screen()`, replace the hardcoded `"you perished"` string with:
+  ```python
+  faction = getattr(self.game, 'player_faction', None)
+  if faction == FACTION_MARKED:
+      msg = DEATH_TEXT_MARKED
+  elif faction == FACTION_FLESHFORGED:
+      msg = DEATH_TEXT_FLESHFORGED
+  else:
+      msg = DEATH_TEXT_NEUTRAL
+  ```
+- Emit 6 `DEATH_PARTICLE_COUNT // 2` particles from the player's last position when the death screen first shows (use a `_death_particles_emitted` flag).
+
+**Acceptance criteria — done when:**
+- Marked player death shows "The ink fades..." in purple-toned text.
+- Fleshforged death shows "The forge goes cold..." in orange-toned text.
+- 6 particles emit from the player position on death screen entry.
+- `python main.py` launches without ImportError.
+
+---
+
+### Task P4-3: Sound System
+
+**Files to touch:**
+- `systems/audio.py` (create)
+- `scenes/gameplay.py` (wire play calls at key events)
+- `settings.py` (add audio constants)
+
+_Blocked on audio asset files. Build-agent should create the `audio.py` wrapper and all call sites, leaving asset paths as `None`-safe stubs that no-op when the file is missing. Assets will be dropped into `assets/sounds/` and `assets/music/` when available._
+
+**What to build:**
+
+`settings.py`:
+```python
+AUDIO_MUSIC_VOLUME = 0.5
+AUDIO_SFX_VOLUME   = 0.7
+SOUND_ATTACK       = "assets/sounds/attack.wav"
+SOUND_HIT          = "assets/sounds/hit.wav"
+SOUND_JUMP         = "assets/sounds/jump.wav"
+SOUND_DEATH        = "assets/sounds/death.wav"
+SOUND_CHECKPOINT   = "assets/sounds/checkpoint.wav"
+SOUND_ABILITY      = "assets/sounds/ability.wav"
+SOUND_BOSS_PHASE   = "assets/sounds/boss_phase.wav"
+MUSIC_LEVEL_1      = "assets/music/outer_district.ogg"
+MUSIC_LEVEL_5      = "assets/music/sanctum.ogg"
+MUSIC_BOSS         = "assets/music/boss.ogg"
+```
+
+`systems/audio.py`: `AudioManager` singleton.
+- `__init__()`: attempt `pygame.mixer.pre_init(44100, -16, 2, 512)` and `pygame.mixer.init()`. Load each sound file with `pygame.mixer.Sound(path)` if the file exists; else store `None`.
+- `play_sfx(key)`: call `.play()` if sound is not None.
+- `play_music(path, loops=-1)`: call `pygame.mixer.music.load(path)` and `.play(loops)` if file exists; no-op otherwise.
+- `set_sfx_volume(v)` / `set_music_volume(v)`: update all loaded sounds and music.
+
+`scenes/gameplay.py` call sites: play SFX at attack swing, hit land, jump, death, checkpoint activate, ability use, boss phase transition. Play `MUSIC_LEVEL_5` on entering level 5; `MUSIC_BOSS` when boss spawns.
+
+**Acceptance criteria — done when:**
+- `python main.py` launches without error whether or not asset files exist.
+- All call sites are wired (SFX plays when assets are present; no crash when absent).
+- `AudioManager` is instantiated once and accessible as `game.audio`.
+
+---
+
+### Task P4-4: Settings Screen
+
+**Files to touch:**
+- `scenes/settings.py` (create)
+- `core/game.py` (register scene)
+- `scenes/gameplay.py` (wire "Settings (soon)" option to new scene)
+- `settings.py` (add scene name constant)
+
+**What to build:**
+
+`settings.py`: Add `SCENE_SETTINGS = "settings"`.
+
+`scenes/settings.py`: `SettingsScene(BaseScene)`.
+- Three rows: Music Volume, SFX Volume, Fullscreen.
+- UP/DOWN to select row; LEFT/RIGHT to adjust value (volume ±0.1, fullscreen toggle).
+- ESC returns to the previous scene (store `_return_scene` from `kwargs.get("return_scene", SCENE_MAIN_MENU)`).
+- Volume changes call `game.audio.set_music_volume()` / `set_sfx_volume()` immediately.
+- Fullscreen toggle calls `pygame.display.toggle_fullscreen()`.
+- Draw: centered panel, three rows with sliders (10-pip bar) and value labels.
+
+`scenes/gameplay.py`: In pause menu, "Settings (soon)" → `game.change_scene(SCENE_SETTINGS, return_scene=SCENE_GAMEPLAY)`.
+
+**Acceptance criteria — done when:**
+- Pressing ENTER on "Settings (soon)" in the pause menu opens the settings screen.
+- Volume changes take effect immediately and persist in `game.save_data`.
+- ESC from settings returns to the pause menu.
+- `python main.py` launches without ImportError.
+
+---
+
+### Task P4-5: Main Menu Polish
+
+**Files to touch:**
+- `scenes/main_menu.py` (add parallax, animated logo, Credits option)
+- `settings.py` (add credits constants)
+
+**What to build:**
+
+`settings.py`:
+```python
+CREDITS_TEXT = [
+    "Steamfall",
+    "",
+    "Design & Code  —  build-agent",
+    "Story         —  hk-agent",
+    "Review        —  review-agent",
+    "Direction     —  orchestrator",
+]
+```
+
+`scenes/main_menu.py`:
+- Background: draw 2–3 layers of slowly scrolling rectangles (parallax clouds/platforms) at different speeds (1, 2, 3 px/frame right-to-left; wrap at screen edge).
+- Logo: pulse the title glow at a slightly faster rate (period 90 frames instead of 120).
+- Add "Credits" as the last menu option (before Quit).
+- Selecting "Credits" shows a centered scrolling credits list over a dark overlay; any key dismisses it.
+
+**Acceptance criteria — done when:**
+- Main menu background shows 2+ parallax scroll layers.
+- "Credits" option appears in the menu and shows the credits text.
+- Existing "Continue" / "New Game" / "Quit" flow is unbroken.
+- `python main.py` launches without ImportError.
+
+---
+
+### Task P4-6: Sprite Replacement
+
+_Blocked on art assets. Build-agent should update `AnimationController._make_frames()` to load from `assets/sprites/<entity>/` directories when the directory exists, falling back to placeholder colored rects when not. This future-proofs all entity draws without requiring assets today._
+
+**Files to touch:**
+- `systems/animation.py` (extend `_make_frames` to load PNGs when available)
+- `entities/player.py` (pass sprite dir path to AnimationController)
+- `entities/enemy.py` and subclasses (same)
+- `settings.py` (add sprite path constants)
+
+**Acceptance criteria — done when:**
+- When `assets/sprites/player/idle/` contains PNG files, they are loaded and used instead of colored rects.
+- When the directory is absent, colored rects render as before (no crash).
+- `python main.py` launches without ImportError.
+
+---
+
+### Task P4-7: Tile Sprites
+
+_Blocked on art assets. Same pattern as P4-6._
+
+**Files to touch:**
+- `world/tilemap.py` (load tile sprite sheet when `assets/tiles/<biome>.png` exists)
+- `settings.py` (add tile sprite path constants)
+
+**Acceptance criteria — done when:**
+- When `assets/tiles/outer_district.png` exists, it is used for level 1–2 tile rendering.
+- Fallback to colored rects when assets are absent.
+- `python main.py` launches without ImportError.
 
 ---
 
@@ -1326,17 +1568,17 @@ _Legend: ✅ Fixed | ⚠️ Flagged / deferred | 🔴 Open_
 
 22. ✅ **BUG-025: Arena-shrink left/right wall injection coupled via single condition** — Fixed by P2-0c (2026-04-23). Left wall injected only when `_shrink_left_x > 0`; right wall injected independently when `_shrink_right_x < self.tilemap.width`.
 
-23. 🔴 **BUG-026: Ending scenes skip two beats on rapid double-press** — `_advance()` in `marked_ending.py` and `fleshforged_ending.py` does not guard against calling `_next_beat()` twice when `DialogueBox` is already done. Assign to build-agent in P3-0b.
+23. ✅ **BUG-026: Ending scenes skip two beats on rapid double-press** — Fixed in P3-0b (2026-04-27). `if self._dialogue.is_done(): return` guard added to `_advance()` in both ending scenes.
 
-24. 🔴 **BUG-027: Architect phase banners always render amber — `"UNLEASHED"` color check never matches** — `_draw_phase_announce` at `gameplay.py:1360` tests only for `"UNLEASHED"`, so `"ABSOLUTE"` (phase 4) never gets the deep-red escalation color. Assign to build-agent in P3-0b.
+24. ✅ **BUG-027: Architect phase banners always render amber — `"UNLEASHED"` color check never matches** — Fixed in P3-0b (2026-04-27). Condition extended to `("UNLEASHED" in ... or "ABSOLUTE" in ...)`.
 
-25. 🔴 **BUG-028: Faction tint applied to Boss / Architect in levels 6–8** — `_level_faction_tint` loop at `gameplay.py:257–261` sets `faction_tint` on every enemy including bosses, overriding phase-shifting colors. Assign to build-agent in P3-0b.
+25. ✅ **BUG-028: Faction tint applied to Boss / Architect in levels 6–8** — Fixed in P3-0b (2026-04-27). `isinstance(e, (Boss, Architect))` guard added to the tint loop.
 
-26. 🔴 **BUG-029: Architect defeat dialogue has no SPACE shortcut — player silently locked out up to 8 s** — 120-frame auto-advance with no input path and no hint text. Assign to build-agent in P3-0b.
+26. ✅ **BUG-029: Architect defeat dialogue has no SPACE shortcut — player silently locked out up to 8 s** — Fixed in P3-0b (2026-04-27). SPACE/RETURN advance `_defeat_line_idx`; hint rendered.
 
-27. ⚠️ **BUG-030: Unreachable checkpoint in LEVEL_2 sub-floor** — `'C'` tile at row 16 is below the solid ground layer (rows 12–13) and can never be activated. Assign to build-agent in P3-0b.
+27. ✅ **BUG-030: Unreachable checkpoint in LEVEL_2 sub-floor** — Fixed in P3-0b (2026-04-27). Checkpoint relocated to row 8 (reachable platform).
 
-28. ⚠️ **BUG-031: NPC "E" hint badge persists while dialogue box is open** — `_show_hint` is not cleared during the `_npc_dialogue is not None` early-return. Assign to build-agent in P3-0b.
+28. ✅ **BUG-031: NPC "E" hint badge persists while dialogue box is open** — Fixed in P3-0b (2026-04-27). `npc._show_hint = False` set inside the `_npc_dialogue` early-return block.
 
 29. ⚠️ **FLAG-010: `game/story.py` `StoryState` class is dead code** — defined but never imported or used. Either wire into `core/game.py` or remove. Low-priority; defer to Phase 4 cleanup.
 
@@ -1358,28 +1600,31 @@ _Legend: ✅ Fixed | ⚠️ Flagged / deferred | 🔴 Open_
 | `scenes/faction_select.py` | build-agent | Stable until Phase 3 |
 | `scenes/marked_prologue.py` | build-agent | Stable until Phase 3 |
 | `scenes/fleshforged_prologue.py` | build-agent | Stable until Phase 3 |
-| `scenes/gameplay.py` | build-agent | Phase 3 complete; BUG-027/028/029/031 fixes pending in P3-0b |
+| `scenes/gameplay.py` | build-agent | P3 + P3-0b complete; P4-1/P4-2/P4-4 will touch this |
 | `entities/entity.py` | build-agent | Stable (iframe fix done in P2-0) |
-| `entities/player.py` | build-agent | Animation draw consolidation deferred to Phase 4 |
-| `entities/enemy.py` | build-agent | Stable (get_drop_fragments + ENEMY_IFRAMES done in P2-0) |
+| `entities/player.py` | build-agent | Animation draw consolidation deferred to P4-6 (sprite pass) |
+| `entities/enemy.py` | build-agent | Stable; faction tint constants extracted (P3-0b) |
 | `entities/crawler.py` | build-agent | Created (P1-1); stable |
 | `entities/boss.py` | build-agent | Warden scripting complete (P2-3); stable |
-| `entities/architect.py` | build-agent | Stable (BUG-020 + BUG-021 fixed in P2-0c; P2-8 warn/clamp complete) |
+| `entities/architect.py` | build-agent | Stable (P2-0c + P2-8 complete) |
 | `entities/shield_guard.py` | build-agent | Created (P2-1); stable |
 | `entities/ranged.py` | build-agent | Created (P2-1); stable |
 | `entities/jumper.py` | build-agent | Created (P2-1); stable |
 | `systems/physics.py` | build-agent | Stable; do not change call signatures |
 | `systems/combat.py` | build-agent | Stable; hitbox logic complete |
 | `systems/dialogue.py` | build-agent | Hint text fix done (Tech Debt #8); stable |
-| `systems/animation.py` | build-agent | Stable until sprite replacement (Phase 4) |
+| `systems/animation.py` | build-agent | Stable; P4-6 extends `_make_frames` for PNG loading |
 | `systems/checkpoint.py` | build-agent | Created (P1-1); stable |
-| `systems/collectible.py` | build-agent | Stable (P2-0c + P2-6 complete); Phase 3 P3-5 adds `LoreItem` here |
-| `systems/minimap.py` | build-agent | Created (P1-7); extend room-chain to 13 levels in P2-8 |
-| `scenes/marked_ending.py` | build-agent | Created (P3-3); BUG-026 fix pending in P3-0b |
-| `scenes/fleshforged_ending.py` | build-agent | Created (P3-3); BUG-026 fix pending in P3-0b |
-| `entities/npc.py` | build-agent | Created (P3-4); stable |
-| `systems/tutorial_minigame.py` | build-agent (created outside roadmap) | Inline control tutorial for prologues; registered here for tracking |
-| `systems/voice_player.py` | build-agent (created outside roadmap) | Voice-line playback; no MP3 assets yet; blocked on Phase 4 audio pass |
-| `world/tilemap.py` | build-agent | All levels complete (Phase 2); BUG-030 LEVEL_2 checkpoint fix pending in P3-0b |
+| `systems/collectible.py` | build-agent | Stable (P3-5 `LoreItem` complete) |
+| `systems/minimap.py` | build-agent | 13-level room-chain complete (P2-8); stable |
+| `systems/particles.py` | build-agent | To be created in P4-1 |
+| `systems/audio.py` | build-agent | To be created in P4-3 |
+| `scenes/marked_ending.py` | build-agent | P3-3 + P3-0b complete; stable |
+| `scenes/fleshforged_ending.py` | build-agent | P3-3 + P3-0b complete; stable |
+| `scenes/settings.py` | build-agent | To be created in P4-4 |
+| `entities/npc.py` | build-agent | Created (P3-4); P3-0b complete; stable |
+| `systems/tutorial_minigame.py` | build-agent (created outside roadmap) | Inline control tutorial for prologues; stable |
+| `systems/voice_player.py` | build-agent (created outside roadmap) | Voice-line playback; integrate with P4-3 audio pass |
+| `world/tilemap.py` | build-agent | All levels complete; P3-0b BUG-030 fixed; stable |
 | `REVIEW_BUGS.md` | review-agent (own) | Never modifies .py files |
 | `REVIEW_HK.md` | hk-agent (own) | Never modifies .py files |
