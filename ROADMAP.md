@@ -1272,23 +1272,65 @@ _Phase 4 begins 2026-04-27. Pre-phase review by review-agent and hk-agent is rec
 
 **Priority order for build-agent** (tackle in this order):
 
-1. **P4-0b (pre-phase review)** — review-agent does a full code pass; hk-agent evaluates feel for Phase 4 targets. Unblock P4-1 through P4-7.
-2. **P4-1 (particle system)** — highest gameplay impact; no art assets needed.
-3. **P4-2 (death screen polish)** — small scope; unlocks faction flavour in the death loop.
-4. **P4-3 (sound system)** — `systems/audio.py`; blocked on audio asset availability.
-5. **P4-4 (settings screen)** — implement the "Settings (soon)" stub as a real scene.
-6. **P4-5 (main menu polish)** — parallax, animated logo, Credits option.
-7. **P4-6 (sprite replacement)** — blocked on art assets; largest scope.
-8. **P4-7 (tile sprites)** — blocked on art assets; pairs with P4-6.
+1. ~~**P4-0b (pre-phase review)**~~ ✅ **DONE (2026-04-27)** — review-agent pass complete; hk-agent pass in progress.
+2. **P4-0c (critical bug-fix sprint)** — BUG-032 through BUG-037; must fix before P4-1.
+3. **P4-1 (particle system)** — highest gameplay impact; no art assets needed.
+4. **P4-2 (death screen polish)** — small scope; unlocks faction flavour in the death loop.
+5. **P4-3 (sound system)** — `systems/audio.py`; blocked on audio asset availability.
+6. **P4-4 (settings screen)** — implement the "Settings (soon)" stub as a real scene.
+7. **P4-5 (main menu polish)** — parallax, animated logo, Credits option.
+8. **P4-6 (sprite replacement)** — blocked on art assets; largest scope.
+9. **P4-7 (tile sprites)** — blocked on art assets; pairs with P4-6.
 
 ---
 
-### Task P4-0b: Pre-Phase Review
+### Task P4-0b: Pre-Phase Review ✅ DONE (2026-04-27) — review pass complete; hk-agent pass in progress
 
-**What to do:**
-- review-agent: full pass on all .py files added or modified since 2026-04-25 (Phase 3 content); write findings to `REVIEW_BUGS.md`.
-- hk-agent: evaluate particle, sound, and feel targets for Phase 4; write recommendations to `REVIEW_HK.md`.
-- orchestrator: update this section once both reviews are complete, before unlocking P4-1.
+_Review-agent found BUG-032 through BUG-043 (see Known Bugs). Six are 🔴 critical and must be fixed before P4-1 content work._
+
+**Critical bugs (block P4-1):** BUG-032, BUG-033, BUG-034, BUG-035, BUG-036, BUG-037
+**Minor bugs (can fold into P4-1 commit):** BUG-038, BUG-039, BUG-040, BUG-041
+**Pre-identified P4 hooks (no fix needed yet):** BUG-042, BUG-043
+
+---
+
+### Task P4-0c: Critical Bug-Fix Sprint (Phase 4 pre-start)
+
+_Unblocked by P4-0b. Must be completed before P4-1._
+
+**Files to touch:**
+- `scenes/gameplay.py` (BUG-032, BUG-035, BUG-036, BUG-037)
+- `systems/collectible.py` (BUG-033)
+- `systems/checkpoint.py` (BUG-034)
+
+**Fixes required:**
+
+- 🔴 **BUG-032** `gameplay.py` `_apply_upgrade_to_player`: Change `if dmg_count > UPGRADE_DMG_MAX_STACKS` to `if dmg_count >= UPGRADE_DMG_MAX_STACKS` so the 3rd stack is the cap, not the 4th.
+
+- 🔴 **BUG-033** `collectible.py` `LoreItem.collect()`: The already-collected branch (`lore_id in lore_found`) should not silently destroy the item — the `on_enter` pre-spawn filter should prevent this from ever being reached. Add `assert lore_id not in game.save_data.get("lore_found", []), "LoreItem spawned despite already being collected"` to the top of `collect()` in debug builds, or at minimum add a comment. No behavior change; just guard the invariant.
+
+- 🔴 **BUG-034** `checkpoint.py` line 55: Change `game.save_data["faction"] = game.player_faction` to `if game.player_faction is not None: game.save_data["faction"] = game.player_faction`.
+
+- 🔴 **BUG-035** `gameplay.py` Warden boss intro banner: The banner index loop should be bounded by the length of `_WARDEN_INTRO_LINES` (6), not `Boss._intro_lines` (3). Fix the banner index guard to `if self._boss_dialogue._index < len(_WARDEN_INTRO_LINES)`.
+
+- 🔴 **BUG-036** `gameplay.py` Architect defeat dialogue: At the moment `_architect_victory_done` transitions to the defeat-dialogue state, set `self.player._iframes = 9999` (or a sufficiently long iframe count) to make the player invincible through the entire cutscene. Clear it when the cutscene ends and `change_scene` fires.
+
+- 🔴 **BUG-037** `gameplay.py` level transition check: Gate `_check_level_transition()` inside `update()` with `if not getattr(self, '_architect_victory_done', False)` to prevent the right-edge trigger from firing during the Architect defeat sequence.
+
+**Also fold in (minor, low-risk):**
+
+- ⚠️ **BUG-038** `architect.py`: Move phase-color computation into `_update_ai()` and store as `self._phase_color`; use it in both `draw()` and any future particle emits.
+- ⚠️ **BUG-039** `minimap.py`: Add `+ TILE_SIZE * 2` to enemy dot Y offset in `draw_overlay`.
+- ⚠️ **BUG-040** `npc.py`: Add Y-axis camera cull check alongside existing X check.
+- ⚠️ **BUG-041** `gameplay.py` lore overlay: Remove `set_alpha(200)` from the text surface; keep it only on the background panel.
+
+**Acceptance criteria — done when:**
+- `UPGRADE_DMG_MAX_STACKS` cap is exactly 3 (not 4).
+- Checkpoint activation never writes `None` as faction in save data.
+- Warden intro banner remains visible for all 6 dialogue lines.
+- Player is invincible during Architect defeat cutscene; cannot die to minions.
+- Right-edge transition cannot fire during Architect defeat sequence.
+- `python main.py` launches without ImportError.
 
 ---
 
@@ -1581,6 +1623,32 @@ _Legend: ✅ Fixed | ⚠️ Flagged / deferred | 🔴 Open_
 28. ✅ **BUG-031: NPC "E" hint badge persists while dialogue box is open** — Fixed in P3-0b (2026-04-27). `npc._show_hint = False` set inside the `_npc_dialogue` early-return block.
 
 29. ⚠️ **FLAG-010: `game/story.py` `StoryState` class is dead code** — defined but never imported or used. Either wire into `core/game.py` or remove. Low-priority; defer to Phase 4 cleanup.
+
+_Review-agent 2026-04-27 pass (P4-0b pre-phase):_
+
+30. 🔴 **BUG-032** `gameplay.py` `_apply_upgrade_to_player`: DMG stack cap uses `>` instead of `>=`, allowing one extra stack beyond `UPGRADE_DMG_MAX_STACKS` on level reload. Fix: change to `>= UPGRADE_DMG_MAX_STACKS`. Assign to build-agent in P4-0b.
+
+31. 🔴 **BUG-033** `collectible.py` `LoreItem.collect()`: already-collected branch sets `self.alive = False` and returns `None` silently — if the pre-spawn filter in `on_enter` is bypassed the item vanishes with no feedback. Fix: guard is acceptable if filter is always in place; annotate with a comment confirming the invariant, or add an `assert lore_id not in save_data["lore_found"]` to catch regressions. Assign to build-agent in P4-0b.
+
+32. 🔴 **BUG-034** `checkpoint.py` line 55: Activation overwrites `save_data["faction"]` with `game.player_faction` which can be `None` on a "Continue" load without a faction in save data, corrupting the faction key. Fix: only write if `game.player_faction is not None`. Assign to build-agent in P4-0b.
+
+33. 🔴 **BUG-035** `gameplay.py` lines 1299–1321: Warden boss intro banner indexes `Boss._intro_lines` (3 entries) via `DialogueBox._index`, but the DialogueBox was loaded with `_WARDEN_INTRO_LINES` (6 entries) — banner disappears silently for dialogue lines 3–5. Fix: use `_WARDEN_INTRO_LINES` length as the index bound, or separate the banner list from the dialogue list. Assign to build-agent in P4-0b.
+
+34. 🔴 **BUG-036** `gameplay.py` lines 779–861: Player can be killed by surviving Crawler minions during Architect defeat dialogue, firing `change_scene` before `victory = True` is saved (game ends as death, not victory). Fix: set `player.invincible = True` (or apply a long iframe) when the defeat dialogue begins. Assign to build-agent in P4-0b.
+
+35. 🔴 **BUG-037** `gameplay.py` lines 825–848: Level right-edge transition check is not suppressed during Architect defeat dialogue — player can walk to the right edge and trigger `SCENE_MAIN_MENU` before victory is saved. Fix: gate `_check_level_transition()` with `if not self._architect_victory_done`. Assign to build-agent in P4-0b.
+
+36. ⚠️ **BUG-038** `architect.py` lines 221–229: `self.color` is set inside `draw()`, not `update()`, so the death particle burst on a phase-transition death frame uses last frame's color. Fix: compute phase color in `update()` or `_update_ai()` and store it before `die()` is called. Assign to build-agent in P4-0b.
+
+37. ⚠️ **BUG-039** `minimap.py` lines 215–220: Enemy spawn dots are rendered 2 tile-rows above their actual tile position because the -64 px Y-spawn offset applied at spawn time is not compensated on the minimap row calculation. Fix: add `+ TILE_SIZE * 2` (or `+ 64`) to the enemy dot's Y offset in `draw_overlay`. Assign to build-agent in P4-0b.
+
+38. ⚠️ **BUG-040** `npc.py` lines 35–36: NPC off-screen culling checks only X axis; NPCs far above/below the viewport blit every frame. Fix: also check `camera.apply(npc.rect).bottom > 0 and camera.apply(npc.rect).top < SCREEN_HEIGHT`. Low priority; assign to build-agent in P4-0b.
+
+39. ⚠️ **BUG-041** `gameplay.py` lines 1372–1381: Lore overlay text uses `set_alpha(200)` during the steady-state window (80% opaque), while the background also uses alpha 200 — stacked alpha makes text appear dimmer than intended. Fix: render text surface without `set_alpha`; apply alpha only to the background panel. Cosmetic; assign to build-agent in P4-0b.
+
+40. ⚠️ **BUG-042** `gameplay.py` lines 1174–1186: No hook point yet for P4-2 faction-specific death text and death-particle emit. Hook should be: `if self._death_timer == 1:` (first frame of death screen). Pre-identified for build-agent when implementing P4-2.
+
+41. ⚠️ **BUG-043** `gameplay.py` lines 450–457 / `settings.py` / `core/game.py`: P4-4 settings screen transition is a no-op stub. Requires: `SCENE_SETTINGS` constant in `settings.py`, scene registration in `game._build_scenes`, and new `scenes/settings.py`. All three touch points noted; unblocked by P4-4 spec in ROADMAP.
 
 ---
 
