@@ -54,7 +54,8 @@ class Architect(Boss):
         self.rect       = pygame.Rect(int(x), int(y), 60, 80)
         self.max_health = ARCHITECT_MAX_HEALTH
         self.health     = ARCHITECT_MAX_HEALTH
-        self.color      = (60, 0, 100)   # deep violet; changes per phase draw
+        self.color       = (60, 0, 100)   # deep violet; updated each update() tick
+        self._phase_color = self.color   # BUG-038: stored here so die() uses current frame color
 
         # Faction the player belongs to — drives all dialogue branching
         self.faction = faction
@@ -108,6 +109,19 @@ class Architect(Boss):
     # ------------------------------------------------------------------
 
     def update(self, dt: int, player=None, solid_rects=None) -> None:
+        # BUG-038: compute phase color here so die() on a phase-transition frame uses
+        # the correct color rather than the previous frame's value.
+        ph = self.phase
+        if ph == 1:
+            self._phase_color = (60,  0,  100)
+        elif ph == 2:
+            self._phase_color = (100, 0,  120)
+        elif ph == 3:
+            self._phase_color = (140, 20, 80)
+        else:
+            self._phase_color = (180, 0,  40)
+        self.color = self._phase_color
+
         # Tick phase-specific cooldowns
         if self._teleport_cd > 0:
             self._teleport_cd -= 1
@@ -217,17 +231,7 @@ class Architect(Boss):
     # ------------------------------------------------------------------
 
     def draw(self, surface: pygame.Surface, camera) -> None:
-        # Shift body colour by phase so the visual stakes escalate
-        ph = self.phase
-        if ph == 1:
-            self.color = (60,  0,  100)   # deep violet
-        elif ph == 2:
-            self.color = (100, 0,  120)   # brighter violet
-        elif ph == 3:
-            self.color = (140, 20, 80)    # violet-crimson
-        else:
-            self.color = (180, 0,  40)    # blood-red
-
+        # self.color is already set to the phase-appropriate value in update()
         super().draw(surface, camera)
 
         # P2-8: Pre-teleport warning flash — draw a distinct white-blue tint overlay

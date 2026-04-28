@@ -10,6 +10,7 @@
 
 import pygame
 from settings import TILE_SIZE, CHECKPOINT_COLOR, CHECKPOINT_GLOW_COLOR
+from systems.audio import audio
 
 
 class Checkpoint:
@@ -52,11 +53,13 @@ class Checkpoint:
         game.save_data["checkpoint_health_frac"]  = (player.health /
                                                       player.max_health)
         game.save_data["checkpoint_level"]        = self.level
-        game.save_data["faction"]                 = game.player_faction
+        if game.player_faction is not None:
+            game.save_data["faction"]             = game.player_faction
         game.save_data["respawn"]                 = False
         game.save_to_disk()
         from systems.particles import particles
         particles.emit_checkpoint(self.rect.centerx, self.rect.top)
+        audio.play_sfx("checkpoint")
 
     # ------------------------------------------------------------------
 

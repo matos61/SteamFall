@@ -22,8 +22,37 @@
 # draw_tile() with surface.blit(tile_image, screen_rect).
 # =============================================================================
 
+import os
 import pygame
-from settings import TILE_SIZE, TILE_COLOR, TILE_EDGE_COLOR, CRUMBLE_COLOR, CRUMBLE_WARNING_COLOR
+from settings import (TILE_SIZE, TILE_COLOR, TILE_EDGE_COLOR,
+                      CRUMBLE_COLOR, CRUMBLE_WARNING_COLOR,
+                      TILE_SHEET_LEVEL_1_2, TILE_SHEET_LEVEL_3_4, TILE_SHEET_LEVEL_5)
+
+
+def _load_tile_sprite(path: str) -> pygame.Surface | None:
+    """Load and scale a tile sprite sheet image to TILE_SIZE × TILE_SIZE.
+
+    Returns None if the file does not exist or cannot be loaded, so the caller
+    can fall back to colored-rect rendering (P4-7).
+    """
+    if not path or not os.path.exists(path):
+        return None
+    try:
+        img = pygame.image.load(path).convert()
+        return pygame.transform.scale(img, (TILE_SIZE, TILE_SIZE))
+    except pygame.error:
+        return None
+
+
+def _tile_sheet_for_level(level_name: str) -> pygame.Surface | None:
+    """Return the pre-loaded tile surface for the given level, or None."""
+    if level_name in ("level_1", "level_2"):
+        return _load_tile_sprite(TILE_SHEET_LEVEL_1_2)
+    if level_name in ("level_3", "level_4"):
+        return _load_tile_sprite(TILE_SHEET_LEVEL_3_4)
+    if level_name == "level_5":
+        return _load_tile_sprite(TILE_SHEET_LEVEL_5)
+    return None
 
 
 # ---------------------------------------------------------------------------
@@ -311,6 +340,8 @@ class TileMap:
         self.level_name  = level_name
         self.tiles: list[pygame.Rect] = []   # Solid collision rects
         self.player_spawn = (100, 100)        # Default; overwritten if 'P' found
+        # P4-7: optional tile sprite (None = fall back to colored rects)
+        self._tile_sprite: pygame.Surface | None = _tile_sheet_for_level(level_name)
         self.enemy_spawns: list[tuple]        = []
         self.crawler_spawns: list[tuple]      = []
         self.checkpoints: list                = []
@@ -409,11 +440,12 @@ class TileMap:
                 screen_rect.bottom < 0 or screen_rect.top  > surface.get_height()):
                 continue
 
-            # Fill
-            pygame.draw.rect(surface, TILE_COLOR, screen_rect)
-            # Top highlight edge for a slight 3-D feel
-            pygame.draw.line(surface, TILE_EDGE_COLOR,
-                screen_rect.topleft, screen_rect.topright, 2)
+            if self._tile_sprite is not None:
+                surface.blit(self._tile_sprite, screen_rect)
+            else:
+                pygame.draw.rect(surface, TILE_COLOR, screen_rect)
+                pygame.draw.line(surface, TILE_EDGE_COLOR,
+                    screen_rect.topleft, screen_rect.topright, 2)
 
     # ------------------------------------------------------------------
 

@@ -216,7 +216,9 @@ class MiniMap:
                              + tilemap.shield_guard_spawns + tilemap.ranged_spawns
                              + tilemap.jumper_spawns):
                 dx = int(ex / TILE_SIZE) * ts + ox + ts // 2
-                dy = int(ey / TILE_SIZE) * ts + oy + ts // 2
+                # BUG-039: compensate the -64 px Y-spawn offset so dots land on
+                # the correct tile row rather than 2 rows above the actual tile.
+                dy = int((ey + TILE_SIZE * 2) / TILE_SIZE) * ts + oy + ts // 2
                 pygame.draw.circle(surface, (200, 40, 40), (dx, dy), max(1, ts // 2))
 
             # Boss spawn — orange dot

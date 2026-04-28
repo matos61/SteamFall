@@ -32,7 +32,8 @@ class NPC:
     def draw(self, surface: pygame.Surface, camera) -> None:
         screen_rect = camera.apply_rect(self.rect)
 
-        if screen_rect.right < 0 or screen_rect.left > surface.get_width():
+        if (screen_rect.right < 0 or screen_rect.left > surface.get_width()
+                or screen_rect.bottom < 0 or screen_rect.top > surface.get_height()):
             return
 
         pygame.draw.rect(surface, NPC_COLOR, screen_rect)

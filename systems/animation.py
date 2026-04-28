@@ -2,12 +2,21 @@
 # systems/animation.py — Simple sprite animation state machine.
 #
 # States: idle, walk, jump, fall, attack, hurt, death
-# Each state owns a list of pygame.Surface frames (colored rects for now).
+# Each state owns a list of pygame.Surface frames.
+#
+# Frame loading (P4-6):
+#   If a sprite_dir is passed to AnimationController and
+#   `{sprite_dir}/{state}/` exists with PNG files, they are loaded and
+#   scaled to (width, height).  When the directory is absent, or loading
+#   fails, the controller falls back to brightness-varying colored rects
+#   so the game always renders without any art assets.
+#
 # AnimationController.update() advances the frame ticker.
 # AnimationController.set_state() only resets the counter when the state
 # actually changes, so animations are not interrupted unnecessarily.
 # =============================================================================
 
+import os
 import pygame
 
 
@@ -22,7 +31,7 @@ _STATE_FPS = {
     "death":  10,
 }
 
-# Frame counts per state (all use solid colored rects with slight variation)
+# Frame counts per state (placeholder fallback)
 _STATE_FRAMES = {
     "idle":   4,
     "walk":   6,
@@ -35,16 +44,39 @@ _STATE_FRAMES = {
 
 
 def _make_frames(base_color: tuple, state: str,
-                 width: int, height: int) -> list:
+                 width: int, height: int,
+                 sprite_dir: str | None = None) -> list:
     """
-    Build placeholder frames as colored surfaces with slight brightness
-    variation per frame so you can visually see the animation playing.
+    Build animation frames for *state*.
+
+    When *sprite_dir* is provided and `{sprite_dir}/{state}/` contains PNG
+    files, those are loaded and scaled to (width, height).  Otherwise returns
+    placeholder colored-rect surfaces.
     """
-    count = _STATE_FRAMES[state]
+    # --- Attempt PNG load when sprite directory is provided ---
+    if sprite_dir:
+        state_path = os.path.join(sprite_dir, state)
+        if os.path.isdir(state_path):
+            png_files = sorted(
+                f for f in os.listdir(state_path) if f.lower().endswith(".png"))
+            if png_files:
+                loaded = []
+                for fname in png_files:
+                    try:
+                        img = pygame.image.load(
+                            os.path.join(state_path, fname)).convert_alpha()
+                        img = pygame.transform.scale(img, (width, height))
+                        loaded.append(img)
+                    except (pygame.error, FileNotFoundError):
+                        pass
+                if loaded:
+                    return loaded
+
+    # --- Fallback: placeholder colored-rect frames ---
+    count  = _STATE_FRAMES[state]
     frames = []
     r, g, b = base_color
     for i in range(count):
-        # Each frame shifts brightness slightly
         delta = int((i - count // 2) * 12)
         fr    = max(0, min(255, r + delta))
         fg    = max(0, min(255, g + delta))
@@ -61,25 +93,32 @@ class AnimationController:
 
     Parameters
     ----------
-    base_color : tuple  RGB color used to tint all placeholder frames.
-    width, height : int  Entity dimensions (placeholder frame size).
+    base_color  : tuple       RGB color used for placeholder frames.
+    width, height : int       Entity dimensions.
+    sprite_dir  : str | None  Optional path to `assets/sprites/<entity>/`.
+                              When the per-state subdirectory contains PNGs
+                              they are loaded; otherwise falls back to colored
+                              rects (P4-6).
     """
 
     VALID_STATES = ("idle", "walk", "jump", "fall", "attack", "hurt", "death")
 
-    def __init__(self, base_color: tuple, width: int, height: int):
-        self._color  = base_color
-        self._width  = width
-        self._height = height
+    def __init__(self, base_color: tuple, width: int, height: int,
+                 sprite_dir: str | None = None):
+        self._color     = base_color
+        self._width     = width
+        self._height    = height
+        self._sprite_dir = sprite_dir
 
         # Build frame lists for every state
         self._frames: dict[str, list[pygame.Surface]] = {}
         for state in self.VALID_STATES:
-            self._frames[state] = _make_frames(base_color, state, width, height)
+            self._frames[state] = _make_frames(
+                base_color, state, width, height, sprite_dir)
 
         self.state         = "idle"
         self._frame_idx    = 0
-        self._tick         = 0          # Counts up to _STATE_FPS[state]
+        self._tick         = 0
 
     # ------------------------------------------------------------------
 

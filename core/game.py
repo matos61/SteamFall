@@ -15,6 +15,7 @@ import json
 import pathlib
 import pygame
 from settings import SCREEN_WIDTH, SCREEN_HEIGHT, FPS, TITLE, BLACK, SCENE_MAIN_MENU, SAVE_FILE
+from systems.audio import audio as _audio_singleton
 
 
 class Game:
@@ -23,6 +24,9 @@ class Game:
         pygame.display.set_caption(TITLE)
         self.clock   = pygame.time.Clock()
         self.running = True
+
+        # --- Audio ---
+        self.audio = _audio_singleton   # AudioManager singleton; no-op when assets absent
 
         # --- Shared game state (read by any scene) ---
         self.player_faction = None   # Set in FactionSelectScene
@@ -51,10 +55,12 @@ class Game:
         from scenes.gameplay             import GameplayScene
         from scenes.marked_ending        import MarkedEndingScene
         from scenes.fleshforged_ending   import FleshforgedEndingScene
+        from scenes.settings             import SettingsScene
 
         from settings import (SCENE_FACTION_SELECT, SCENE_MARKED_PROLOGUE,
                                SCENE_FLESHFORGED_PROLOGUE, SCENE_GAMEPLAY,
-                               SCENE_MARKED_ENDING, SCENE_FLESHFORGED_ENDING)
+                               SCENE_MARKED_ENDING, SCENE_FLESHFORGED_ENDING,
+                               SCENE_SETTINGS)
 
         self._scenes = {
             SCENE_MAIN_MENU:             MainMenuScene(self),
@@ -64,6 +70,7 @@ class Game:
             SCENE_GAMEPLAY:              GameplayScene(self),
             SCENE_MARKED_ENDING:         MarkedEndingScene(self),
             SCENE_FLESHFORGED_ENDING:    FleshforgedEndingScene(self),
+            SCENE_SETTINGS:              SettingsScene(self),
         }
 
     # ------------------------------------------------------------------

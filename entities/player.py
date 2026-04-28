@@ -19,6 +19,7 @@ import pygame
 from entities.entity     import Entity
 from systems.combat      import AttackHitbox
 from systems.animation   import AnimationController
+from systems.audio       import audio
 from settings import (
     PLAYER_SPEED, PLAYER_JUMP_FORCE, PLAYER_MAX_HEALTH,
     PLAYER_MAX_SOUL, PLAYER_MAX_HEAT, PLAYER_IFRAMES,
@@ -31,6 +32,7 @@ from settings import (
     FLESHFORGED_GRAVITY_MULT, FLESHFORGED_AIR_CONTROL, FLESHFORGED_FRICTION,
     FLESHFORGED_JUMP_MULT,    FLESHFORGED_JUMP_CUT,
     ABILITY_SLOTS_DEFAULT,
+    SPRITE_DIR_PLAYER,
 )
 
 ATTACK_DAMAGE    = 20
@@ -98,7 +100,8 @@ class Player(Entity):
         self.ability_slots: int = ABILITY_SLOTS_DEFAULT
 
         # Animation state machine
-        self._anim = AnimationController(color, width=30, height=54)
+        self._anim = AnimationController(color, width=30, height=54,
+                                         sprite_dir=SPRITE_DIR_PLAYER)
 
         # --- Faction-specific physics feel ---
         # Values pulled from settings so designers can tune without touching code.
@@ -246,6 +249,7 @@ class Player(Entity):
             self._jump_buffer   = 0
             self._coyote_timer  = 0
             self._jump_held     = True
+            audio.play_sfx("jump")
 
         # Variable jump height: releasing jump early cuts the arc.
         # Marked cut is gentle (floatier short hop).
@@ -298,6 +302,7 @@ class Player(Entity):
             # Begin windup telegraph before hitbox activates
             self._windup_timer    = WINDUP_FRAMES
             self._attack_cooldown = PLAYER_ATTACK_COOLDOWN
+            audio.play_sfx("attack")
 
     # ------------------------------------------------------------------
 
@@ -321,6 +326,7 @@ class Player(Entity):
         if not self._spend_resource(ABILITY_COST):
             return
         self._ability_cooldown = 90
+        audio.play_sfx("ability")
         from systems.particles import particles
         particles.emit_soul_surge(self.rect.centerx, self.rect.centery)
         # Create four outward hitboxes (up, down, left, right)
@@ -339,6 +345,7 @@ class Player(Entity):
         """Fleshforged ability: speed + damage boost for 3 seconds."""
         if not self._spend_resource(ABILITY_COST):
             return
+        audio.play_sfx("ability")
         from systems.particles import particles
         particles.emit_overdrive(self.rect.centerx, self.rect.centery)
         self._overdrive        = True

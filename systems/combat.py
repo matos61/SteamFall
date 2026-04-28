@@ -13,6 +13,7 @@ import pygame
 from core.hitstop import hitstop
 from settings import FACTION_MARKED
 from systems.particles import particles
+from systems.audio import audio
 
 
 class AttackHitbox:
@@ -72,6 +73,7 @@ class AttackHitbox:
         hit_x = (self.rect.centerx + target.rect.centerx) // 2
         hit_y = target.rect.centery
         particles.emit_hit(hit_x, hit_y, target.color, direction)
+        audio.play_sfx("hit")
 
         # Hit-stop: freeze game for 4 frames so hits feel punchy
         hitstop.trigger(4)

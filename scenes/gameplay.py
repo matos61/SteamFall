@@ -39,6 +39,7 @@ from systems.checkpoint import Checkpoint
 from systems.collectible import SoulFragment, HeatCore, SoulShard, AbilityOrb, LoreItem
 from systems.minimap    import MiniMap
 from systems.particles  import particles
+from systems.audio      import audio
 from entities.npc       import NPC
 
 
@@ -170,7 +171,7 @@ def _apply_upgrade_to_player(player, upg_id: str,
         # P2-8: skip if already at max stacks
         if save_upgrades is not None:
             existing = sum(1 for u in save_upgrades if u == "dmg")
-            if existing > UPGRADE_DMG_MAX_STACKS:
+            if existing >= UPGRADE_DMG_MAX_STACKS:
                 return
         player.attack_damage_bonus   += UPGRADE_DMG_BONUS
     elif upg_id == "res":
@@ -262,6 +263,14 @@ class GameplayScene(BaseScene):
                 if not isinstance(e, (Boss, Architect)):
                     e.faction_tint = _tint
 
+        # P4-3: Level music — MUSIC_BOSS if boss is present, else level-specific track
+        if self._boss or self._architect:
+            audio.play_music(MUSIC_BOSS)
+        elif level_name == "level_5":
+            audio.play_music(MUSIC_LEVEL_5)
+        else:
+            audio.play_music(MUSIC_LEVEL_1)
+
         # Checkpoints
         self.checkpoints: list[Checkpoint] = list(self.tilemap.checkpoints)
 
@@ -298,7 +307,7 @@ class GameplayScene(BaseScene):
 
         # --- Pause menu ---
         self._paused        = False
-        self._pause_options = ["Resume", "Return to Main Menu", "Settings (soon)"]
+        self._pause_options = ["Resume", "Return to Main Menu", "Settings"]
         self._pause_sel     = 0
 
         # --- NPCs (P3-4) ---
@@ -329,13 +338,15 @@ class GameplayScene(BaseScene):
 
         # --- Misc HUD state ---
         self._setup_done   = True
-        self._death_timer  = 0
-        self._damage_flash = 0
-        self._prev_iframes = 0
+        self._death_timer             = 0
+        self._damage_flash            = 0
+        self._prev_iframes            = 0
+        self._death_particles_emitted = False   # P4-2: emit once on first death frame
 
         # --- Architect defeat dialogue cadence ---
-        self._architect_defeat_timer = 0   # counts frames between lines
-        self._architect_victory_done = False
+        self._architect_defeat_timer   = 0   # counts frames between lines
+        self._architect_victory_done   = False
+        self._architect_defeat_started = False   # BUG-036: track first frame of defeat dialogue
 
         # --- P2-5: Upgrade selection ---
         self._upgrade_active   = False
@@ -454,7 +465,9 @@ class GameplayScene(BaseScene):
             self._pause_sel = 0
         elif opt == "Return to Main Menu":
             self.game.change_scene(SCENE_MAIN_MENU)
-        # "Settings (soon)" → stub, do nothing
+        elif "Settings" in opt:
+            self._paused = False
+            self.game.change_scene(SCENE_SETTINGS, return_scene=SCENE_GAMEPLAY)
 
     # ------------------------------------------------------------------
     # Update
@@ -698,6 +711,7 @@ class GameplayScene(BaseScene):
             self._boss_phase_text  = f"PHASE {labels[phase]}{suffix}"
             self._boss_phase_timer = BOSS_PHASE_ANNOUNCE_FRAMES
             self._screen_shake     = 10
+            audio.play_sfx("boss_phase")
             if phase == 3:
                 self._shrink_active       = True
                 self._shrink_left_x       = 0.0
@@ -716,6 +730,7 @@ class GameplayScene(BaseScene):
             self._boss_phase_text  = f"PHASE {labels[phase]}{suffix}"
             self._boss_phase_timer = BOSS_PHASE_ANNOUNCE_FRAMES
             self._screen_shake     = 10
+            audio.play_sfx("boss_phase")
             if phase == 4:
                 self._shrink_active       = True
                 self._shrink_left_x       = 0.0
@@ -750,6 +765,8 @@ class GameplayScene(BaseScene):
         if not hitstop.is_active():
             newly_dead = [e for e in self.enemies if not e.alive]
             for dead_e in newly_dead:
+                particles.emit_death(dead_e.rect.centerx, dead_e.rect.centery,
+                                     dead_e.color)
                 for drop in dead_e.get_drop_fragments():
                     if isinstance(drop, (HeatCore, SoulShard)):
                         self.drops.append(drop)
@@ -779,6 +796,11 @@ class GameplayScene(BaseScene):
         if self._architect and not self._architect.alive and not self._architect_victory_done:
             arch = self._architect
             if arch._defeat_dialogue_active:
+                # BUG-036: grant invincibility on the first frame of defeat dialogue so
+                # surviving Crawler minions cannot kill the player during the cutscene.
+                if not self._architect_defeat_started:
+                    self._architect_defeat_started = True
+                    self.player._iframes = 9999
                 if arch._defeat_line_idx < len(arch._defeat_lines):
                     self._architect_defeat_timer += 1
                     if self._architect_defeat_timer >= 120:
@@ -822,9 +844,12 @@ class GameplayScene(BaseScene):
             self.player.take_damage(self.player.max_health)
 
         # --- Level transition: right edge → next level (alive players only) ---
+        # BUG-037: suppress during Architect defeat sequence so walking to the right
+        # edge cannot fire change_scene before victory is saved.
         _faction = self.game.player_faction or FACTION_MARKED
         next_level = _faction_next_level(self._level_name, _faction)
-        if self.player.alive and self.player.rect.right >= self.tilemap.width - 64:
+        if (self.player.alive and self.player.rect.right >= self.tilemap.width - 64
+                and not self._architect_victory_done):
             if next_level:
                 # P3-1: leaving level_3 triggers a faction mid-game lore cutscene
                 if self._level_name == "level_3":
@@ -850,6 +875,13 @@ class GameplayScene(BaseScene):
         # --- Player death ---
         if not self.player.alive:
             self._death_timer += 1
+            # P4-2/P4-3: emit particles and play SFX on the very first frame of death screen
+            if self._death_timer == 1 and not self._death_particles_emitted:
+                self._death_particles_emitted = True
+                particles.emit_death(self.player.rect.centerx,
+                                     self.player.rect.centery,
+                                     self.player.color)
+                audio.play_sfx("death")
             if self._death_timer >= 150:
                 save = self.game.save_data
                 if save.get("checkpoint_pos"):
@@ -1177,7 +1209,18 @@ class GameplayScene(BaseScene):
         overlay.fill((0, 0, 0, fade))
         surface.blit(overlay, (0, 0))
         if self._death_timer > 30:
-            txt = self.font_death.render("you perished", True, (160, 30, 30))
+            # P4-2: faction-specific death message and text color
+            faction = getattr(self.game, "player_faction", None)
+            if faction == FACTION_MARKED:
+                msg   = DEATH_TEXT_MARKED
+                color = (130, 60, 200)   # purple tint
+            elif faction == FACTION_FLESHFORGED:
+                msg   = DEATH_TEXT_FLESHFORGED
+                color = (220, 100, 20)   # orange tint
+            else:
+                msg   = DEATH_TEXT_NEUTRAL
+                color = (160, 30, 30)
+            txt = self.font_death.render(msg, True, color)
             surface.blit(txt, (SCREEN_WIDTH // 2 - txt.get_width() // 2,
                                SCREEN_HEIGHT // 2 - 40))
         if self._death_timer > 80:
@@ -1299,11 +1342,18 @@ class GameplayScene(BaseScene):
             return
         # BUG-022: drive banner index from DialogueBox so it stays in sync with
         # the player pressing SPACE to advance, rather than a separate 120-frame timer.
+        # BUG-035: use _WARDEN_INTRO_LINES (6 entries) as the bound for the warden subject
+        # so the banner stays visible for all 6 dialogue lines, not just the 3 in Boss._intro_lines.
         line_idx = self._boss_dialogue._index if self._boss_dialogue else 0
-        lines    = active_boss._intro_lines
-        if line_idx >= len(lines):
-            return
-        line = lines[line_idx]
+        if subject == "warden":
+            if line_idx >= len(_WARDEN_INTRO_LINES):
+                return
+            line = _WARDEN_INTRO_LINES[line_idx][1]
+        else:
+            lines = active_boss._intro_lines
+            if line_idx >= len(lines):
+                return
+            line = lines[line_idx]
         font = pygame.font.SysFont("georgia", 22)
         if subject == "architect":
             text_color = (255, 200, 255)   # pale violet-white
@@ -1377,7 +1427,8 @@ class GameplayScene(BaseScene):
         color = LORE_ITEM_COLOR
         for i, ln in enumerate(lines):
             rendered = self._lore_font.render(ln, True, color)
-            rendered.set_alpha(alpha)
+            # BUG-041: do not apply set_alpha to text; alpha is handled by the
+            # SRCALPHA bg panel, preventing stacked-alpha dimming of text.
             surface.blit(rendered, (box_x + pad, box_y + pad + i * line_h))
 
     def _draw_phase_announce(self, surface: pygame.Surface) -> None:

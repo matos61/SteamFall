@@ -235,6 +235,7 @@ FLESHFORGED_LORE_BEAT_START = 30   # Index of first mid-game Fleshforged lore be
 # --- P3-3: Ending scenes ---
 SCENE_MARKED_ENDING      = "marked_ending"
 SCENE_FLESHFORGED_ENDING = "fleshforged_ending"
+SCENE_SETTINGS           = "settings"
 
 # --- P3-4: NPC encounters ---
 NPC_WIDTH         = 24
@@ -261,3 +262,41 @@ PARTICLE_LAND_COUNT       = 6      # dust puffs emitted on landing
 PARTICLE_ABILITY_COUNT    = 8      # particles per ability activation
 PARTICLE_CHECKPOINT_COUNT = 14     # golden embers per checkpoint activation
 PARTICLE_DUST_COLOR       = (160, 140, 110)   # warm tan for landing dust
+
+# --- P4-2: Death screen text ---
+DEATH_TEXT_MARKED      = "The ink fades..."
+DEATH_TEXT_FLESHFORGED = "The forge goes cold..."
+DEATH_TEXT_NEUTRAL     = "You perished."
+
+# --- P4-3: Audio ---
+AUDIO_MUSIC_VOLUME = 0.5
+AUDIO_SFX_VOLUME   = 0.7
+SOUND_ATTACK       = "assets/sounds/attack.wav"
+SOUND_HIT          = "assets/sounds/hit.wav"
+SOUND_JUMP         = "assets/sounds/jump.wav"
+SOUND_DEATH        = "assets/sounds/death.wav"
+SOUND_CHECKPOINT   = "assets/sounds/checkpoint.wav"
+SOUND_ABILITY      = "assets/sounds/ability.wav"
+SOUND_BOSS_PHASE   = "assets/sounds/boss_phase.wav"
+MUSIC_LEVEL_1      = "assets/music/outer_district.ogg"
+MUSIC_LEVEL_5      = "assets/music/sanctum.ogg"
+MUSIC_BOSS         = "assets/music/boss.ogg"
+
+# --- P4-5: Credits ---
+# --- P4-6: Sprite paths (assets are optional; colored-rect fallback used when absent) ---
+SPRITE_DIR_PLAYER = "assets/sprites/player"
+SPRITE_DIR_ENEMY  = "assets/sprites/enemy"
+
+# --- P4-7: Tile sprites ---
+TILE_SHEET_LEVEL_1_2 = "assets/tiles/outer_district.png"
+TILE_SHEET_LEVEL_3_4 = "assets/tiles/foundry.png"
+TILE_SHEET_LEVEL_5   = "assets/tiles/sanctum.png"
+
+CREDITS_TEXT = [
+    "Steamfall",
+    "",
+    "Design & Code  —  build-agent",
+    "Story         —  hk-agent",
+    "Review        —  review-agent",
+    "Direction     —  orchestrator",
+]

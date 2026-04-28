@@ -261,5 +261,7 @@ class LoreItem:
             game.save_to_disk()
             self.alive = False
             return self._text
+        # Invariant: on_enter() pre-filters already-collected lore items, so this branch
+        # should never be reached in normal play.
         self.alive = False
         return None
