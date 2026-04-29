@@ -1276,7 +1276,7 @@ _Phase 4 begins 2026-04-27. Pre-phase review by review-agent and hk-agent is rec
 2. ~~**P4-0c (critical bug-fix sprint)**~~ ✅ **DONE (2026-04-29)** — BUG-032 through BUG-041 all verified fixed in code.
 3. ~~**P4-1 (particle system)**~~ ✅ **DONE (2026-04-29)** — `systems/particles.py` updated; all emit sites wired; NPC hint alpha-fade (HK-P4-D) and particle constant alignment (HK-P4-A) folded in.
 4. ~~**P4-2 (death screen polish)**~~ ✅ **DONE (2026-04-29)** — faction text + colors, death particles, hitstop snap, player-skip shortcut (HK-P4-B folded in).
-5. **P4-3 (sound system)** — `systems/audio.py`; blocked on audio asset availability.
+5. ~~**P4-3 (sound system)**~~ ✅ **DONE (2026-04-29)** — `AudioManager` and all SFX/music call sites confirmed present; faction branch music constants added (HK-P4-E folded in).
 6. **P4-4 (settings screen)** — implement the "Settings (soon)" stub as a real scene.
 7. **P4-5 (main menu polish)** — parallax, animated logo, Credits option.
 8. **P4-6 (sprite replacement)** — blocked on art assets; largest scope.
@@ -1660,7 +1660,7 @@ _hk-agent 2026-04-29 Phase 4 feel pass (see `REVIEW_HK.md` for full analysis):_
 
 45. ✅ **HK-P4-D** `entities/npc.py` lines 40–45 / `scenes/gameplay.py` lines 825–828: NPC `"E"` hint still snaps on/off instantly (Phase 3 deferral never implemented). Add `_hint_alpha` field to `NPC.__init__`, alpha-ramp logic in `npc.draw()` (delta 25/frame → 10-frame fade), and Y-axis proximity gate in `gameplay.py`. Assign to build-agent in P4-1 (fold into same commit as particle system since both touch gameplay.py).
 
-46. ⚠️ **HK-P4-E** `scenes/gameplay.py` / `settings.py`: Faction branch levels 6–8 fall back to `outer_district.ogg` — no faction audio identity. Recommend adding `MUSIC_MARKED_BRANCH` / `MUSIC_FLESHFORGED_BRANCH` constants to `settings.py` and wiring them in the level-load music logic. Assign to build-agent in P4-3.
+46. ✅ **HK-P4-E** `scenes/gameplay.py` / `settings.py`: Faction branch levels 6–8 fall back to `outer_district.ogg` — no faction audio identity. Recommend adding `MUSIC_MARKED_BRANCH` / `MUSIC_FLESHFORGED_BRANCH` constants to `settings.py` and wiring them in the level-load music logic. Assign to build-agent in P4-3.
 
 ---
 

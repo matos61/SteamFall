@@ -263,9 +263,15 @@ class GameplayScene(BaseScene):
                 if not isinstance(e, (Boss, Architect)):
                     e.faction_tint = _tint
 
-        # P4-3: Level music — MUSIC_BOSS if boss is present, else level-specific track
+        # P4-3: Level music — MUSIC_BOSS if boss is present, else level-specific track.
+        # HK-P4-E: faction branch levels 6–8 get their own audio identity.
         if self._boss or self._architect:
             audio.play_music(MUSIC_BOSS)
+        elif level_name in ("level_6_marked", "level_7_marked", "level_8_marked"):
+            audio.play_music(MUSIC_MARKED_BRANCH)
+        elif level_name in ("level_6_fleshforged", "level_7_fleshforged",
+                            "level_8_fleshforged"):
+            audio.play_music(MUSIC_FLESHFORGED_BRANCH)
         elif level_name == "level_5":
             audio.play_music(MUSIC_LEVEL_5)
         else:

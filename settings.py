@@ -307,9 +307,11 @@ SOUND_DEATH        = "assets/sounds/death.wav"
 SOUND_CHECKPOINT   = "assets/sounds/checkpoint.wav"
 SOUND_ABILITY      = "assets/sounds/ability.wav"
 SOUND_BOSS_PHASE   = "assets/sounds/boss_phase.wav"
-MUSIC_LEVEL_1      = "assets/music/outer_district.ogg"
-MUSIC_LEVEL_5      = "assets/music/sanctum.ogg"
-MUSIC_BOSS         = "assets/music/boss.ogg"
+MUSIC_LEVEL_1            = "assets/music/outer_district.ogg"
+MUSIC_LEVEL_5            = "assets/music/sanctum.ogg"
+MUSIC_BOSS               = "assets/music/boss.ogg"
+MUSIC_MARKED_BRANCH      = "assets/music/marked_branch.ogg"      # HK-P4-E: levels 6–8 Marked path
+MUSIC_FLESHFORGED_BRANCH = "assets/music/fleshforged_branch.ogg" # HK-P4-E: levels 6–8 Fleshforged path
 
 # --- P4-5: Credits ---
 # --- P4-6: Sprite paths (assets are optional; colored-rect fallback used when absent) ---
