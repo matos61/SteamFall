@@ -567,6 +567,12 @@ class GameplayScene(BaseScene):
 
             if prev_iframes == 0 and self.player.iframes > 0:
                 self._damage_flash = DAMAGE_FLASH_FRAMES
+                # Player-hit sparks: radial 360° burst when player first takes damage
+                particles.emit(
+                    self.player.rect.centerx, self.player.rect.centery,
+                    HIT_PARTICLE_COUNT, HIT_PARTICLE_SPEED,
+                    RED, HIT_PARTICLE_LIFE, spread=360,
+                )
             self._prev_iframes = self.player.iframes
             if self._damage_flash > 0:
                 self._damage_flash -= 1
@@ -821,11 +827,13 @@ class GameplayScene(BaseScene):
                                   else SCENE_FLESHFORGED_ENDING)
                         self._begin_transition(ending)
 
-        # --- NPC proximity hints (P3-4) ---
+        # --- NPC proximity hints (P3-4, HK-P4-D) ---
+        # X gate: within NPC_INTERACT_DIST px horizontally (0.33 s lead at full sprint)
+        # Y gate: within NPC_HEIGHT * 2 px vertically (suppresses off-platform hints)
         for npc in self.npcs:
             dist_x = abs(self.player.rect.centerx - npc.rect.centerx)
             dist_y = abs(self.player.rect.centery - npc.rect.centery)
-            npc._show_hint = dist_x < NPC_INTERACT_DIST and dist_y < NPC_INTERACT_DIST
+            npc._show_hint = dist_x < NPC_INTERACT_DIST and dist_y < NPC_HEIGHT * 2
 
         # --- Checkpoints ---
         faction = self.game.player_faction or FACTION_MARKED

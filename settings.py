@@ -254,14 +254,43 @@ LORE_ITEM_COLOR     = (160, 140, 100)    # Parchment tone
 LORE_DISPLAY_FRAMES = 300                # 5 seconds at 60 FPS
 
 # --- Phase 4: Particle system ---
-PARTICLE_GRAVITY          = 0.25   # px/frame² downward acceleration
-PARTICLE_DRAG             = 0.92   # horizontal velocity multiplier per frame
-PARTICLE_HIT_COUNT        = 5      # sparks emitted per hit connection
-PARTICLE_DEATH_COUNT      = 12     # particles per entity death burst
-PARTICLE_LAND_COUNT       = 6      # dust puffs emitted on landing
+# Core physics (aligned to P4-1 spec; HK-P4-A review restored to spec values)
+PARTICLE_GRAVITY          = 0.3    # px/frame² downward acceleration (was 0.25 — snappier arc)
+PARTICLE_FRICTION         = 0.88   # horizontal velocity multiplier per frame (was PARTICLE_DRAG=0.92)
+PARTICLE_DRAG             = PARTICLE_FRICTION   # backwards-compat alias
+
+# Hit sparks (nail connects with enemy)
+HIT_PARTICLE_COUNT        = 6      # sparks per hit connection (spec; was 5 — too thin)
+HIT_PARTICLE_SPEED        = 4.0    # initial speed of hit sparks
+HIT_PARTICLE_LIFE         = 18     # frames
+PARTICLE_HIT_COUNT        = HIT_PARTICLE_COUNT  # backwards-compat alias
+
+# Enemy death burst
+DEATH_PARTICLE_COUNT      = 14     # particles per entity death burst (spec; was 12)
+DEATH_PARTICLE_LIFE       = 30     # frames
+PARTICLE_DEATH_COUNT      = DEATH_PARTICLE_COUNT  # backwards-compat alias
+
+# Soul Surge ability (Marked faction)
+SOUL_SURGE_PARTICLE_COUNT = 10     # outward burst on Soul Surge activation
+SOUL_SURGE_PARTICLE_COLOR = (140, 80, 220)   # ink-purple
+
+# Overdrive ability (Fleshforged faction)
+OVERDRIVE_PARTICLE_COUNT  = 8      # heat shimmer on Overdrive activation
+OVERDRIVE_PARTICLE_COLOR  = (220, 120, 20)   # fire-orange
+
+# Checkpoint activation
+CHECKPOINT_PARTICLE_COUNT = 12     # golden embers on checkpoint activation (spec; was 14)
+CHECKPOINT_PARTICLE_COLOR = (200, 180, 80)   # warm gold
+PARTICLE_CHECKPOINT_COUNT = CHECKPOINT_PARTICLE_COUNT  # backwards-compat alias
+
+# Landing dust
+LANDING_PARTICLE_COUNT    = 4      # dust puffs emitted on landing
+LANDING_PARTICLE_COLOR    = (120, 100, 70)   # warm tan dust
+PARTICLE_LAND_COUNT       = LANDING_PARTICLE_COUNT  # backwards-compat alias
+
+# Misc particle constants (ability, dust color kept for existing code)
 PARTICLE_ABILITY_COUNT    = 8      # particles per ability activation
-PARTICLE_CHECKPOINT_COUNT = 14     # golden embers per checkpoint activation
-PARTICLE_DUST_COLOR       = (160, 140, 110)   # warm tan for landing dust
+PARTICLE_DUST_COLOR       = LANDING_PARTICLE_COLOR
 
 # --- P4-2: Death screen text ---
 DEATH_TEXT_MARKED      = "The ink fades..."
