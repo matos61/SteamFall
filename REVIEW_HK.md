@@ -616,3 +616,111 @@ color = tuple(int(a * (1 - blend) + b * blend) for a, b in zip(base_color, tint)
 | Mid-game tonal whiplash | `fleshforged_prologue.py` L129–139 | Dry Datalog register immediately follows intense combat | Delay trigger one level (4 → 5) to allow checkpoint rest |
 | Faction tint visibility | `enemy.py` L158–168 | Fleshforged tint `(160,130,100)` is desaturated tan — reads as dirty, not faction-marked | Raise to `(200,110,50)`; increase blend to `FACTION_TINT_BLEND = 0.65` |
 | Tint as magic number | `enemy.py` L160–166 | Blend weight `0.5` and tint colours are hardcoded inline | Extract to `settings.py` as `FACTION_TINT_BLEND`, `FLESHFORGED_TINT_COLOR`, `MARKED_TINT_COLOR` |
+
+---
+
+## Phase 4 Feel Review — 2026-04-29
+
+### 1. Particle System Constants (P4-1)
+
+The ROADMAP P4-1 spec (line 1347) proposed `PARTICLE_GRAVITY = 0.3` and `PARTICLE_FRICTION = 0.88`. The live `settings.py` values (lines 257–258) are `PARTICLE_GRAVITY = 0.25` and `PARTICLE_DRAG = 0.92`. The downward pull has been softened and the horizontal damping loosened relative to the spec — both moves make particles linger longer and arc more shallowly. For hit sparks that is mildly too floaty: HK's nail sparks fall quickly and spend only a handful of frames before vanishing. Restoring `PARTICLE_GRAVITY` to `0.3` and tightening drag to `0.88` (matching the spec) would produce a snappier, more percussive burst.
+
+Count-wise, the live constants differ from the spec: `PARTICLE_HIT_COUNT = 5` (spec: 6), `PARTICLE_DEATH_COUNT = 12` (spec: 14), `PARTICLE_CHECKPOINT_COUNT = 14` (spec: 12). The hit and death counts are both one step below spec — at small sprite scale any reduction below 6/14 starts to feel thin on contact. Recommend raising both back to spec values.
+
+Emit sites in `gameplay.py` (lines 768, 879–883) cover enemy death and player death. `player.py` lines 181–182 and 330–331 add landing and ability particles. However there is no hit-spark emit site on the enemy side — particle sparks are not emitted when the player's nail connects with a living enemy, only when the enemy dies. In HK, the nail contact flash is the primary tactile feedback. This is the highest-priority missing emit site for Phase 4.
+
+**Recommended constant changes:**
+```python
+# settings.py
+PARTICLE_GRAVITY   = 0.30   # was 0.25 — snappier arc, matches spec
+PARTICLE_DRAG      = 0.88   # was 0.92 — faster horizontal decay, less float
+PARTICLE_HIT_COUNT = 6      # was 5 — matches spec; thin below 6 at sprite scale
+PARTICLE_DEATH_COUNT = 14   # was 12 — matches spec; death burst needs density
+```
+
+Add a hit-spark emit call in `gameplay.py` at the `hb.check_hits()` loop (lines 633–635): emit `PARTICLE_HIT_COUNT` sparks at the hit point when `check_hits` registers a landing blow.
+
+---
+
+### 2. Death Screen Timing (P4-2)
+
+The death screen implementation in `gameplay.py` `_draw_death` (lines 1206–1229) is clean: the overlay alpha ramps from 0 to 180 over 90 frames (`min(180, self._death_timer * 2)`), the faction text appears at frame 30, and the "returning..." subline appears at frame 80. The respawn fires at frame 150 (line 885). The total 2.5-second window is correct for HK's "You Died" pacing.
+
+The faction text and colour choices are well-calibrated: Marked purple `(130, 60, 200)` against the dark overlay reads clearly (line 1218); Fleshforged orange `(220, 100, 20)` likewise (line 1220). These match the faction signature colors in `settings.py` lines 23–24.
+
+What the death screen lacks is any camera or physics punctuation at the moment of death. In HK, the Knight's body freezes for approximately 8–12 frames before the screen darkens — a micro-pause that lets the player register the hit that killed them. Currently the death particles emit on `_death_timer == 1` (line 879) while the camera continues to follow the player position. The player's body simply stops rendering as alive with no physical freeze. Adding a 6–8 frame `hitstop.trigger(6)` call on `_death_timer == 1` before the overlay begins would deliver this beat cheaply with existing infrastructure.
+
+A second gap: the "returning..." prompt at frame 80 appears during the full 150-frame window but there is no way for the player to skip the remainder. HK allows pressing any key to accelerate the respawn once the death title has fully appeared (around frame 30–40 equivalent). Adding a `pygame.KEYDOWN` check inside the `not self.player.alive` branch of `handle_event` to set `_death_timer = 149` (fire respawn next frame) when `_death_timer > 60` would improve pacing without skipping the emotional beat.
+
+**Recommended changes:**
+- `gameplay.py` line 879: after emitting death particles, call `hitstop.trigger(6)` to freeze the frame for 6 frames — the death blow lands with weight before the screen darkens.
+- `gameplay.py` `handle_event`: add early-skip on any key once `_death_timer > 60`.
+
+---
+
+### 3. Sound Architecture (P4-3)
+
+The ROADMAP P4-3 spec (line 1437) lists seven SFX: attack, hit, jump, death, checkpoint, ability, boss_phase. All seven are present in `settings.py` (lines 274–280) and wired in `gameplay.py` and `player.py`. The music split — `MUSIC_LEVEL_1`, `MUSIC_LEVEL_5`, `MUSIC_BOSS` — covers three distinct tracks for five distinct biomes, which is functional but sparse. Level 5 gets its own track (sanctum.ogg); levels 1–4 share `outer_district.ogg`; levels 6–10 share `boss.ogg` whenever a boss is present and fall back to `MUSIC_LEVEL_1` otherwise. Levels 6–8 are the faction branches — long stretches of gameplay with neither a boss track nor a dedicated faction track. These sections will play `outer_district.ogg`, which carries no faction identity. HK's equivalent (the Queen's Gardens, Ancient Basin) each have a dedicated track that reinforces location mood. Recommend reserving paths for faction branch music even if no asset is available yet:
+
+```python
+# settings.py — recommended additions
+MUSIC_MARKED_BRANCH      = "assets/music/marked_branch.ogg"      # levels 6-8 Marked path
+MUSIC_FLESHFORGED_BRANCH = "assets/music/fleshforged_branch.ogg" # levels 6-8 Fleshforged path
+```
+
+The volume split `AUDIO_MUSIC_VOLUME = 0.5` / `AUDIO_SFX_VOLUME = 0.7` (settings.py lines 272–273) matches HK's convention of SFX slightly above music in the mix. No change needed.
+
+One missing SFX call site: enemy hit-connect (when the player's nail lands on a living enemy) currently has no SFX emit. The spec lists `SOUND_HIT = "assets/sounds/hit.wav"` and wires it to `take_damage`, but `take_damage` is called on the enemy, not from `gameplay.py`. Verify that `audio.play_sfx("hit")` is called inside `entity.py` or `enemy.py` `take_damage()` — if it is absent there, the hit sound will never play during normal combat, only on player-damage events.
+
+---
+
+### 4. Main Menu Atmosphere (P4-5)
+
+The parallax background in `main_menu.py` uses three layers at speeds 1, 2, 3 px/frame (line 31–33). The shapes are thin horizontal rectangles (6–14 px tall, 60–180 px wide, lines 22–25) in very dark near-black colours (`(20,15,35)`, `(28,18,50)`, `(36,20,60)`). The overall effect is correct in structure but the shapes are nearly invisible against the `(8, 4, 18)` background fill (line 120). The darkest layer at `(20,15,35)` has a luminance delta of approximately 14–17 against the background — below the perceptual threshold on most monitors in a dimly lit room. HK's main menu parallax (the roots and lanterns of Dirtmouth) is intentionally low-contrast but retains clear silhouette separation.
+
+The speed differential between layers 1 and 3 (3×) is appropriate — enough to convey depth without feeling mechanical. The 1 px/frame background layer is at the edge of perceptibility on a 60 FPS loop; consider 1.5 px/frame minimum for that layer to ensure motion is registered.
+
+The title pulse uses `self._pulse += 0.044 * self._pulse_dir` (line 103), giving an ~90-frame period as specified. The glow range is `180 + pulse * 75` (line 135), yielding RGB from `(180, 151, 50)` to `(255, 214, 50)`. This is a warm gold drift — feels appropriate for Steamfall's aesthetic, though the green channel `int(glow_val * 0.84)` tracks the red channel with a fixed ratio, meaning the hue barely shifts during the pulse. A slight hue rotation (e.g. edging the min state toward amber `(180, 120, 40)` vs. the max state at `(255, 220, 60)`) would give the pulse more visual character.
+
+The credits overlay (lines 177–201) uses any-key dismiss — correct UX for a single-screen credits list. No changes needed to the credits flow.
+
+**Recommended changes:**
+```python
+# main_menu.py _PARALLAX_LAYERS (lines 31–33): raise layer colors for visibility
+(1, (35, 28, 55), _make_layer(6, (35, 28, 55))),   # was (20,15,35) — +15 luminance
+(2, (45, 32, 68), _make_layer(5, (45, 32, 68))),   # was (28,18,50)
+(3, (55, 38, 78), _make_layer(4, (55, 38, 78))),   # was (36,20,60)
+```
+
+Raise the slow layer speed from 1 to 1.5 px/frame (line 31) so near-background motion is perceivable on all displays.
+
+---
+
+### 5. NPC Hint Fade (P3 deferred)
+
+The Phase 3 review (Summary Table, 2026-04-25) flagged that the `"E"` hint label in `npc.py` snaps on and off instantly (lines 40–45) and recommended a 10-frame alpha fade-in. As of the current `npc.py`, the implementation is unchanged: `_show_hint` is set as a boolean in `gameplay.py` line 828 and rendered without any alpha transition at `npc.py` lines 41–45. There is no `_hint_alpha` field, no ramp counter, and no `set_alpha` call. The snap-on behaviour is still present.
+
+This deferred recommendation is directly actionable with no dependency on art assets or audio. The full fix requires three small changes:
+
+1. **`entities/npc.py` `__init__`**: add `self._hint_alpha = 0` (integer 0–255).
+2. **`entities/npc.py` `draw`**: replace the `if self._show_hint:` block with an alpha-ramp: increment `_hint_alpha` by 25 when `_show_hint` is True, decrement by 25 otherwise, clamp to `[0, 255]`. Create a surface for the label, call `set_alpha(self._hint_alpha)`, and blit only when `_hint_alpha > 0`.
+3. **`gameplay.py` line 828**: the existing boolean assignment is sufficient; the ramp runs inside `npc.draw()` so no gameplay change is needed.
+
+Re-flagging for Phase 4 implementation. Additionally, the Y-axis proximity gate recommended in the Phase 3 review (to prevent off-platform NPCs from triggering the hint) is also still absent from `gameplay.py` lines 825–828. Both fixes are in the same two files and should be batched into a single commit.
+
+---
+
+## Summary Table (2026-04-29)
+
+| Topic | File(s) | Key Issue | Recommended Change |
+|---|---|---|---|
+| Particle gravity / drag | `settings.py` L257–258 | `PARTICLE_GRAVITY = 0.25` / `PARTICLE_DRAG = 0.92` — particles float; arc too shallow for HK impact | Restore to spec: `PARTICLE_GRAVITY = 0.30`, `PARTICLE_DRAG = 0.88` |
+| Particle hit/death counts | `settings.py` L259–260 | `PARTICLE_HIT_COUNT = 5`, `PARTICLE_DEATH_COUNT = 12` — below spec; bursts feel thin | Raise to `PARTICLE_HIT_COUNT = 6`, `PARTICLE_DEATH_COUNT = 14` |
+| Missing hit-spark emit site | `gameplay.py` L633–635 | No particles emitted when nail connects with living enemy — central HK tactile beat absent | Add `particles.emit_hit()` call in `hb.check_hits()` loop on successful hit |
+| Death screen — no freeze frame | `gameplay.py` L879 | Player body vanishes without physics pause — no "weight" to the death blow | Call `hitstop.trigger(6)` on `_death_timer == 1` before overlay begins |
+| Death screen — no skip | `gameplay.py` `handle_event` | Full 150-frame window is mandatory; HK allows key-press to accelerate past frame 60 | Handle `KEYDOWN` when `_death_timer > 60` to set `_death_timer = 149` |
+| Missing faction branch music | `settings.py` | Levels 6–8 fall back to `outer_district.ogg`; no faction audio identity in branch levels | Add `MUSIC_MARKED_BRANCH` and `MUSIC_FLESHFORGED_BRANCH` path constants; wire in `on_enter` |
+| Hit SFX call site audit | `entities/entity.py` or `gameplay.py` | `SOUND_HIT` is defined but unclear if `audio.play_sfx("hit")` fires on enemy `take_damage` | Verify `audio.play_sfx("hit")` is called inside `take_damage()` for enemy hits |
+| Parallax layer visibility | `scenes/main_menu.py` L31–33 | Layer colors `(20,15,35)` — `(36,20,60)` are near-invisible against `(8,4,18)` background | Raise each layer color by ~+15 luminance; raise slow layer speed from 1 to 1.5 px/frame |
+| Title pulse hue | `scenes/main_menu.py` L135–136 | Pulse drifts only in brightness; hue is static — less character than HK's logo animations | Shift min-state toward amber `(180,120,40)` for a visible warm-to-bright hue drift |
+| NPC hint fade-in (P3 deferred) | `entities/npc.py` L40–45; `scenes/gameplay.py` L825–828 | `"E"` hint still snaps on/off with no alpha ramp — re-flagged from Phase 3 review | Add `_hint_alpha` ramp (±25/frame) in `npc.draw()`; add Y-axis proximity gate in `gameplay.py` |

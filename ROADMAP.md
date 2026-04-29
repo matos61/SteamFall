@@ -1272,8 +1272,8 @@ _Phase 4 begins 2026-04-27. Pre-phase review by review-agent and hk-agent is rec
 
 **Priority order for build-agent** (tackle in this order):
 
-1. ~~**P4-0b (pre-phase review)**~~ ✅ **DONE (2026-04-27)** — review-agent pass complete; hk-agent pass in progress.
-2. **P4-0c (critical bug-fix sprint)** — BUG-032 through BUG-037; must fix before P4-1.
+1. ~~**P4-0b (pre-phase review)**~~ ✅ **DONE (2026-04-29)** — both passes complete (review-agent BUG-032–043; hk-agent Phase 4 feel analysis in `REVIEW_HK.md`).
+2. ~~**P4-0c (critical bug-fix sprint)**~~ ✅ **DONE (2026-04-29)** — BUG-032 through BUG-041 all verified fixed in code.
 3. **P4-1 (particle system)** — highest gameplay impact; no art assets needed.
 4. **P4-2 (death screen polish)** — small scope; unlocks faction flavour in the death loop.
 5. **P4-3 (sound system)** — `systems/audio.py`; blocked on audio asset availability.
@@ -1284,7 +1284,7 @@ _Phase 4 begins 2026-04-27. Pre-phase review by review-agent and hk-agent is rec
 
 ---
 
-### Task P4-0b: Pre-Phase Review ✅ DONE (2026-04-27) — review pass complete; hk-agent pass in progress
+### Task P4-0b: Pre-Phase Review ✅ DONE (2026-04-29) — both passes complete
 
 _Review-agent found BUG-032 through BUG-043 (see Known Bugs). Six are 🔴 critical and must be fixed before P4-1 content work._
 
@@ -1294,9 +1294,9 @@ _Review-agent found BUG-032 through BUG-043 (see Known Bugs). Six are 🔴 criti
 
 ---
 
-### Task P4-0c: Critical Bug-Fix Sprint (Phase 4 pre-start)
+### Task P4-0c: Critical Bug-Fix Sprint (Phase 4 pre-start) ✅ DONE (2026-04-29)
 
-_Unblocked by P4-0b. Must be completed before P4-1._
+_All fixes confirmed present in code (prior pass). Verified with `python main.py` — no ImportError._
 
 **Files to touch:**
 - `scenes/gameplay.py` (BUG-032, BUG-035, BUG-036, BUG-037)
@@ -1649,6 +1649,18 @@ _Review-agent 2026-04-27 pass (P4-0b pre-phase):_
 40. ⚠️ **BUG-042** `gameplay.py` lines 1174–1186: No hook point yet for P4-2 faction-specific death text and death-particle emit. Hook should be: `if self._death_timer == 1:` (first frame of death screen). Pre-identified for build-agent when implementing P4-2.
 
 41. ⚠️ **BUG-043** `gameplay.py` lines 450–457 / `settings.py` / `core/game.py`: P4-4 settings screen transition is a no-op stub. Requires: `SCENE_SETTINGS` constant in `settings.py`, scene registration in `game._build_scenes`, and new `scenes/settings.py`. All three touch points noted; unblocked by P4-4 spec in ROADMAP.
+
+_hk-agent 2026-04-29 Phase 4 feel pass (see `REVIEW_HK.md` for full analysis):_
+
+42. ⚠️ **HK-P4-A** `systems/particles.py` (to be created in P4-1): `PARTICLE_GRAVITY` spec value is 0.3 but current `settings.py` has 0.25; `PARTICLE_DRAG` (friction) spec is 0.88 but `settings.py` has 0.92 — will produce overly floaty arcs. Also `PARTICLE_HIT_COUNT = 5` and `PARTICLE_DEATH_COUNT = 12` are below spec density. Recommend aligning to spec before P4-1 ships. Also: P4-1 spec is missing a hit-spark emit site for nail-connects-living-enemy (only enemy-death burst is listed for enemies). Assign to build-agent in P4-1.
+
+43. ⚠️ **HK-P4-B** `scenes/gameplay.py` (death screen, `_draw_death`): No freeze-frame on death onset. Recommend `hitstop.trigger(6)` at `_death_timer == 1` (line ~879) for a punchy death snap. Also: no player-skip mechanism in the 150-frame window — recommend `KEYDOWN` early-exit when `_death_timer > 60` to avoid lockout feel. Assign to build-agent in P4-2.
+
+44. ⚠️ **HK-P4-C** `scenes/main_menu.py` (parallax layers): Layer fill colors `(20,15,35)` / `(28,17,48)` / `(36,20,60)` have a luminance delta of only ~14–17 against the `(8,4,18)` background — effectively invisible. Recommend raising each layer by +15 luminance and the slowest scroll from 1 to 1.5 px/frame. Title pulse hue is brightness-only; recommend shifting the min-state toward amber for visible character. Assign to build-agent in P4-5.
+
+45. ⚠️ **HK-P4-D** `entities/npc.py` lines 40–45 / `scenes/gameplay.py` lines 825–828: NPC `"E"` hint still snaps on/off instantly (Phase 3 deferral never implemented). Add `_hint_alpha` field to `NPC.__init__`, alpha-ramp logic in `npc.draw()` (delta 25/frame → 10-frame fade), and Y-axis proximity gate in `gameplay.py`. Assign to build-agent in P4-1 (fold into same commit as particle system since both touch gameplay.py).
+
+46. ⚠️ **HK-P4-E** `scenes/gameplay.py` / `settings.py`: Faction branch levels 6–8 fall back to `outer_district.ogg` — no faction audio identity. Recommend adding `MUSIC_MARKED_BRANCH` / `MUSIC_FLESHFORGED_BRANCH` constants to `settings.py` and wiring them in the level-load music logic. Assign to build-agent in P4-3.
 
 ---
 
