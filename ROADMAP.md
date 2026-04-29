@@ -1277,7 +1277,7 @@ _Phase 4 begins 2026-04-27. Pre-phase review by review-agent and hk-agent is rec
 3. ~~**P4-1 (particle system)**~~ ✅ **DONE (2026-04-29)** — `systems/particles.py` updated; all emit sites wired; NPC hint alpha-fade (HK-P4-D) and particle constant alignment (HK-P4-A) folded in.
 4. ~~**P4-2 (death screen polish)**~~ ✅ **DONE (2026-04-29)** — faction text + colors, death particles, hitstop snap, player-skip shortcut (HK-P4-B folded in).
 5. ~~**P4-3 (sound system)**~~ ✅ **DONE (2026-04-29)** — `AudioManager` and all SFX/music call sites confirmed present; faction branch music constants added (HK-P4-E folded in).
-6. **P4-4 (settings screen)** — implement the "Settings (soon)" stub as a real scene.
+6. ~~**P4-4 (settings screen)**~~ ✅ **DONE (2026-04-29)** — `scenes/settings.py` rewritten to spec; volume sliders, fullscreen toggle, ESC-back flow, pause menu wired.
 7. **P4-5 (main menu polish)** — parallax, animated logo, Credits option.
 8. **P4-6 (sprite replacement)** — blocked on art assets; largest scope.
 9. **P4-7 (tile sprites)** — blocked on art assets; pairs with P4-6.
@@ -1648,7 +1648,7 @@ _Review-agent 2026-04-27 pass (P4-0b pre-phase):_
 
 40. ⚠️ **BUG-042** `gameplay.py` lines 1174–1186: No hook point yet for P4-2 faction-specific death text and death-particle emit. Hook should be: `if self._death_timer == 1:` (first frame of death screen). Pre-identified for build-agent when implementing P4-2.
 
-41. ⚠️ **BUG-043** `gameplay.py` lines 450–457 / `settings.py` / `core/game.py`: P4-4 settings screen transition is a no-op stub. Requires: `SCENE_SETTINGS` constant in `settings.py`, scene registration in `game._build_scenes`, and new `scenes/settings.py`. All three touch points noted; unblocked by P4-4 spec in ROADMAP.
+41. ✅ **BUG-043** `gameplay.py` lines 450–457 / `settings.py` / `core/game.py`: P4-4 settings screen transition is a no-op stub. Requires: `SCENE_SETTINGS` constant in `settings.py`, scene registration in `game._build_scenes`, and new `scenes/settings.py`. All three touch points noted; unblocked by P4-4 spec in ROADMAP.
 
 _hk-agent 2026-04-29 Phase 4 feel pass (see `REVIEW_HK.md` for full analysis):_
 
