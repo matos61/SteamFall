@@ -431,6 +431,12 @@ class GameplayScene(BaseScene):
                     self._npc_dialogue = None
             return
 
+        # HK-P4-B: player can skip the death screen after 60 frames
+        if self._death_timer > 60:
+            if event.key in (pygame.K_SPACE, pygame.K_RETURN):
+                self._death_timer = 148
+                return
+
         if self._paused:
             if event.key == pygame.K_ESCAPE:
                 self._paused = False
@@ -883,12 +889,17 @@ class GameplayScene(BaseScene):
         # --- Player death ---
         if not self.player.alive:
             self._death_timer += 1
-            # P4-2/P4-3: emit particles and play SFX on the very first frame of death screen
+            # P4-2/P4-3: emit particles, hitstop, and play SFX on the very first frame of death screen
             if self._death_timer == 1 and not self._death_particles_emitted:
                 self._death_particles_emitted = True
-                particles.emit_death(self.player.rect.centerx,
-                                     self.player.rect.centery,
-                                     self.player.color)
+                particles.emit(self.player.rect.centerx,
+                               self.player.rect.centery,
+                               count=DEATH_PARTICLE_COUNT // 2,
+                               speed=3.0,
+                               color=RED,
+                               life=25,
+                               spread=360)
+                hitstop.trigger(6)
                 audio.play_sfx("death")
             if self._death_timer >= 150:
                 save = self.game.save_data
@@ -1221,13 +1232,13 @@ class GameplayScene(BaseScene):
             faction = getattr(self.game, "player_faction", None)
             if faction == FACTION_MARKED:
                 msg   = DEATH_TEXT_MARKED
-                color = (130, 60, 200)   # purple tint
+                color = (180, 140, 220)   # purple tint
             elif faction == FACTION_FLESHFORGED:
                 msg   = DEATH_TEXT_FLESHFORGED
-                color = (220, 100, 20)   # orange tint
+                color = (220, 160, 80)    # orange tint
             else:
                 msg   = DEATH_TEXT_NEUTRAL
-                color = (160, 30, 30)
+                color = WHITE
             txt = self.font_death.render(msg, True, color)
             surface.blit(txt, (SCREEN_WIDTH // 2 - txt.get_width() // 2,
                                SCREEN_HEIGHT // 2 - 40))
