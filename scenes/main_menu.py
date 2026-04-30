@@ -27,10 +27,10 @@ def _make_layer(count: int, color: tuple) -> list:
 
 
 _PARALLAX_LAYERS = [
-    # (speed, color, shapes)
-    (1, (20, 15, 35), _make_layer(6, (20, 15, 35))),
-    (2, (28, 18, 50), _make_layer(5, (28, 18, 50))),
-    (3, (36, 20, 60), _make_layer(4, (36, 20, 60))),
+    # (speed, color, shapes) — luminance raised +15 from original per HK-P4-C
+    (1.5, (35, 30, 50), _make_layer(6, (35, 30, 50))),
+    (2,   (43, 33, 65), _make_layer(5, (43, 33, 65))),
+    (3,   (51, 35, 75), _make_layer(4, (51, 35, 75))),
 ]
 
 
@@ -131,9 +131,12 @@ class MainMenuScene(BaseScene):
 
         cx = SCREEN_WIDTH // 2
 
-        # Title with pulsing glow color
-        glow_val    = int(180 + self._pulse * 75)
-        title_color = (glow_val, int(glow_val * 0.84), 50)
+        # Title with pulsing glow — min-state shifted toward amber per HK-P4-C
+        title_color = (
+            int(200 + self._pulse * 55),   # R: 200 (amber) → 255 (bright gold)
+            int(100 + self._pulse * 110),  # G: 100 (amber) → 210 (bright gold)
+            int(20  + self._pulse * 45),   # B:  20 (warm)  →  65
+        )
         title       = self.font_title.render("STEAMFALL", True, title_color)
         surface.blit(title, (cx - title.get_width() // 2, 130))
 
