@@ -19,7 +19,7 @@ from settings          import (ENEMY_PATROL_SPEED, ENEMY_CHASE_SPEED,
                                 ENEMY_IFRAMES,
                                 FACTION_FLESHFORGED, FACTION_MARKED,
                                 FACTION_TINT_BLEND, FLESHFORGED_TINT_COLOR,
-                                MARKED_TINT_COLOR)
+                                MARKED_TINT_COLOR, SPRITE_DIR_ENEMY)
 
 # AI states
 _PATROL = "patrol"
@@ -53,6 +53,10 @@ class Enemy(Entity):
         # "" → no tint; FACTION_FLESHFORGED → iron-orange blend; FACTION_MARKED → acolyte purple blend
         self.faction_tint: str = ""
 
+        # Animation controller (P4-6) — lazily initialised on first update() call
+        # so subclasses that override self.rect dimensions are always handled correctly.
+        self._anim = None
+
     # ------------------------------------------------------------------
 
     def update(self, dt: int, player=None, solid_rects=None) -> None:
@@ -72,6 +76,22 @@ class Enemy(Entity):
         apply_gravity(self)
         if solid_rects:
             move_and_collide(self, solid_rects)
+
+        # P4-6: lazily init AnimationController on first update using final rect dims
+        if self._anim is None:
+            from systems.animation import AnimationController
+            self._anim = AnimationController(
+                self.color, self.rect.width, self.rect.height,
+                sprite_dir=SPRITE_DIR_ENEMY)
+        if self.iframes > 0:
+            self._anim.set_state("hurt")
+        elif self._state == _ATTACK:
+            self._anim.set_state("attack")
+        elif abs(self.vx) > 0.1:
+            self._anim.set_state("walk")
+        else:
+            self._anim.set_state("idle")
+        self._anim.update()
 
     # ------------------------------------------------------------------
 
@@ -154,25 +174,39 @@ class Enemy(Entity):
         return [SoulFragment(cx, cy)]
 
     def draw(self, surface: pygame.Surface, camera) -> None:
+        # P4-6: ensure controller exists (fallback if update() was somehow skipped)
+        if self._anim is None:
+            from systems.animation import AnimationController
+            self._anim = AnimationController(
+                self.color, self.rect.width, self.rect.height,
+                sprite_dir=SPRITE_DIR_ENEMY)
+
         screen_rect = camera.apply(self)
-        # 2-frame red hit-flash instead of the white player flash
-        base_color = RED if (self.iframes > 0 and self.iframes % 4 < 2) else self.color
-        # P3-2: blend toward faction tint for themed levels
-        if self.faction_tint == FACTION_FLESHFORGED:
-            tint = FLESHFORGED_TINT_COLOR
-            w = FACTION_TINT_BLEND
-            color = tuple(int(a * (1 - w) + b * w)
-                          for a, b in zip(base_color, tint))
-        elif self.faction_tint == FACTION_MARKED:
-            tint = MARKED_TINT_COLOR
-            w = FACTION_TINT_BLEND
-            color = tuple(int(a * (1 - w) + b * w)
-                          for a, b in zip(base_color, tint))
+
+        # Hit flash: solid red fill replaces the frame during iframes (2-frame strobe)
+        if self.iframes > 0 and self.iframes % 4 < 2:
+            pygame.draw.rect(surface, RED, screen_rect)
         else:
-            color = base_color
-        pygame.draw.rect(surface, color, screen_rect)
+            frame = self._anim.current_frame
+            if frame.get_size() != (screen_rect.width, screen_rect.height):
+                frame = pygame.transform.scale(
+                    frame, (screen_rect.width, screen_rect.height))
+            # P3-2: faction tint — blend the frame toward the tint color via
+            # a semi-transparent overlay (equivalent to the previous per-channel
+            # lerp at weight FACTION_TINT_BLEND for placeholder solid-color frames,
+            # and a natural tint overlay for real sprites).
+            if self.faction_tint:
+                tint = (FLESHFORGED_TINT_COLOR if self.faction_tint == FACTION_FLESHFORGED
+                        else MARKED_TINT_COLOR)
+                frame = frame.copy()
+                tint_surf = pygame.Surface(frame.get_size(), pygame.SRCALPHA)
+                tint_surf.fill((*tint, int(255 * FACTION_TINT_BLEND)))
+                frame.blit(tint_surf, (0, 0))
+            surface.blit(frame, screen_rect.topleft)
+
+        # Health bar (shown when below max health)
         if self.health < self.max_health and self.max_health > 0:
-            bw = self.rect.width
+            bw = screen_rect.width
             bh = 5
             bx = screen_rect.x
             by = screen_rect.y - 10
