@@ -1564,6 +1564,131 @@ _`_load_tile_sprite()` and `_tile_sheet_for_level()` added to `world/tilemap.py`
 
 ---
 
+## Phase 5 — Art Asset Integration
+
+Art assets were delivered in `Delivery/` on 2026-05-01. The sprite loading infrastructure from P4-6/P4-7 is in place (with colored-rect fallback). Phase 5 wires the delivered assets into the `assets/` directory tree and resolves remaining cleanup items.
+
+**Priority order for build-agent** (tackle in this order):
+
+1. **P5-0b (pre-phase review)** — review-agent and hk-agent review Phase 4 code; update REVIEW_BUGS.md and REVIEW_HK.md.
+2. **P5-1 (sprite sheet integration)** — extend `animation.py` to support sprite-sheet PNGs; create `assets/sprites/player/` and `assets/sprites/enemy/` from `Delivery/AnimationSheets/Warrior/` and `Delivery/AnimationSheets/Antraxis/`.
+3. **P5-2 (tile asset integration)** — create `assets/tiles/` directory and populate `outer_district.png`, `foundry.png`, `sanctum.png` from `Delivery/Tiles/`.
+4. **P5-3 (tutorial replacement)** — apply `Delivery/replacements/tutorial_minigame.py` → `systems/tutorial_minigame.py`.
+5. **P5-4 (dead code cleanup)** — delete `game/story.py` (FLAG-010).
+
+---
+
+### Task P5-0b: Pre-Phase Review
+
+_Run review-agent and hk-agent over all Phase 4 .py files to catch any issues before asset work begins. Update REVIEW_BUGS.md (tick stale FLAG-013 checkboxes; add any new bugs). Update REVIEW_HK.md with Phase 5 feel analysis._
+
+**Acceptance criteria — done when:**
+- REVIEW_BUGS.md checkboxes for BUG-032–041 are ticked ✅ (FLAG-013 resolved).
+- Any new bugs discovered in Phase 4 code are documented with file + line references.
+- REVIEW_HK.md updated with any Phase 4 feel gaps.
+
+---
+
+### Task P5-1: Sprite Sheet Integration
+
+**Files to touch:**
+- `systems/animation.py` (extend `_make_frames` to handle sprite sheets)
+- `settings.py` (add `SPRITE_DIR_ENEMY_*` constants if per-type dirs are desired; otherwise keep `SPRITE_DIR_ENEMY` shared)
+
+**What to build:**
+
+Art assets delivered in `Delivery/AnimationSheets/`:
+- `Warrior/` — player character (Side_Idle, Side_Walk, Side_Attack, Side_Die, Side_SpecialAttack)
+- `Antraxis/` — enemy character (Side_Idle, Side_Walk, Side_Attack, Side_Die)
+- `Crymore/`, `Tethion/` — additional enemy characters (same layout as Antraxis)
+
+The sprite sheets are single PNG files where all frames run left-to-right (standard horizontal sprite sheet format).
+
+`systems/animation.py` — extend `_make_frames()`:
+- After the per-frame PNG subdirectory check, also check for `{sprite_dir}/Side_{state_capitalized}.png` (state name mapping: `idle`→`Idle`, `walk`→`Walk`, `attack`→`Attack`, `death`→`Die`, `hurt`→`Idle` fallback, `jump`→`Walk` fallback, `fall`→`Walk` fallback).
+- If the sprite sheet exists, load it and slice horizontally into `_STATE_FRAMES[state]` equal-width frames using `pygame.Surface.subsurface()`.
+- Scale each frame slice to `(width, height)`.
+- If the sheet width is not evenly divisible by `_STATE_FRAMES[state]`, use floor division.
+
+`assets/sprites/player/` — create by **copying** (not symlinking) from `Delivery/AnimationSheets/Warrior/`:
+- Copy all `Side_*.png` files into `assets/sprites/player/`.
+- The `_make_frames` sprite-sheet loader will pick them up automatically.
+
+`assets/sprites/enemy/` — create by **copying** from `Delivery/AnimationSheets/Antraxis/`:
+- Copy all `Side_*.png` files into `assets/sprites/enemy/`.
+- All enemy subclasses share `SPRITE_DIR_ENEMY`, so Antraxis art will be used for all non-player entities.
+
+**Acceptance criteria — done when:**
+- `python main.py` launches without ImportError.
+- Player entity renders using `Warrior` sprite frames (not colored rect) when `assets/sprites/player/` is populated.
+- Enemy entities render using `Antraxis` sprite frames when `assets/sprites/enemy/` is populated.
+- States without a delivered sheet (`jump`, `fall`, `hurt`) fall back to colored rects gracefully (no crash).
+
+---
+
+### Task P5-2: Tile Asset Integration
+
+**Files to touch:**
+- `assets/tiles/` (create directory and populate)
+- `settings.py` (if tile sheet paths need updating — otherwise no change needed)
+
+**What to build:**
+
+Art assets delivered in `Delivery/Tiles/`:
+- `Tiles.png` — general tile sheet (likely multiple tile types)
+- `Tiles_40.png` — 40×40 tile variants
+- Various individual tile PNGs: `GroundTile_Castle*.png`, `GroundTile_Rock*.png`, `GroundTile_Sand*.png`, `GroundPath_Rock*.png`, `CastleWall*.png`, etc.
+
+The `_load_tile_sprite()` in `tilemap.py` already scales any loaded PNG to `TILE_SIZE × TILE_SIZE`, so any tile PNG can be used directly.
+
+Create `assets/tiles/` directory and populate:
+- `assets/tiles/outer_district.png` — copy `Delivery/Tiles/GroundTile_Castle1.png` (castle/city ground tile for levels 1–2)
+- `assets/tiles/foundry.png` — copy `Delivery/Tiles/GroundTile_Rock1.png` (industrial stone for levels 3–4)
+- `assets/tiles/sanctum.png` — copy `Delivery/Tiles/Tiles.png` (or `Tiles_40.png`; inspect and choose the most thematic for level 5)
+
+**Acceptance criteria — done when:**
+- `python main.py` launches without ImportError.
+- Solid tiles in levels 1–2 render using `GroundTile_Castle1.png` art instead of the `TILE_COLOR` colored rect.
+- Solid tiles in levels 3–4 render using `GroundTile_Rock1.png` art.
+- Level 5 tiles render using the sanctum tile art.
+- Levels 6–10 still use colored-rect fallback (acceptable; extend tile mapping in a future pass if desired).
+
+---
+
+### Task P5-3: Tutorial Minigame Replacement
+
+**Files to touch:**
+- `systems/tutorial_minigame.py` (replace with delivered version)
+
+**What to build:**
+
+`Delivery/replacements/tutorial_minigame.py` contains an updated version of the inline tutorial minigame. Copy its contents over `systems/tutorial_minigame.py`.
+
+Verify the replacement is API-compatible (same class name `TutorialMinigame`, same `handle_event` / `update` / `draw` / `is_complete()` interface) before applying.
+
+**Acceptance criteria — done when:**
+- `systems/tutorial_minigame.py` contains the replacement content.
+- `python main.py` launches without ImportError.
+- Prologues that use `TutorialMinigame` still function correctly.
+
+---
+
+### Task P5-4: Dead Code Cleanup
+
+**Files to touch:**
+- `game/story.py` (delete)
+
+**What to build:**
+
+Delete `game/story.py` — a 15-line `StoryState` stub that is defined but never imported or used anywhere in the codebase (FLAG-010). Verify with `grep -r "StoryState\|from game" --include="*.py"` that no file imports it before deleting.
+
+**Acceptance criteria — done when:**
+- `game/story.py` is deleted.
+- `python main.py` launches without ImportError.
+- No other file in the project imports from `game.story`.
+
+---
+
 ## Known Bugs / Tech Debt
 
 _Legend: ✅ Fixed | ⚠️ Flagged / deferred | 🔴 Open_
@@ -1588,7 +1713,7 @@ _Legend: ✅ Fixed | ⚠️ Flagged / deferred | 🔴 Open_
 
 10. ⚠️ **Wildcard imports in scene files** — Flagged (REVIEW_BUGS FLAG-001). Architectural style; not blocking; defer to Phase 4 cleanup.
 
-11. 🔴 **Audio subsystem incomplete** — `systems/voice_player.py` added (voice lines); `systems/audio.py` for music/SFX still absent. `pygame.mixer` is initialised by `pygame.init()` but no sounds play. Assign to build-agent in Phase 4.
+11. ✅ **Audio subsystem incomplete** — Fixed by P4-3 (2026-04-29). `systems/audio.py` created with `AudioManager` singleton; all SFX/music call sites wired; faction branch music constants added.
 
 12. ⚠️ **World bounds not enforced for enemies** — Flagged. Low-priority edge case; assign to build-agent if enemies escape the visible world during playtesting.
 
@@ -1664,7 +1789,7 @@ _hk-agent 2026-04-29 Phase 4 feel pass (see `REVIEW_HK.md` for full analysis):_
 
 46. ✅ **HK-P4-E** `scenes/gameplay.py` / `settings.py`: Faction branch levels 6–8 fall back to `outer_district.ogg` — no faction audio identity. Recommend adding `MUSIC_MARKED_BRANCH` / `MUSIC_FLESHFORGED_BRANCH` constants to `settings.py` and wiring them in the level-load music logic. Assign to build-agent in P4-3.
 
-47. ⚠️ **FLAG-012: `scenes/cutscene_scene.py` is dead code** — imports from `steamfall.core.scene` (non-existent package path in the current project structure) and is not referenced by any other file. It was created outside the roadmap. Either delete it or port it to the `BaseScene` interface and add it properly to `ROADMAP.md`. Assign to build-agent as a cleanup item (can batch with P4-6 or handle separately).
+47. ✅ **FLAG-012: `scenes/cutscene_scene.py` is dead code** — File was removed (confirmed absent from `scenes/` directory as of 2026-05-01 orchestrator check). No further action required.
 
 48. ⚠️ **FLAG-013: `REVIEW_BUGS.md` BUG-032–041 checkboxes are stale** — all ten bugs were confirmed fixed in code as of P4-0c (2026-04-29), but the `[ ]` markers in `REVIEW_BUGS.md` have not been ticked. Review-agent should update those checkboxes in its next session to keep the document accurate.
 
@@ -1708,7 +1833,8 @@ _hk-agent 2026-04-29 Phase 4 feel pass (see `REVIEW_HK.md` for full analysis):_
 | `scenes/marked_ending.py` | build-agent | P3-3 + P3-0b complete; stable |
 | `scenes/fleshforged_ending.py` | build-agent | P3-3 + P3-0b complete; stable |
 | `scenes/settings.py` | build-agent | Created in P4-4; stable |
-| `scenes/cutscene_scene.py` | build-agent (cleanup) | Dead code — imports non-existent `steamfall.core.scene`; not referenced anywhere; see FLAG-012 |
+| `scenes/cutscene_scene.py` | — | Removed (FLAG-012 resolved 2026-05-01) |
+| `game/story.py` | build-agent (cleanup) | Dead code — 15-line `StoryState` stub, never imported; delete in P5-4 |
 | `entities/npc.py` | build-agent | Created (P3-4); P3-0b complete; stable |
 | `systems/tutorial_minigame.py` | build-agent (created outside roadmap) | Inline control tutorial for prologues; stable |
 | `systems/voice_player.py` | build-agent (created outside roadmap) | Voice-line playback; integrate with P4-3 audio pass |
