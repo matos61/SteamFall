@@ -1266,9 +1266,11 @@ _Evaluated by hk-agent 2026-04-25; see `REVIEW_HK.md` for full analysis._
 
 ---
 
-## Phase 4 — Polish
+## Phase 4 — Polish ✅ COMPLETE (2026-05-01)
 
-_Phase 4 begins 2026-04-27. Pre-phase review by review-agent and hk-agent is recommended before build-agent starts P4-1._
+All Phase 4 tasks are done. The game has a particle system, faction-specific death screen, full audio architecture, a settings screen, polished main menu, and sprite/tile loading infrastructure with PNG fallback. P4-6 and P4-7 will visually improve once art assets are dropped into `assets/sprites/` and `assets/tiles/`.
+
+_Phase 4 began 2026-04-27. Pre-phase review done by review-agent and hk-agent (P4-0b)._
 
 **Priority order for build-agent** (tackle in this order):
 
@@ -1278,9 +1280,9 @@ _Phase 4 begins 2026-04-27. Pre-phase review by review-agent and hk-agent is rec
 4. ~~**P4-2 (death screen polish)**~~ ✅ **DONE (2026-04-29)** — faction text + colors, death particles, hitstop snap, player-skip shortcut (HK-P4-B folded in).
 5. ~~**P4-3 (sound system)**~~ ✅ **DONE (2026-04-29)** — `AudioManager` and all SFX/music call sites confirmed present; faction branch music constants added (HK-P4-E folded in).
 6. ~~**P4-4 (settings screen)**~~ ✅ **DONE (2026-04-29)** — `scenes/settings.py` rewritten to spec; volume sliders, fullscreen toggle, ESC-back flow, pause menu wired.
-7. **P4-5 (main menu polish)** — parallax, animated logo, Credits option.
-8. **P4-6 (sprite replacement)** — blocked on art assets; largest scope.
-9. **P4-7 (tile sprites)** — blocked on art assets; pairs with P4-6.
+7. ~~**P4-5 (main menu polish)**~~ ✅ **DONE (2026-04-29)** — parallax background (+15 lum, 1.5 px/frame slow layer), amber-drift logo pulse, Credits overlay; HK-P4-C feel improvements folded in.
+8. ~~**P4-6 (sprite replacement)**~~ ✅ **DONE (2026-05-01)** — `AnimationController` extended with `sprite_dir` PNG-load fallback; wired into `player.py` (`SPRITE_DIR_PLAYER`) and `enemy.py` + all subclasses (`SPRITE_DIR_ENEMY`); colored-rect fallback active until assets land.
+9. ~~**P4-7 (tile sprites)**~~ ✅ **DONE (2026-05-01)** — `_load_tile_sprite()` and `_tile_sheet_for_level()` added to `world/tilemap.py`; `TILE_SHEET_LEVEL_1_2`, `TILE_SHEET_LEVEL_3_4`, `TILE_SHEET_LEVEL_5` constants in `settings.py`; colored-rect fallback active until art assets land in `assets/tiles/`.
 
 ---
 
@@ -1530,9 +1532,9 @@ CREDITS_TEXT = [
 
 ---
 
-### Task P4-6: Sprite Replacement
+### Task P4-6: Sprite Replacement ✅ DONE (2026-05-01)
 
-_Blocked on art assets. Build-agent should update `AnimationController._make_frames()` to load from `assets/sprites/<entity>/` directories when the directory exists, falling back to placeholder colored rects when not. This future-proofs all entity draws without requiring assets today._
+_`AnimationController` updated with `sprite_dir` parameter. Player and all enemy subclasses wired. PNG loading active when `assets/sprites/<entity>/` dirs exist; colored-rect fallback otherwise._
 
 **Files to touch:**
 - `systems/animation.py` (extend `_make_frames` to load PNGs when available)
@@ -1547,9 +1549,9 @@ _Blocked on art assets. Build-agent should update `AnimationController._make_fra
 
 ---
 
-### Task P4-7: Tile Sprites
+### Task P4-7: Tile Sprites ✅ DONE (2026-05-01)
 
-_Blocked on art assets. Same pattern as P4-6._
+_`_load_tile_sprite()` and `_tile_sheet_for_level()` added to `world/tilemap.py`. Three tile sheet path constants in `settings.py`. PNG load with colored-rect fallback when assets absent._
 
 **Files to touch:**
 - `world/tilemap.py` (load tile sprite sheet when `assets/tiles/<biome>.png` exists)
@@ -1656,11 +1658,15 @@ _hk-agent 2026-04-29 Phase 4 feel pass (see `REVIEW_HK.md` for full analysis):_
 
 43. ✅ **HK-P4-B** `scenes/gameplay.py` (death screen, `_draw_death`): No freeze-frame on death onset. Recommend `hitstop.trigger(6)` at `_death_timer == 1` (line ~879) for a punchy death snap. Also: no player-skip mechanism in the 150-frame window — recommend `KEYDOWN` early-exit when `_death_timer > 60` to avoid lockout feel. Assign to build-agent in P4-2.
 
-44. ⚠️ **HK-P4-C** `scenes/main_menu.py` (parallax layers): Layer fill colors `(20,15,35)` / `(28,17,48)` / `(36,20,60)` have a luminance delta of only ~14–17 against the `(8,4,18)` background — effectively invisible. Recommend raising each layer by +15 luminance and the slowest scroll from 1 to 1.5 px/frame. Title pulse hue is brightness-only; recommend shifting the min-state toward amber for visible character. Assign to build-agent in P4-5.
+44. ✅ **HK-P4-C** `scenes/main_menu.py` (parallax layers): Fixed in P4-5 (2026-04-29). Layer colors raised by +15 luminance (`(35,30,50)` / `(43,33,65)` / `(51,35,75)`); slowest layer speed raised to 1.5 px/frame; title pulse min-state shifted toward amber `(200,100,20)` for a warm-to-bright hue drift.
 
 45. ✅ **HK-P4-D** `entities/npc.py` lines 40–45 / `scenes/gameplay.py` lines 825–828: NPC `"E"` hint still snaps on/off instantly (Phase 3 deferral never implemented). Add `_hint_alpha` field to `NPC.__init__`, alpha-ramp logic in `npc.draw()` (delta 25/frame → 10-frame fade), and Y-axis proximity gate in `gameplay.py`. Assign to build-agent in P4-1 (fold into same commit as particle system since both touch gameplay.py).
 
 46. ✅ **HK-P4-E** `scenes/gameplay.py` / `settings.py`: Faction branch levels 6–8 fall back to `outer_district.ogg` — no faction audio identity. Recommend adding `MUSIC_MARKED_BRANCH` / `MUSIC_FLESHFORGED_BRANCH` constants to `settings.py` and wiring them in the level-load music logic. Assign to build-agent in P4-3.
+
+47. ⚠️ **FLAG-012: `scenes/cutscene_scene.py` is dead code** — imports from `steamfall.core.scene` (non-existent package path in the current project structure) and is not referenced by any other file. It was created outside the roadmap. Either delete it or port it to the `BaseScene` interface and add it properly to `ROADMAP.md`. Assign to build-agent as a cleanup item (can batch with P4-6 or handle separately).
+
+48. ⚠️ **FLAG-013: `REVIEW_BUGS.md` BUG-032–041 checkboxes are stale** — all ten bugs were confirmed fixed in code as of P4-0c (2026-04-29), but the `[ ]` markers in `REVIEW_BUGS.md` have not been ticked. Review-agent should update those checkboxes in its next session to keep the document accurate.
 
 ---
 
@@ -1676,11 +1682,11 @@ _hk-agent 2026-04-29 Phase 4 feel pass (see `REVIEW_HK.md` for full analysis):_
 | `core/camera.py` | build-agent | Stable; unlikely to change |
 | `core/hitstop.py` | build-agent | Stable (Tech Debt #2 fixed) |
 | `scenes/base_scene.py` | build-agent | Stable interface; do not change method signatures |
-| `scenes/main_menu.py` | build-agent | Continue/New Game complete (P1-3); stable |
+| `scenes/main_menu.py` | build-agent | P1-3 + P4-5 complete (parallax, amber logo, Credits); stable |
 | `scenes/faction_select.py` | build-agent | Stable until Phase 3 |
 | `scenes/marked_prologue.py` | build-agent | Stable until Phase 3 |
 | `scenes/fleshforged_prologue.py` | build-agent | Stable until Phase 3 |
-| `scenes/gameplay.py` | build-agent | P3 + P3-0b complete; P4-1/P4-2/P4-4 will touch this |
+| `scenes/gameplay.py` | build-agent | P3 + P3-0b + P4-1 through P4-4 complete; stable |
 | `entities/entity.py` | build-agent | Stable (iframe fix done in P2-0) |
 | `entities/player.py` | build-agent | Animation draw consolidation deferred to P4-6 (sprite pass) |
 | `entities/enemy.py` | build-agent | Stable; faction tint constants extracted (P3-0b) |
@@ -1693,18 +1699,19 @@ _hk-agent 2026-04-29 Phase 4 feel pass (see `REVIEW_HK.md` for full analysis):_
 | `systems/physics.py` | build-agent | Stable; do not change call signatures |
 | `systems/combat.py` | build-agent | Stable; hitbox logic complete |
 | `systems/dialogue.py` | build-agent | Hint text fix done (Tech Debt #8); stable |
-| `systems/animation.py` | build-agent | Stable; P4-6 extends `_make_frames` for PNG loading |
+| `systems/animation.py` | build-agent | P4-6 complete; `sprite_dir` PNG load wired; stable |
 | `systems/checkpoint.py` | build-agent | Created (P1-1); stable |
 | `systems/collectible.py` | build-agent | Stable (P3-5 `LoreItem` complete) |
 | `systems/minimap.py` | build-agent | 13-level room-chain complete (P2-8); stable |
-| `systems/particles.py` | build-agent | To be created in P4-1 |
-| `systems/audio.py` | build-agent | To be created in P4-3 |
+| `systems/particles.py` | build-agent | Created in P4-1; stable |
+| `systems/audio.py` | build-agent | Created in P4-3; stable |
 | `scenes/marked_ending.py` | build-agent | P3-3 + P3-0b complete; stable |
 | `scenes/fleshforged_ending.py` | build-agent | P3-3 + P3-0b complete; stable |
-| `scenes/settings.py` | build-agent | To be created in P4-4 |
+| `scenes/settings.py` | build-agent | Created in P4-4; stable |
+| `scenes/cutscene_scene.py` | build-agent (cleanup) | Dead code — imports non-existent `steamfall.core.scene`; not referenced anywhere; see FLAG-012 |
 | `entities/npc.py` | build-agent | Created (P3-4); P3-0b complete; stable |
 | `systems/tutorial_minigame.py` | build-agent (created outside roadmap) | Inline control tutorial for prologues; stable |
 | `systems/voice_player.py` | build-agent (created outside roadmap) | Voice-line playback; integrate with P4-3 audio pass |
-| `world/tilemap.py` | build-agent | All levels complete; P3-0b BUG-030 fixed; stable |
+| `world/tilemap.py` | build-agent | All levels complete; P3-0b BUG-030 fixed; P4-7 tile sprite loading added; stable |
 | `REVIEW_BUGS.md` | review-agent (own) | Never modifies .py files |
 | `REVIEW_HK.md` | hk-agent (own) | Never modifies .py files |
