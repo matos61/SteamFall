@@ -1572,9 +1572,9 @@ Art assets were delivered in `Delivery/` on 2026-05-01. The sprite loading infra
 
 1. **P5-0b (pre-phase review)** ⏳ IN PROGRESS (2026-05-02) — review-agent and hk-agent passes in flight.
 2. **P5-1 (sprite sheet integration)** — extend `animation.py` to support sprite-sheet PNGs; create `assets/sprites/player/` and `assets/sprites/enemy/` from `Delivery/AnimationSheets/Warrior/` and `Delivery/AnimationSheets/Antraxis/`.
-3. **P5-2 (tile asset integration)** — create `assets/tiles/` directory and populate `outer_district.png`, `foundry.png`, `sanctum.png` from `Delivery/Tiles/`.
-4. **P5-3 (tutorial replacement)** — apply `Delivery/replacements/tutorial_minigame.py` → `systems/tutorial_minigame.py`.
-5. **P5-4 (dead code cleanup)** — delete `game/story.py` (FLAG-010).
+3. ~~**P5-2 (tile asset integration)**~~ ✅ **DONE (2026-05-02)** — `assets/tiles/` created; `outer_district.png`, `foundry.png`, `sanctum.png` copied from `Delivery/Tiles/`. `assets/sprites/` directory also created (empty stub for P5-1).
+4. ~~**P5-3 (tutorial replacement)**~~ ✅ **DONE (2026-05-02)** — `Delivery/replacements/tutorial_minigame.py` applied; fixes tutorial attack hitbox to respect left-facing direction.
+5. ~~**P5-4 (dead code cleanup)**~~ ✅ **DONE (2026-05-02)** — `game/story.py` deleted; confirmed no imports remain.
 
 _Orchestrator pre-check 2026-05-02:_
 - `assets/sprites/` and `assets/tiles/` do not yet exist — P5-1 and P5-2 unblocked once P5-0b is done.
@@ -1633,7 +1633,9 @@ The sprite sheets are single PNG files where all frames run left-to-right (stand
 
 ---
 
-### Task P5-2: Tile Asset Integration
+### Task P5-2: Tile Asset Integration ✅ DONE (2026-05-02)
+
+_`assets/tiles/` created; three tile PNGs copied from `Delivery/Tiles/` matching the paths already in `settings.py`. `assets/sprites/` stub directory also created._
 
 **Files to touch:**
 - `assets/tiles/` (create directory and populate)
@@ -1662,7 +1664,9 @@ Create `assets/tiles/` directory and populate:
 
 ---
 
-### Task P5-3: Tutorial Minigame Replacement
+### Task P5-3: Tutorial Minigame Replacement ✅ DONE (2026-05-02)
+
+_`Delivery/replacements/tutorial_minigame.py` applied. Fixes tutorial attack hitbox to branch on `self._facing` (was always extending right); attack arc draw also updated to match._
 
 **Files to touch:**
 - `systems/tutorial_minigame.py` (replace with delivered version)
@@ -1680,7 +1684,9 @@ Verify the replacement is API-compatible (same class name `TutorialMinigame`, sa
 
 ---
 
-### Task P5-4: Dead Code Cleanup
+### Task P5-4: Dead Code Cleanup ✅ DONE (2026-05-02)
+
+_`game/story.py` deleted. Confirmed no file imports `StoryState` or `from game`._
 
 **Files to touch:**
 - `game/story.py` (delete)
@@ -1841,9 +1847,9 @@ _hk-agent 2026-04-29 Phase 4 feel pass (see `REVIEW_HK.md` for full analysis):_
 | `scenes/fleshforged_ending.py` | build-agent | P3-3 + P3-0b complete; stable |
 | `scenes/settings.py` | build-agent | Created in P4-4; stable |
 | `scenes/cutscene_scene.py` | — | Removed (FLAG-012 resolved 2026-05-01) |
-| `game/story.py` | build-agent (cleanup) | Dead code — 15-line `StoryState` stub, never imported; delete in P5-4 |
+| `game/story.py` | — | Deleted (P5-4, 2026-05-02) |
 | `entities/npc.py` | build-agent | Created (P3-4); P3-0b complete; stable |
-| `systems/tutorial_minigame.py` | build-agent (created outside roadmap) | Inline control tutorial for prologues; stable |
+| `systems/tutorial_minigame.py` | build-agent | Inline control tutorial for prologues; P5-3 replacement applied (facing-direction fix); stable |
 | `systems/voice_player.py` | build-agent (created outside roadmap) | Voice-line playback; integrate with P4-3 audio pass |
 | `world/tilemap.py` | build-agent | All levels complete; P3-0b BUG-030 fixed; P4-7 tile sprite loading added; stable |
 | `REVIEW_BUGS.md` | review-agent (own) | Never modifies .py files |
