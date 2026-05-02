@@ -1598,8 +1598,12 @@ _Run review-agent and hk-agent over all Phase 4 .py files to catch any issues be
 
 ### Task P5-1: Sprite Sheet Integration
 
+_Blocked until P5-0b complete. Also requires two animation code fixes (HK-P5-D, HK-P5-E) before sprites land — fold into same commit._
+
 **Files to touch:**
 - `systems/animation.py` (extend `_make_frames` to handle sprite sheets)
+- `entities/player.py` (HK-P5-D: hurt-state strobe fix — set "hurt" only on first iframe frame)
+- `entities/enemy.py` (HK-P5-E: add airborne animation state branches for jump/fall)
 - `settings.py` (add `SPRITE_DIR_ENEMY_*` constants if per-type dirs are desired; otherwise keep `SPRITE_DIR_ENEMY` shared)
 
 **What to build:**
@@ -1699,6 +1703,26 @@ Delete `game/story.py` — a 15-line `StoryState` stub that is defined but never
 - `game/story.py` is deleted.
 - `python main.py` launches without ImportError.
 - No other file in the project imports from `game.story`.
+
+---
+
+## HK Feel Improvements — Phase 5 (reviewed 2026-05-02)
+
+_Evaluated by hk-agent 2026-05-02; see `REVIEW_HK.md` for full analysis._
+
+| # | Improvement | Status | Effort | Files |
+|---|---|---|---|---|
+| HK-P5-A | Remove dead `PARTICLE_ABILITY_COUNT` import in `particles.py` L22 (constant exists in `settings.py` but is never used) | ⏳ Phase 5 | Trivial | `systems/particles.py`, `settings.py` |
+| HK-P5-B | Landing dust: raise lifetime `(8,14)` → `(16,22)` frames; add `LANDING_PARTICLE_LIFE=20`; raise `LANDING_PARTICLE_COUNT` 4 → 6 | ⏳ Phase 5 | Trivial | `settings.py`, `systems/particles.py` |
+| HK-P5-C | Player death particles use plain `RED`; should be faction-colored (purple Marked / orange Fleshforged) to match death text | ⏳ Phase 5 | Minor | `scenes/gameplay.py` |
+| HK-P5-D | **Hurt animation flicker will strobe under real sprites** — `player.py` toggles "hurt"/"locomotion" states 7–8 times over 45 frames; `AnimationController.set_state()` resets `_frame_idx` to 0 each toggle, causing PNG frames to restart repeatedly. Fix: set "hurt" state only on first iframe frame (`iframes == PLAYER_IFRAMES`); rely on draw-layer outline for blink cue. **Must fix before P5-1 sprites land.** | ⏳ **P5-1 prereq** | Minor | `entities/player.py` |
+| HK-P5-E | **Enemy animation missing jump/fall states** — `enemy.py` state selector has no airborne branches; Jumper will display walk/idle during its entire hop arc with real sprites. Needs `not self.on_ground` + `vy` checks mirroring `player.py`. **Must fix before P5-1 sprites land.** | ⏳ **P5-1 prereq** | Minor | `entities/enemy.py` |
+| HK-P5-F | Tile sheet coverage stops at level 5 — `_tile_sheet_for_level()` returns `None` for levels 6–10; add three constants (`TILE_SHEET_LEVEL_6_8`, etc.) and branches | ⏳ Phase 5 | Minor | `world/tilemap.py`, `settings.py` |
+| HK-P5-G | No enemy death SFX — kill confirmations are silent; needs `SOUND_ENEMY_DEATH` constant and `audio.play_sfx()` call at enemy-death particle emit site | ⏳ Phase 5 | Minor | `settings.py`, `scenes/gameplay.py`, `systems/audio.py` |
+| HK-P5-H | Settings screen silent on volume change — add `audio.play_sfx("hit")` after each SFX slider adjustment for auditory feedback | ⏳ Phase 5 | Trivial | `scenes/settings.py` |
+| HK-P5-I | Lore auto-dismiss still active (deferred from P3, P4) — no player-dismiss pathway; raise `LORE_DISPLAY_FRAMES` 300 → 480 and add SPACE/KEYDOWN intercept in `gameplay.py handle_event` | ⏳ Phase 5 | Minor | `settings.py`, `scenes/gameplay.py` |
+
+**Items HK-P5-D and HK-P5-E are P5-1 prerequisites** — build-agent must fix both animation code issues *before* wiring sprite-sheet assets, or real PNG frames will strobe/be absent on airborne enemies.
 
 ---
 

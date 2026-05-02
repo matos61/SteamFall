@@ -724,3 +724,409 @@ Re-flagging for Phase 4 implementation. Additionally, the Y-axis proximity gate 
 | Parallax layer visibility | `scenes/main_menu.py` L31–33 | Layer colors `(20,15,35)` — `(36,20,60)` are near-invisible against `(8,4,18)` background | Raise each layer color by ~+15 luminance; raise slow layer speed from 1 to 1.5 px/frame |
 | Title pulse hue | `scenes/main_menu.py` L135–136 | Pulse drifts only in brightness; hue is static — less character than HK's logo animations | Shift min-state toward amber `(180,120,40)` for a visible warm-to-bright hue drift |
 | NPC hint fade-in (P3 deferred) | `entities/npc.py` L40–45; `scenes/gameplay.py` L825–828 | `"E"` hint still snaps on/off with no alpha ramp — re-flagged from Phase 3 review | Add `_hint_alpha` ramp (±25/frame) in `npc.draw()`; add Y-axis proximity gate in `gameplay.py` |
+
+---
+
+## Phase 5 Feel Analysis (2026-05-02)
+
+_Focus: Phase 4 additions — particle system (P4-1), death screen (P4-2), audio architecture (P4-3), sprite animation state mapping (P4-6), tile sprite fallback (P4-7), main menu polish (P4-5), settings screen (P4-4), ending scenes (P3-3). Evaluated against the HK feel pillars._
+
+---
+
+### Status of Phase 4 Review Recommendations
+
+Before listing new gaps, the previous review pass (2026-04-29) flagged nine items. Their current status after P4-0c:
+
+| Previous Flag | Status |
+|---|---|
+| `PARTICLE_GRAVITY = 0.30`, `PARTICLE_DRAG = 0.88` | **FIXED** — `settings.py` L258–259 now match spec values |
+| `HIT_PARTICLE_COUNT = 6`, `DEATH_PARTICLE_COUNT = 14` | **FIXED** — `settings.py` L263, L269 now match spec |
+| Missing hit-spark emit in `gameplay.py` hit loop | **FIXED** — `systems/combat.py` L75 calls `particles.emit_hit()` on every confirmed hit |
+| Death screen `hitstop.trigger(6)` | **FIXED** — `gameplay.py` L908 fires on `_death_timer == 1` |
+| Death screen player skip after frame 60 | **FIXED** — `gameplay.py` L441–444 handles `KEYDOWN` when `_death_timer > 60` |
+| Faction branch music constants | **FIXED** — `MUSIC_MARKED_BRANCH` and `MUSIC_FLESHFORGED_BRANCH` in `settings.py` L313–314; wired in `gameplay.py` `on_enter` |
+| Hit SFX audit | **FIXED** — `systems/combat.py` L76 calls `audio.play_sfx("hit")` |
+| Parallax layer visibility and speed | **FIXED** — `main_menu.py` L31–33 luminance raised +15; slow layer speed is 1.5 px/frame |
+| Title pulse hue amber drift | **FIXED** — `main_menu.py` L135–139 min-state is amber `(200, 100, 20)`; max-state bright gold |
+| NPC hint fade-in (P3 deferred) | **FIXED** — `npc.py` L27–53 implements `_hint_alpha` ramp ±25/frame |
+
+All nine prior recommendations have been applied. The items below are **new gaps** found in the Phase 4 code.
+
+---
+
+### 1. `PARTICLE_ABILITY_COUNT` Is Imported but Never Used
+
+**File:** `systems/particles.py` L22.
+
+```python
+# particles.py L14–22
+from settings import (... PARTICLE_ABILITY_COUNT)
+```
+
+`PARTICLE_ABILITY_COUNT = 8` is declared in `settings.py` L292 and imported into `particles.py` L22, but it is never referenced anywhere in the file. Neither `emit_soul_surge` (L134–147) nor `emit_overdrive` (L149–160) uses it — each function hardcodes its count via the specific `SOUL_SURGE_PARTICLE_COUNT` and `OVERDRIVE_PARTICLE_COUNT` constants instead. The import is a dead reference and the constant itself is orphaned.
+
+This is not a crash bug, but it is a HK-feel gap by proxy: the constant name suggests there should be a unified ability activation emission path. Currently there is no single emit function that produces a generic "ability fired" burst — each ability has its own emitter. If a future ability (e.g., a dash or secondary) needs particles, a developer will duplicate the emission pattern rather than calling a shared function. In HK, spell activations share a common visual grammar (bright colour burst, brief shimmer) that reinforces the "something powerful just happened" signal regardless of spell type.
+
+**Recommended change:** Remove the dead `PARTICLE_ABILITY_COUNT` import from `particles.py` L22 and the constant from `settings.py` L292, OR give the constant a home by adding a generic `emit_ability(x, y, color)` method to `ParticleSystem` that uses it:
+
+```python
+# systems/particles.py — add alongside emit_soul_surge / emit_overdrive
+def emit_ability(self, x: float, y: float, color: tuple) -> None:
+    """Generic ability-fire burst — used when a new ability has no bespoke emitter."""
+    for _ in range(PARTICLE_ABILITY_COUNT):
+        angle = random.uniform(0.0, math.pi * 2.0)
+        speed = random.uniform(2.0, 6.0)
+        vx = math.cos(angle) * speed
+        vy = math.sin(angle) * speed
+        lt = random.randint(14, 24)
+        size = random.randint(2, 4)
+        self._particles.append(
+            Particle(x, y, vx, vy, color, lt, size, gravity=False))
+```
+
+If the constant is removed instead, also remove `PARTICLE_ABILITY_COUNT = 8` from `settings.py` L292 and `PARTICLE_DUST_COLOR = LANDING_PARTICLE_COLOR` from `settings.py` L293 (which is also never referenced in `particles.py`).
+
+---
+
+### 2. `emit_landing` Lifetime Is Shorter Than Expected — Dust Disappears Too Quickly
+
+**File:** `systems/particles.py` L129; `settings.py` L287–288.
+
+```python
+# particles.py L129
+lt = random.randint(8, 14)
+```
+
+Landing dust particles have a lifetime of 8–14 frames. At 60 FPS this is 133–233 ms. The constant `LANDING_PARTICLE_COUNT = 4` (settings.py L287) produces four dust puffs, each one vanishing in under a quarter-second. In HK, landing dust (from the Knight dropping any significant height) persists for approximately 18–24 frames — long enough to be seen in peripheral vision while the player immediately begins moving. At 8–14 frames the dust evaporates before the player's eye can register it, especially since gameplay resumes at the same instant.
+
+The spec at ROADMAP L1381 says landing particles should "drift outward, fade alpha" — the current implementation satisfies the geometry (left/right split, slight upward initial vy) but the lifetime is roughly half what is needed to be felt. Note that `LANDING_PARTICLE_COUNT = 4` was already at the minimum spec value (ROADMAP L1381: "4 dust particles"); with only 4 particles and a sub-14-frame lifetime the effect is barely perceptible on a running player.
+
+**Recommended changes:**
+
+```python
+# settings.py
+LANDING_PARTICLE_COUNT = 6      # was 4 — minimum 6 particles for visible dust at sprite scale
+```
+
+```python
+# systems/particles.py L129 — change lifetime range
+lt = random.randint(16, 22)     # was random.randint(8, 14) — 0.27–0.37 s; matches HK dust
+```
+
+The `lt` range in `emit_landing` is hardcoded rather than referencing a constant. Add a `LANDING_PARTICLE_LIFE` constant to `settings.py` and use it (mirrors the pattern used by `HIT_PARTICLE_LIFE` and `DEATH_PARTICLE_LIFE`):
+
+```python
+# settings.py — add alongside other particle constants (around L288)
+LANDING_PARTICLE_LIFE = 20   # NEW — frames; hardcoded 8–14 in particles.py emit_landing
+```
+
+---
+
+### 3. Player Death Particles Use a Generic Red Burst, Not Faction Color
+
+**File:** `scenes/gameplay.py` L901–907.
+
+```python
+# gameplay.py L901–907
+particles.emit(
+    self.player.rect.centerx,
+    self.player.rect.centery,
+    count=DEATH_PARTICLE_COUNT // 2,
+    speed=3.0,
+    color=RED,
+    life=25,
+    spread=360,
+)
+```
+
+When the player dies, the death burst emits `DEATH_PARTICLE_COUNT // 2 = 7` particles in plain `RED` (imported from settings as `(200, 20, 20)`). The faction-specific death text is applied at `gameplay.py` L1237–1247 (purple for Marked, orange for Fleshforged), but the particle color ignores faction entirely. In HK, the Knight's death is a single coherent visual moment — the shade burst, screen overlay, and text all share a palette. The current implementation has the faction-colored text floating above a faction-neutral red particle cloud, which dilutes the faction identity signal precisely at the most emotionally loaded moment in a run.
+
+This is the counterpart to the death text being faction-specific: both elements should share the palette.
+
+**Recommended change:** In `gameplay.py` `_draw_death` handler (or `update()` at the death particle emit site, L901–907), replace the hardcoded `RED` with a faction-resolved color:
+
+```python
+# gameplay.py around L901 — replace color=RED with:
+_faction = getattr(self.game, "player_faction", None)
+_death_color = (180, 140, 220) if _faction == FACTION_MARKED else \
+               (220, 160, 80)  if _faction == FACTION_FLESHFORGED else RED
+particles.emit(
+    self.player.rect.centerx, self.player.rect.centery,
+    count=DEATH_PARTICLE_COUNT // 2,
+    speed=3.0,
+    color=_death_color,
+    life=25,
+    spread=360,
+)
+```
+
+The color values `(180, 140, 220)` and `(220, 160, 80)` already match the death text colors at `gameplay.py` L1241, L1244. No new constants needed; the death text color values could alternatively be extracted to `settings.py` as `DEATH_TEXT_COLOR_MARKED` and `DEATH_TEXT_COLOR_FLESHFORGED` for DRY compliance, but that is a build-agent concern — the color match is the HK-feel fix.
+
+---
+
+### 4. Hurt State in `_update_animation` Flickers Rapidly — Jarring Under P4-6 Sprites
+
+**File:** `entities/player.py` L370–371; `systems/animation.py` L30.
+
+```python
+# player.py L370–371
+elif self.iframes > 0 and self.iframes % 6 < 3:
+    self._anim.set_state("hurt")
+```
+
+```python
+# animation.py L30
+"hurt": 6,  # frames per animation tick in _STATE_FPS
+```
+
+With `PLAYER_IFRAMES = 45` (settings.py L73), the `iframes % 6 < 3` condition toggles the "hurt" state on for 3 frames and off for 3 frames, cycling 7–8 times over the full 45-frame iframe window. Each time the condition is False the state machine falls through to whichever state applies (walk, jump, idle, attack), then returns to "hurt" 3 frames later. This means `AnimationController.set_state()` is called with alternating `"hurt"` → `"walk/idle"` → `"hurt"` → ... on every 3rd frame.
+
+Using colored-rect placeholder frames (the current default), this flicker is readable because the draw method (`player.py` L405–407) independently draws a white outline during iframes — the visual cue is the outline, not the animation state. Under real PNG sprites (P4-6/P5-1), however, each `set_state` call that differs from the previous resets `_frame_idx` to 0 (`animation.py` L129–131):
+
+```python
+if name != self.state:
+    self.state      = name
+    self._frame_idx = 0
+    self._tick      = 0
+```
+
+The animation state machine will restart from frame 0 of the idle/walk/attack sprite, then snap back to frame 0 of the hurt sprite 3 frames later, repeatedly. Under real sprites this will produce a jarring seizure of conflicting animation frames for the full 45-frame iframe window — exactly the opposite of HK's iframe flash, which is a smooth blink on a held pose.
+
+HK's iframe flash is a draw-layer effect (the Knight flashes transparent/opaque) applied to the current animation state, not an animation state switch. The "hurt" animation in HK plays once on the first hit, then the Knight returns to the locomotion state while blinking.
+
+**Recommended change:** Remove the iframe-based `set_state("hurt")` from `_update_animation` and keep "hurt" as a one-shot transition that plays once on the first frame of iframe, then returns to locomotion state. The iframe blink should be handled purely in `draw()` via the existing outline logic.
+
+The minimal fix is to change the condition from a frame-mod flicker to a one-shot trigger: only set "hurt" on the first frame of iframe (when iframes transitions from 0 to a positive value), then let the state resolve normally afterward. The existing iframe outline in `draw()` (L405–407) already handles the visual blink without any animation state switch.
+
+```python
+# entities/player.py _update_animation — replace the hurt branch:
+# BEFORE:
+elif self.iframes > 0 and self.iframes % 6 < 3:
+    self._anim.set_state("hurt")
+# AFTER (one-shot transition only):
+elif self.iframes == PLAYER_IFRAMES:   # first frame of iframe window only
+    self._anim.set_state("hurt")
+```
+
+This plays the hurt animation once (it will run through its 3 frames × 6 ticks = 18 frames of animation), then the state machine falls through to normal locomotion while the outline blink continues independently. Under placeholder rects the behavior is visually identical to today; under real sprites the hurt clip plays once cleanly.
+
+Note: `PLAYER_IFRAMES` must be imported in `player.py` for this comparison — it is already imported at L26.
+
+---
+
+### 5. Enemy Animation State Machine Is Missing `fall` and `jump` States
+
+**File:** `entities/enemy.py` L86–94.
+
+```python
+# enemy.py L86–94
+if self.iframes > 0:
+    self._anim.set_state("hurt")
+elif self._state == _ATTACK:
+    self._anim.set_state("attack")
+elif abs(self.vx) > 0.1:
+    self._anim.set_state("walk")
+else:
+    self._anim.set_state("idle")
+```
+
+The enemy animation controller has `jump` and `fall` states loaded (`animation.py` L35–37, `_STATE_FRAMES` dict), but the enemy state selector never drives them. Any enemy that is airborne (launched by knockback, walking off a ledge, or a Jumper entity mid-hop) will display the `walk` or `idle` sprite while visibly not touching the ground. In HK, every airborne entity uses its airborne animation — the visual mismatch between physics state (falling) and animation state (walking) is a polish gap that becomes visible as soon as real sprites land in `assets/sprites/enemy/`.
+
+Jumper (`entities/jumper.py`) is the most egregious case: it deliberately launches into the air on every hop, but the animation state machine will show `walk` or `idle` for the entire arc.
+
+**Recommended change:** Add `vy` inspection to the enemy animation selector, matching the logic in `player.py` L374–377:
+
+```python
+# entities/enemy.py — replace the animation block (L86–94):
+if self.iframes > 0:
+    self._anim.set_state("hurt")
+elif self._state == _ATTACK:
+    self._anim.set_state("attack")
+elif not self.on_ground and self.vy < -1.0:
+    self._anim.set_state("jump")
+elif not self.on_ground and self.vy > 1.0:
+    self._anim.set_state("fall")
+elif abs(self.vx) > 0.1:
+    self._anim.set_state("walk")
+else:
+    self._anim.set_state("idle")
+```
+
+The `vy` threshold of `±1.0` (vs. the player's `vy < 0` / `vy > 0`) avoids flickering on shallow bounces where `vy` hovers near zero at the apex of a short hop. Subclasses (Jumper, Boss) inherit this fix immediately since they call `super().update()` which runs this block.
+
+---
+
+### 6. Tile Sprite Coverage Stops at Level 5 — Levels 6–10 Have No Tile Sheet Mapping
+
+**File:** `world/tilemap.py` L47–55.
+
+```python
+# tilemap.py L47–55
+def _tile_sheet_for_level(level_name: str) -> pygame.Surface | None:
+    if level_name in ("level_1", "level_2"):
+        return _load_tile_sprite(TILE_SHEET_LEVEL_1_2)
+    if level_name in ("level_3", "level_4"):
+        return _load_tile_sprite(TILE_SHEET_LEVEL_3_4)
+    if level_name == "level_5":
+        return _load_tile_sprite(TILE_SHEET_LEVEL_5)
+    return None   # levels 6–10 always fall back to colored rects
+```
+
+The three tile sheet constants (`TILE_SHEET_LEVEL_1_2`, `TILE_SHEET_LEVEL_3_4`, `TILE_SHEET_LEVEL_5`) only cover levels 1–5. Levels 6–10 unconditionally return `None`, meaning even when tile art assets are delivered they will render as colored rects in the faction branches and boss levels. LEVEL_5 (`"V — The Sanctum"`) uses `sanctum.ogg` — a dedicated biome — but LEVEL_6 through LEVEL_10 have no corresponding tile sheet path defined in `settings.py`.
+
+HK assigns distinct visual palettes to each major biome region. The faction branches (levels 6–8) and the final levels (9–10) are the most tonally distinct sections of the game and are precisely the sections that need separate tile palettes.
+
+**Recommended change:** Add three more tile sheet constants to `settings.py` and extend `_tile_sheet_for_level` to cover the full level range:
+
+```python
+# settings.py — add after TILE_SHEET_LEVEL_5 (L324)
+TILE_SHEET_LEVEL_6_MARKED      = "assets/tiles/ink_labyrinth.png"
+TILE_SHEET_LEVEL_6_FLESHFORGED = "assets/tiles/steam_tunnels.png"
+TILE_SHEET_LEVEL_9_10          = "assets/tiles/convergence.png"
+```
+
+```python
+# world/tilemap.py _tile_sheet_for_level — extend:
+if level_name in ("level_6_marked", "level_7_marked", "level_8_marked"):
+    return _load_tile_sprite(TILE_SHEET_LEVEL_6_MARKED)
+if level_name in ("level_6_fleshforged", "level_7_fleshforged", "level_8_fleshforged"):
+    return _load_tile_sprite(TILE_SHEET_LEVEL_6_FLESHFORGED)
+if level_name in ("level_9", "level_10"):
+    return _load_tile_sprite(TILE_SHEET_LEVEL_9_10)
+```
+
+This change is a `tilemap.py`-only expansion of existing pattern code (no logic change); it adds six new path constants to `settings.py` and three branches to a pure-lookup function.
+
+---
+
+### 7. Audio — No `SOUND_ENEMY_DEATH` SFX Call Site
+
+**File:** `scenes/gameplay.py` L783–787.
+
+```python
+# gameplay.py L783–787
+newly_dead = [e for e in self.enemies if not e.alive]
+for dead_e in newly_dead:
+    particles.emit_death(dead_e.rect.centerx, dead_e.rect.centery,
+                         dead_e.color)
+    for drop in dead_e.get_drop_fragments():
+        ...
+```
+
+Enemy death emits a particle burst (correct) but plays no SFX. The audio system has `SOUND_DEATH = "assets/sounds/death.wav"` wired to the player death event (`gameplay.py` L909), but there is no dedicated enemy-death sound. In HK, each enemy type has a death chirp or crumble sound that closes the engagement — it provides the auditory punctuation for a kill. Without it, kills are silent beyond the hit-stop white flash.
+
+The existing `SOUND_HIT` plays on every confirmed hit (via `combat.py` L76), which provides partial feedback, but a kill with no distinct sound leaves the player uncertain whether the enemy is dead or just in hit-stun.
+
+**Recommended change:** Add `SOUND_ENEMY_DEATH` to `settings.py` and wire it at the enemy-death emit site in `gameplay.py`:
+
+```python
+# settings.py — add alongside other SOUND_ constants (around L307)
+SOUND_ENEMY_DEATH = "assets/sounds/enemy_death.wav"
+```
+
+```python
+# systems/audio.py _SFX_KEYS dict — add entry:
+"enemy_death": SOUND_ENEMY_DEATH,
+```
+
+```python
+# scenes/gameplay.py L786 — add SFX call in the newly-dead loop:
+for dead_e in newly_dead:
+    particles.emit_death(dead_e.rect.centerx, dead_e.rect.centery,
+                         dead_e.color)
+    audio.play_sfx("enemy_death")   # ADD THIS LINE
+    for drop in dead_e.get_drop_fragments():
+        ...
+```
+
+The `audio.py` `play_sfx` is no-op when the file is absent, so this is safe to add before the sound asset exists.
+
+---
+
+### 8. Settings Screen — No Audio Preview on Volume Change
+
+**File:** `scenes/settings.py` L79–89.
+
+```python
+# settings.py scene L75–89
+def _adjust(self, delta: float) -> None:
+    if self._sel == 0:
+        ...
+        self.game.audio.set_music_volume(self._music_vol)
+        self.game.save_data["music_vol"] = self._music_vol
+    elif self._sel == 1:
+        ...
+        self.game.audio.set_sfx_volume(self._sfx_vol)
+        self.game.save_data["sfx_vol"] = self._sfx_vol
+```
+
+Adjusting SFX Volume changes the volume but does not play a test sound, so the player has no immediate auditory feedback confirming the new level. In HK's settings, adjusting SFX volume plays a brief tick or whoosh at the new level so the player can hear the change in real time. The current implementation applies the volume change silently — the player must exit settings and re-enter gameplay to hear the effect.
+
+**Recommended change:** After `self.game.audio.set_sfx_volume(self._sfx_vol)` in `_adjust`, call `self.game.audio.play_sfx("hit")` (or another short SFX) as an immediate preview:
+
+```python
+# scenes/settings.py L84 — add preview call after volume set:
+self.game.audio.set_sfx_volume(self._sfx_vol)
+self.game.audio.play_sfx("hit")   # preview the new SFX volume immediately
+self.game.save_data["sfx_vol"] = self._sfx_vol
+```
+
+No new constants needed; `SOUND_HIT` is already defined and loaded.
+
+---
+
+### 9. Lore Item Display — Auto-Dismiss Timer Still Active; Player-Dismiss Still Absent (P3 Deferred, Re-Flagged)
+
+**File:** `scenes/gameplay.py` L715–721; `settings.py` L254.
+
+The Phase 3 review (2026-04-25, item 2) recommended replacing the `LORE_DISPLAY_FRAMES = 300` auto-dismiss with a player-acknowledge model (SPACE/RETURN to dismiss). As of the current code:
+
+```python
+# gameplay.py L715–721
+if result:
+    self._lore_text  = result
+    self._lore_timer = LORE_DISPLAY_FRAMES   # 300 frames = 5 seconds
+...
+if self._lore_timer > 0:
+    self._lore_timer -= 1
+```
+
+The auto-dismiss is unchanged. `settings.py` L254 still reads `LORE_DISPLAY_FRAMES = 300`. There is no `_lore_waiting_dismiss` flag, no `KEYDOWN` intercept for lore text in `handle_event`, and the game logic does not pause during lore display.
+
+The Phase 3 review also recommended raising the fallback floor to `LORE_DISPLAY_FRAMES = 480` (8 s) if the timer model is kept. Neither the floor raise nor the player-dismiss model has been implemented. Since Phase 5 will add more lore discovery moments (P5-1/P5-2 will apply art assets that make lore items more visually salient, increasing discover rate), this gap becomes more urgent.
+
+**Recommended changes (same as Phase 3 review; re-citing with current line numbers):**
+
+```python
+# settings.py L254 — raise floor if timer model kept:
+LORE_DISPLAY_FRAMES = 480   # was 300 — 8 s floor; prefer player-dismiss model
+```
+
+For the player-dismiss model, add to `gameplay.py` `handle_event` (after the boss-intro intercept and before pause handling, around L440):
+
+```python
+# gameplay.py handle_event — add lore dismiss before pause handling:
+if self._lore_timer > 0 and self._lore_text:
+    if event.key in (pygame.K_SPACE, pygame.K_RETURN):
+        self._lore_timer = 0
+        self._lore_text  = ""
+        return
+```
+
+This requires no new constants and is a minimal 4-line addition.
+
+---
+
+### Summary Table (2026-05-02)
+
+| Topic | File(s) | Key Issue | Recommended Change |
+|---|---|---|---|
+| `PARTICLE_ABILITY_COUNT` dead import | `systems/particles.py` L22; `settings.py` L292 | Constant imported but never used — orphaned | Remove from both files, OR add a `emit_ability(x, y, color)` method that uses it |
+| Landing dust too brief | `systems/particles.py` L129; `settings.py` L287 | Lifetime 8–14 frames too short to register in peripheral vision | Raise to `random.randint(16, 22)`; add `LANDING_PARTICLE_LIFE = 20` constant; raise count to `LANDING_PARTICLE_COUNT = 6` |
+| Player death particles faction-neutral | `scenes/gameplay.py` L901–907 | Death burst uses hardcoded `RED` regardless of faction | Resolve death color from `player_faction`; use same colors as death text (`(180,140,220)` Marked / `(220,160,80)` Fleshforged) |
+| Hurt animation flicker | `entities/player.py` L370–371 | `iframes % 6 < 3` alternates "hurt" ↔ locomotion state 7× — will seizure under real sprites | Change to one-shot: set "hurt" only on `iframes == PLAYER_IFRAMES` (first frame); draw blink via existing outline |
+| Enemy animation missing jump/fall | `entities/enemy.py` L86–94 | Airborne enemies (esp. Jumper) always show walk/idle — visual mismatch once sprites land | Add `not self.on_ground` branches for `"jump"` / `"fall"` states, same as player logic |
+| Tile sheets stop at level 5 | `world/tilemap.py` L47–55; `settings.py` L318–324 | Levels 6–10 always return `None` from `_tile_sheet_for_level` — no art coverage for faction branches | Add `TILE_SHEET_LEVEL_6_MARKED`, `TILE_SHEET_LEVEL_6_FLESHFORGED`, `TILE_SHEET_LEVEL_9_10` constants; extend the lookup function |
+| No enemy death SFX | `scenes/gameplay.py` L783–787; `systems/audio.py` L21–29 | Enemy kills are silent — no auditory kill confirmation | Add `SOUND_ENEMY_DEATH` constant; wire `audio.play_sfx("enemy_death")` in death loop |
+| Settings screen silent volume change | `scenes/settings.py` L83–86 | Adjusting SFX volume has no auditory preview | Call `audio.play_sfx("hit")` after each SFX volume adjustment |
+| Lore display no player-dismiss (P3 deferred × 2) | `scenes/gameplay.py` L715–721; `settings.py` L254 | Auto-dismiss still active; no SPACE shortcut; timer floor still 300 | Add `KEYDOWN` intercept in `handle_event`; raise `LORE_DISPLAY_FRAMES` to `480` as fallback |
