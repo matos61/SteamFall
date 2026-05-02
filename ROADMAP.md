@@ -1570,15 +1570,22 @@ Art assets were delivered in `Delivery/` on 2026-05-01. The sprite loading infra
 
 **Priority order for build-agent** (tackle in this order):
 
-1. **P5-0b (pre-phase review)** — review-agent and hk-agent review Phase 4 code; update REVIEW_BUGS.md and REVIEW_HK.md.
+1. **P5-0b (pre-phase review)** ⏳ IN PROGRESS (2026-05-02) — review-agent and hk-agent passes in flight.
 2. **P5-1 (sprite sheet integration)** — extend `animation.py` to support sprite-sheet PNGs; create `assets/sprites/player/` and `assets/sprites/enemy/` from `Delivery/AnimationSheets/Warrior/` and `Delivery/AnimationSheets/Antraxis/`.
 3. **P5-2 (tile asset integration)** — create `assets/tiles/` directory and populate `outer_district.png`, `foundry.png`, `sanctum.png` from `Delivery/Tiles/`.
 4. **P5-3 (tutorial replacement)** — apply `Delivery/replacements/tutorial_minigame.py` → `systems/tutorial_minigame.py`.
 5. **P5-4 (dead code cleanup)** — delete `game/story.py` (FLAG-010).
 
+_Orchestrator pre-check 2026-05-02:_
+- `assets/sprites/` and `assets/tiles/` do not yet exist — P5-1 and P5-2 unblocked once P5-0b is done.
+- `animation.py` has per-frame PNG subdirectory support (`sprite_dir`) but **lacks** sprite-sheet (`Side_{state}.png`) loading — P5-1 requires the sprite-sheet branch in `_make_frames()`.
+- `Delivery/replacements/tutorial_minigame.py` differs from live file: replacement fixes the tutorial attack hitbox to respect left-facing direction (was always hitting right). P5-3 **must** be applied.
+- `game/story.py` confirmed dead (15-line stub, never imported). P5-4 safe to execute any time.
+- P5-2, P5-3, P5-4 may run in parallel with P5-0b review (no .py file conflicts). P5-1 blocked until P5-0b complete.
+
 ---
 
-### Task P5-0b: Pre-Phase Review
+### Task P5-0b: Pre-Phase Review ⏳ IN PROGRESS (2026-05-02)
 
 _Run review-agent and hk-agent over all Phase 4 .py files to catch any issues before asset work begins. Update REVIEW_BUGS.md (tick stale FLAG-013 checkboxes; add any new bugs). Update REVIEW_HK.md with Phase 5 feel analysis._
 
