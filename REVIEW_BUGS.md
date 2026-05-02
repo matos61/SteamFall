@@ -541,14 +541,14 @@ No blocking issues found.
 
 ---
 
-- [ ] **BUG-032: `_apply_upgrade_to_player` "dmg" stack-cap check uses `>` instead of `>=` — one extra "dmg" stack beyond UPGRADE_DMG_MAX_STACKS is always allowed**
+- [x] **BUG-032: `_apply_upgrade_to_player` "dmg" stack-cap check uses `>` instead of `>=` — one extra "dmg" stack beyond UPGRADE_DMG_MAX_STACKS is always allowed**
   - **File:** `scenes/gameplay.py`, line 173
   - **Problem:** The guard is `if existing > UPGRADE_DMG_MAX_STACKS: return`. `UPGRADE_DMG_MAX_STACKS = 3`. If the player already has 3 `"dmg"` entries in `save_data["upgrades"]`, `existing == 3` and `3 > 3` is `False`, so the return is NOT taken and a 4th stack is applied. The effective cap is therefore 4 stacks, not 3. The same off-by-one exists in `_confirm_upgrade` at line 1437 (`if existing >= UPGRADE_DMG_MAX_STACKS`) — that site uses `>=` which IS correct. The two sites are inconsistent, so `_apply_upgrade_to_player` (called on level load to replay saved upgrades) permits one extra stack compared to the interactive selection gate.
   - **Minimal fix:** Change line 173 to `if existing >= UPGRADE_DMG_MAX_STACKS: return` so both call sites enforce the same cap.
 
 ---
 
-- [ ] **BUG-033: `LoreItem.collect()` sets `self.alive = False` even when the lore item was already in `save_data["lore_found"]` — the item disappears silently without returning text, but `alive` is still set False in both branches**
+- [x] **BUG-033: `LoreItem.collect()` sets `self.alive = False` even when the lore item was already in `save_data["lore_found"]` — the item disappears silently without returning text, but `alive` is still set False in both branches**
   - **File:** `systems/collectible.py`, lines 256–265
   - **Problem:**
     ```python
@@ -567,14 +567,14 @@ No blocking issues found.
 
 ---
 
-- [ ] **BUG-034: `Checkpoint._activate` overwrites `save_data["faction"]` with `game.player_faction` every activation — if the player triggers a checkpoint before `game.player_faction` is set (e.g., via a Continue load that skips FactionSelectScene), faction is written as `None`**
+- [x] **BUG-034: `Checkpoint._activate` overwrites `save_data["faction"]` with `game.player_faction` every activation — if the player triggers a checkpoint before `game.player_faction` is set (e.g., via a Continue load that skips FactionSelectScene), faction is written as `None`**
   - **File:** `systems/checkpoint.py`, line 55
   - **Problem:** `game.save_data["faction"] = game.player_faction`. In `GameplayScene.on_enter()`, `faction = self.game.player_faction or FACTION_MARKED` is used locally but `game.player_faction` itself is not updated — it remains `None` if the player loaded via "Continue" from main menu without going through FactionSelectScene. `MainMenuScene._activate` does `self.game.player_faction = saved_faction` only if `saved_faction` is truthy (line 51). If the save file has no `"faction"` key (edge case: old save pre-Phase-3), `saved_faction` is `None`, `game.player_faction` is never assigned, and the checkpoint will write `"faction": null` to disk. The next "Continue" load will then read `null` and restore `game.player_faction = None`, causing all subsequent `player_faction or FACTION_MARKED` guards to silently default to Marked for a Fleshforged player.
   - **Minimal fix:** In `Checkpoint._activate`, write `game.save_data["faction"] = game.player_faction or game.save_data.get("faction")` so a None faction doesn't overwrite a previously valid one.
 
 ---
 
-- [ ] **BUG-035: `_draw_boss_intro` indexes `active_boss._intro_lines` using `self._boss_dialogue._index`, but the Warden's `_WARDEN_INTRO_LINES` has 6 tuples while `Boss._intro_lines` has 3 strings — the banner shows a line from `_intro_lines` that is 2 positions behind the DialogueBox, and crashes with `IndexError` when `_boss_dialogue._index` reaches 3, 4, or 5**
+- [x] **BUG-035: `_draw_boss_intro` indexes `active_boss._intro_lines` using `self._boss_dialogue._index`, but the Warden's `_WARDEN_INTRO_LINES` has 6 tuples while `Boss._intro_lines` has 3 strings — the banner shows a line from `_intro_lines` that is 2 positions behind the DialogueBox, and crashes with `IndexError` when `_boss_dialogue._index` reaches 3, 4, or 5**
   - **File:** `scenes/gameplay.py`, lines 1299–1321
   - **Problem:**
     ```python
@@ -589,7 +589,7 @@ No blocking issues found.
 
 ---
 
-- [ ] **BUG-036: `gameplay.py` player death at line 851 still increments `_death_timer` and eventually calls `change_scene` even when the Architect defeat dialogue is in progress — ending is cut short if the player dies during or just after the Architect fight**
+- [x] **BUG-036: `gameplay.py` player death at line 851 still increments `_death_timer` and eventually calls `change_scene` even when the Architect defeat dialogue is in progress — ending is cut short if the player dies during or just after the Architect fight**
   - **File:** `scenes/gameplay.py`, lines 779–800 and 851–861
   - **Problem:** The Architect defeat sequence sets `arch._defeat_dialogue_active = True` after `arch.alive` is False. The player is still alive at this point in the intended flow, but nothing prevents the player from being killed by a Crawler minion that was already active (Architect spawns Crawlers in Phase 4; they remain in `self.enemies` even after the Architect dies because the prune at line 770 only removes the `arch` object, not its spawned minions, and Crawlers can continue attacking). If the player takes lethal touch damage from a Crawler while `_defeat_dialogue_active` is True:
     1. `self.player.alive` becomes False.
@@ -601,21 +601,21 @@ No blocking issues found.
 
 ---
 
-- [ ] **BUG-037: `gameplay.py` level transition triggers while the Architect defeat dialogue is in progress — right-edge walk during dialogue immediately starts a transition to SCENE_MAIN_MENU**
+- [x] **BUG-037: `gameplay.py` level transition triggers while the Architect defeat dialogue is in progress — right-edge walk during dialogue immediately starts a transition to SCENE_MAIN_MENU**
   - **File:** `scenes/gameplay.py`, lines 825–848
   - **Problem:** The level-transition check (lines 827–848) runs every frame regardless of whether `_architect._defeat_dialogue_active` is True. In LEVEL_10 the level is only 65 columns wide (2080 px) and the Architect spawns near column 44 (world x ≈ 1408). The transition trigger fires when `player.rect.right >= self.tilemap.width - 64` (i.e., player reaches world x ≈ 2016). During the defeat dialogue sequence the player can still move freely (no movement lock is applied post-defeat), so they could walk to the right edge and trigger `_begin_transition(SCENE_MAIN_MENU)` before all defeat lines are shown. `_architect_victory_done` would then be False when the scene exits, so `game.save_data["victory"]` is never set.
   - **Minimal fix:** Wrap the level-transition block in a guard: `if not (self._architect and not self._architect.alive and not self._architect_victory_done):` so the transition is suppressed until the defeat sequence completes.
 
 ---
 
-- [ ] **BUG-038: `ParticleSystem.emit_death` is called from `Entity.die()` passing `self.color`, but `Architect.draw()` reassigns `self.color` each frame based on phase — the death-burst color reflects whichever phase color was set on the draw frame, not the Architect's actual death phase color, and may be stale if `draw()` hasn't been called since the last update**
+- [x] **BUG-038: `ParticleSystem.emit_death` is called from `Entity.die()` passing `self.color`, but `Architect.draw()` reassigns `self.color` each frame based on phase — the death-burst color reflects whichever phase color was set on the draw frame, not the Architect's actual death phase color, and may be stale if `draw()` hasn't been called since the last update**
   - **File:** `entities/entity.py`, line 73; `entities/architect.py`, lines 221–229
   - **Problem:** `Entity.die()` calls `particles.emit_death(self.rect.centerx, self.rect.centery, self.color)`. For most entities `self.color` is set in `__init__` and never changes, so it is always correct. For `Architect`, `self.color` is reassigned in `draw()` (not in `update()`) based on `self.phase`. The order in a frame is: `update()` → (combat / take_damage / die) → `draw()`. When `Architect.die()` is called during `update()`, `self.color` still holds the value set by the **previous** frame's `draw()` call. In most cases this is the correct phase color. However, if the Architect dies exactly on the frame it transitions to a new phase (health crosses a threshold in `update()` before `draw()` has run), `self.color` is one phase behind. This is a cosmetic-only issue: the death-burst particles use last-frame's color.
   - **Minimal fix:** Assign `self.color` at the start of `Architect.update()` (mirroring the phase computation that already happens there for `_phase4_entered`) instead of only in `draw()`, so `self.color` is always current when `die()` fires.
 
 ---
 
-- [ ] **BUG-039: `systems/minimap.py` draws enemy spawn dots using world-coordinate arithmetic that does not account for entities spawned with a Y-offset — enemy dots appear one or more tile-rows above their actual position on the minimap**
+- [x] **BUG-039: `systems/minimap.py` draws enemy spawn dots using world-coordinate arithmetic that does not account for entities spawned with a Y-offset — enemy dots appear one or more tile-rows above their actual position on the minimap**
   - **File:** `systems/minimap.py`, lines 215–220
   - **Problem:**
     ```python
@@ -628,7 +628,7 @@ No blocking issues found.
 
 ---
 
-- [ ] **BUG-040: `NPC` `draw()` culls off-screen NPCs only on the X axis — an NPC far above or below the viewport (e.g., a Y-displaced spawn) is never culled and is drawn every frame even when invisible**
+- [x] **BUG-040: `NPC` `draw()` culls off-screen NPCs only on the X axis — an NPC far above or below the viewport (e.g., a Y-displaced spawn) is never culled and is drawn every frame even when invisible**
   - **File:** `entities/npc.py`, lines 35–36
   - **Problem:**
     ```python
@@ -640,7 +640,7 @@ No blocking issues found.
 
 ---
 
-- [ ] **BUG-041: `_draw_lore_overlay` sets `alpha` to 200 (not 255) in the fully-visible window but then calls `rendered.set_alpha(alpha)` on individual line surfaces — the `bg_surf` separately uses `min(200, alpha)` as its fill alpha; the two alpha values are inconsistent, and `set_alpha` on a surface with per-pixel alpha (SRCALPHA not set) has no effect in pygame**
+- [x] **BUG-041: `_draw_lore_overlay` sets `alpha` to 200 (not 255) in the fully-visible window but then calls `rendered.set_alpha(alpha)` on individual line surfaces — the `bg_surf` separately uses `min(200, alpha)` as its fill alpha; the two alpha values are inconsistent, and `set_alpha` on a surface with per-pixel alpha (SRCALPHA not set) has no effect in pygame**
   - **File:** `scenes/gameplay.py`, lines 1372–1381
   - **Problem:**
     ```python
@@ -663,14 +663,14 @@ The following are not bugs in existing code but are pre-conditions that could ca
 
 ---
 
-- [ ] **BUG-042: `_draw_death` in `gameplay.py` does not read faction or save data for the death text — P4-2 (faction-specific death text) has no hook point; `font_death` is allocated in `on_enter` and cannot be swapped per-faction after init**
+- [x] **BUG-042: `_draw_death` in `gameplay.py` does not read faction or save data for the death text — P4-2 (faction-specific death text) has no hook point; `font_death` is allocated in `on_enter` and cannot be swapped per-faction after init**
   - **File:** `scenes/gameplay.py`, lines 1174–1186
   - **Problem:** `_draw_death` hard-codes `"you perished"` (line 1180) and `"returning..."` (line 1184) with no reference to `self.game.player_faction`. For P4-2 build-agent will need to branch on faction here. The method is straightforward to extend, but `self.font_death = pygame.font.SysFont("georgia", 52, bold=True)` is created once per `on_enter` — this is fine. The death overlay surface is also recreated each draw call via SRCALPHA (no reuse bug). No crash risk, but calling this out so build-agent knows the exact lines to edit.
   - **Note for build-agent (P4-2):** Add a branch in `_draw_death` at line 1180: choose death text string based on `self.game.player_faction`. Also add the particle emit call (P4-2 spec) using `particles.emit_death` — but guard it so it only fires on the first frame of death (e.g., `if self._death_timer == 1:`).
 
 ---
 
-- [ ] **BUG-043: `GameplayScene` pause menu option "Settings (soon)" is a non-functional stub — `_activate_pause_option` silently does nothing for it; P4-4 settings screen hook is missing**
+- [x] **BUG-043: `GameplayScene` pause menu option "Settings (soon)" is a non-functional stub — `_activate_pause_option` silently does nothing for it; P4-4 settings screen hook is missing**
   - **File:** `scenes/gameplay.py`, lines 450–457
   - **Problem:**
     ```python
@@ -684,6 +684,71 @@ The following are not bugs in existing code but are pre-conditions that could ca
     ```
     When P4-4 adds `scenes/settings.py` and registers it as `SCENE_SETTINGS`, the pause menu will need to call `self.game.change_scene(SCENE_SETTINGS)`. Currently there is no `SCENE_SETTINGS` constant in `settings.py` and no scene key in `core/game.py`'s `_build_scenes`. Build-agent must add both when implementing P4-4.
   - **Note for build-agent (P4-4):** Add `SCENE_SETTINGS = "settings"` to `settings.py`, register `SettingsScene` in `game._build_scenes`, and replace the stub comment in `_activate_pause_option` with `self.game.change_scene(SCENE_SETTINGS)`.
+
+---
+
+### FLAG-013: BUG-032 through BUG-043 checkboxes were stale — all confirmed fixed in P4-0c (2026-04-29) but `[ ]` markers were not updated
+- All twelve bugs listed above (BUG-032 through BUG-043) were resolved by build-agent as of the P4-0c sprint (completed 2026-04-29). Their `[ ]` markers were not ticked at the time of writing; this review pass (2026-05-02) updates them to `[x]`.
+- FLAG-013 resolved 2026-05-02.
+
+---
+
+# Bug Review — 2026-05-02
+
+**Scope:** Phase 4 .py files reviewed: `systems/particles.py`, `systems/audio.py`, `scenes/settings.py`, `scenes/main_menu.py`, `scenes/gameplay.py`, `scenes/marked_ending.py`, `scenes/fleshforged_ending.py`, `entities/player.py`, `entities/enemy.py`, `entities/shield_guard.py`, `entities/ranged.py`, `entities/jumper.py`, `entities/crawler.py`, `entities/boss.py`, `entities/architect.py`, `entities/npc.py`, `systems/animation.py`, `world/tilemap.py`, `core/game.py`, `main.py`. All .py files re-read before writing this section.
+
+---
+
+## New Bugs
+
+---
+
+- [ ] **BUG-044: `gameplay.py` BUG-036 invincibility fix uses wrong attribute name `_iframes` instead of `iframes` — the player receives no actual invincibility during the Architect defeat sequence**
+  - **File:** `scenes/gameplay.py`, line 821
+  - **Problem:** The BUG-036 fix adds `self.player._iframes = 9999` to grant the player invincibility while the Architect defeat dialogue plays (so surviving Crawlers cannot kill the player). However, `Entity` stores invincibility as `self.iframes` (no leading underscore — see `entities/entity.py` lines 40, 63, 87). Setting `self.player._iframes = 9999` creates a new dead attribute that is never read by `Entity.update()`, `Entity.take_damage()`, or any other method. The actual `self.player.iframes` counter remains unchanged (typically 0), so the player is fully vulnerable during the defeat cutscene. A surviving Crawler minion can kill the player, triggering the normal death sequence and discarding the Architect victory state (same symptom as the original BUG-036).
+  - **Minimal fix:** Change line 821 from `self.player._iframes = 9999` to `self.player.iframes = 9999`.
+
+---
+
+- [ ] **BUG-045: `scenes/main_menu.py` parallax second-copy draw offset is `SCREEN_WIDTH * 2` too large — wrapped ghost copies of shapes land far off-screen instead of at the visible right seam**
+  - **File:** `scenes/main_menu.py`, lines 129–130
+  - **Problem:**
+    ```python
+    if sx + sw > SCREEN_WIDTH:
+        pygame.draw.rect(surface, color,
+                         (int(sx) - SCREEN_WIDTH * 2, sy, sw, sh))
+    ```
+    Shapes are initialized with `x` in `[0, SCREEN_WIDTH * 2]` and scroll left, wrapping when `shape[0] + shape[2] < 0`. The second draw condition is intended to render the "leading edge" of a shape that straddles the right boundary of the screen. For that to be visible at the right edge, the copy should be drawn at `int(sx) - SCREEN_WIDTH` (one screen width to the left of the original), not `int(sx) - SCREEN_WIDTH * 2`. With the current formula, a shape at `sx = 2400` (near the wrap point) renders its ghost at `2400 - 2560 = -160` px, which clips to a thin sliver at the left edge instead of appearing near the right edge. Shapes with `SCREEN_WIDTH <= sx < SCREEN_WIDTH * 2 - sw` satisfy the second condition but produce ghost draws entirely off the left side of the screen (large negative x). The parallax wrap seam is therefore invisible — the background appears to pop rather than scroll smoothly onto the screen from the right.
+  - **Minimal fix:** Change `SCREEN_WIDTH * 2` to `SCREEN_WIDTH` in the second draw call: `(int(sx) - SCREEN_WIDTH, sy, sw, sh)`.
+
+---
+
+- [ ] **BUG-046: `gameplay.py` LEVEL_10 right-edge check grants victory and transitions to `SCENE_MAIN_MENU` even when the Architect is still alive — walking to the right wall bypasses the final boss**
+  - **File:** `scenes/gameplay.py`, lines 871–893
+  - **Problem:**
+    ```python
+    if (self.player.alive and self.player.rect.right >= self.tilemap.width - 64
+            and not self._architect_victory_done):
+        if next_level:
+            ...
+        elif self._level_name == "level_10":
+            self.game.save_data["victory"] = True
+            self.game.save_to_disk()
+            self._begin_transition(SCENE_MAIN_MENU)
+            return
+    ```
+    The outer guard `not self._architect_victory_done` is True whenever the Architect has not yet been killed (it starts False and is only set True inside the defeat dialogue block). `next_level` for `"level_10"` is `None` (not in `_LEVEL_CHAIN`), so the `elif self._level_name == "level_10"` branch is always taken when the player reaches the right edge. Combined, this means any living player who walks to the rightmost wall of LEVEL_10 (`player.rect.right >= tilemap.width - 64 = 2016`) triggers a free victory write and transitions directly to SCENE_MAIN_MENU, completely bypassing the Architect boss fight. In LEVEL_10, the solid floor tiles at rows 11–12 extend to `x = 2048` (tile column 64), which is `>= 2016`, so simply walking to the right wall achieves this.
+  - **Minimal fix:** Add a check that the Architect is defeated before allowing the LEVEL_10 right-edge win:
+    ```python
+    elif self._level_name == "level_10":
+        if self._architect and self._architect.alive:
+            pass   # boss still alive; block the exit
+        else:
+            self.game.save_data["victory"] = True
+            self.game.save_to_disk()
+            self._begin_transition(SCENE_MAIN_MENU)
+            return
+    ```
 
 ---
 

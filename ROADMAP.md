@@ -1570,7 +1570,8 @@ Art assets were delivered in `Delivery/` on 2026-05-01. The sprite loading infra
 
 **Priority order for build-agent** (tackle in this order):
 
-1. **P5-0b (pre-phase review)** ⏳ IN PROGRESS (2026-05-02) — review-agent and hk-agent passes in flight.
+1. ~~**P5-0b (pre-phase review)**~~ ✅ **DONE (2026-05-02)** — review-agent ticked BUG-032–041; found BUG-044/045/046. hk-agent found HK-P5-A through HK-P5-I.
+1a. **P5-0c (critical bug-fix sprint)** — fix BUG-044 (wrong `_iframes` attr) and BUG-046 (Architect bypass) before P5-1. BUG-045 cosmetic, fold in if trivial.
 2. **P5-1 (sprite sheet integration)** — extend `animation.py` to support sprite-sheet PNGs; create `assets/sprites/player/` and `assets/sprites/enemy/` from `Delivery/AnimationSheets/Warrior/` and `Delivery/AnimationSheets/Antraxis/`.
 3. ~~**P5-2 (tile asset integration)**~~ ✅ **DONE (2026-05-02)** — `assets/tiles/` created; `outer_district.png`, `foundry.png`, `sanctum.png` copied from `Delivery/Tiles/`. `assets/sprites/` directory also created (empty stub for P5-1).
 4. ~~**P5-3 (tutorial replacement)**~~ ✅ **DONE (2026-05-02)** — `Delivery/replacements/tutorial_minigame.py` applied; fixes tutorial attack hitbox to respect left-facing direction.
@@ -1585,7 +1586,9 @@ _Orchestrator pre-check 2026-05-02:_
 
 ---
 
-### Task P5-0b: Pre-Phase Review ⏳ IN PROGRESS (2026-05-02)
+### Task P5-0b: Pre-Phase Review ✅ DONE (2026-05-02)
+
+**What was found:** BUG-032–041 checkboxes ticked (FLAG-013 resolved). New bugs BUG-044 (🔴), BUG-045 (⚠️), BUG-046 (🔴) documented in REVIEW_BUGS.md. hk-agent identified 9 feel gaps (HK-P5-A through HK-P5-I) in REVIEW_HK.md.
 
 _Run review-agent and hk-agent over all Phase 4 .py files to catch any issues before asset work begins. Update REVIEW_BUGS.md (tick stale FLAG-013 checkboxes; add any new bugs). Update REVIEW_HK.md with Phase 5 feel analysis._
 
@@ -1596,9 +1599,43 @@ _Run review-agent and hk-agent over all Phase 4 .py files to catch any issues be
 
 ---
 
+### Task P5-0c: Critical Bug-Fix Sprint (Phase 5 pre-start)
+
+_Unblocked by P5-0b completion. BUG-044 and BUG-046 are 🔴 critical and must be fixed before P5-1. BUG-045 is cosmetic — fold into the same commit._
+
+**Files to touch:**
+- `scenes/gameplay.py` (BUG-044, BUG-046)
+- `scenes/main_menu.py` (BUG-045)
+
+**Fixes required:**
+
+- 🔴 **BUG-044** `gameplay.py` line ~821: Change `self.player._iframes = 9999` to `self.player.iframes = 9999`. The BUG-036 fix used a leading underscore which creates a dead attribute; `Entity.take_damage()` reads `self.iframes` (no underscore). Player is currently fully vulnerable during the Architect defeat dialogue.
+
+- 🔴 **BUG-046** `gameplay.py` lines ~871–893: The LEVEL_10 right-edge win condition fires even when the Architect is still alive, allowing the boss fight to be bypassed. Add a guard:
+  ```python
+  elif self._level_name == "level_10":
+      if self._architect and self._architect.alive:
+          pass   # block exit until boss is dead
+      else:
+          self.game.save_data["victory"] = True
+          self.game.save_to_disk()
+          self._begin_transition(SCENE_MAIN_MENU)
+          return
+  ```
+
+- ⚠️ **BUG-045** `main_menu.py` lines ~129–130: Parallax ghost-copy offset is `SCREEN_WIDTH * 2` — should be `SCREEN_WIDTH`. Change the second draw call from `(int(sx) - SCREEN_WIDTH * 2, sy, sw, sh)` to `(int(sx) - SCREEN_WIDTH, sy, sw, sh)`.
+
+**Acceptance criteria — done when:**
+- Player is invincible (no damage taken) during the Architect defeat dialogue.
+- Walking to the right wall of LEVEL_10 while Architect is alive does not grant victory or trigger a scene change.
+- Parallax background scrolls smoothly with no pop seam on the right edge.
+- `python main.py` launches without ImportError.
+
+---
+
 ### Task P5-1: Sprite Sheet Integration
 
-_Blocked until P5-0b complete. Also requires two animation code fixes (HK-P5-D, HK-P5-E) before sprites land — fold into same commit._
+_Blocked until P5-0c complete. Also requires two animation code fixes (HK-P5-D, HK-P5-E) before sprites land — fold into same commit._
 
 **Files to touch:**
 - `systems/animation.py` (extend `_make_frames` to handle sprite sheets)
@@ -1828,7 +1865,15 @@ _hk-agent 2026-04-29 Phase 4 feel pass (see `REVIEW_HK.md` for full analysis):_
 
 47. ✅ **FLAG-012: `scenes/cutscene_scene.py` is dead code** — File was removed (confirmed absent from `scenes/` directory as of 2026-05-01 orchestrator check). No further action required.
 
-48. ⚠️ **FLAG-013: `REVIEW_BUGS.md` BUG-032–041 checkboxes are stale** — all ten bugs were confirmed fixed in code as of P4-0c (2026-04-29), but the `[ ]` markers in `REVIEW_BUGS.md` have not been ticked. Review-agent should update those checkboxes in its next session to keep the document accurate.
+48. ✅ **FLAG-013: `REVIEW_BUGS.md` BUG-032–041 checkboxes are stale** — resolved 2026-05-02. All 10 checkboxes ticked by review-agent P5-0b pass.
+
+_Review-agent 2026-05-02 pass (P5-0b):_
+
+49. 🔴 **BUG-044** `gameplay.py` line ~821: BUG-036 invincibility fix uses `self.player._iframes = 9999` (dead attribute — `Entity` stores it as `self.iframes` with no underscore). Player is fully vulnerable during Architect defeat dialogue; Crawler minions can still kill and discard the victory state. Fix: change to `self.player.iframes = 9999`. Assign to build-agent in P5-0c.
+
+50. ⚠️ **BUG-045** `scenes/main_menu.py` lines ~129–130: Parallax second-copy ghost draw uses `int(sx) - SCREEN_WIDTH * 2` offset — should be `int(sx) - SCREEN_WIDTH`. With `*2`, ghost shapes land far off-screen and the right-edge seam pops instead of scrolling smoothly. Cosmetic. Fix: change `SCREEN_WIDTH * 2` to `SCREEN_WIDTH` in the second draw call. Assign to build-agent in P5-0c.
+
+51. 🔴 **BUG-046** `gameplay.py` lines ~871–893: LEVEL_10 right-edge exit check fires while the Architect is still alive — any player who walks to the rightmost wall bypasses the boss fight, writes `save_data["victory"] = True`, and transitions to SCENE_MAIN_MENU. The `not self._architect_victory_done` guard is True (not done) at this point, so it doesn't protect against early exit. Fix: add `if self._architect and self._architect.alive: pass` guard before writing victory. Assign to build-agent in P5-0c. — all ten bugs were confirmed fixed in code as of P4-0c (2026-04-29), but the `[ ]` markers in `REVIEW_BUGS.md` have not been ticked. Review-agent should update those checkboxes in its next session to keep the document accurate.
 
 ---
 
