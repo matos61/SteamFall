@@ -127,7 +127,7 @@ class MainMenuScene(BaseScene):
                     pygame.draw.rect(surface, color, (int(sx), sy, sw, sh))
                 if sx + sw > SCREEN_WIDTH:
                     pygame.draw.rect(surface, color,
-                                     (int(sx) - SCREEN_WIDTH * 2, sy, sw, sh))
+                                     (int(sx) - SCREEN_WIDTH, sy, sw, sh))
 
         cx = SCREEN_WIDTH // 2
 

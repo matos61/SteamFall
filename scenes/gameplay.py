@@ -818,7 +818,7 @@ class GameplayScene(BaseScene):
                 # surviving Crawler minions cannot kill the player during the cutscene.
                 if not self._architect_defeat_started:
                     self._architect_defeat_started = True
-                    self.player._iframes = 9999
+                    self.player.iframes = 9999
                 if arch._defeat_line_idx < len(arch._defeat_lines):
                     self._architect_defeat_timer += 1
                     if self._architect_defeat_timer >= 120:
@@ -886,11 +886,14 @@ class GameplayScene(BaseScene):
                     self._begin_transition(SCENE_GAMEPLAY, level=next_level)
                 return
             elif self._level_name == "level_10":
-                # Architect defeated / level 10 right-edge reached: Victory!
-                self.game.save_data["victory"] = True
-                self.game.save_to_disk()
-                self._begin_transition(SCENE_MAIN_MENU)
-                return
+                # BUG-046: block exit until the Architect boss is dead
+                if self._architect and self._architect.alive:
+                    pass
+                else:
+                    self.game.save_data["victory"] = True
+                    self.game.save_to_disk()
+                    self._begin_transition(SCENE_MAIN_MENU)
+                    return
 
         # --- Player death ---
         if not self.player.alive:

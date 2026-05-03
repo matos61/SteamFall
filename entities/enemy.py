@@ -87,6 +87,10 @@ class Enemy(Entity):
             self._anim.set_state("hurt")
         elif self._state == _ATTACK:
             self._anim.set_state("attack")
+        elif not self.on_ground and self.vy < 0:
+            self._anim.set_state("jump")
+        elif not self.on_ground and self.vy > 0:
+            self._anim.set_state("fall")
         elif abs(self.vx) > 0.1:
             self._anim.set_state("walk")
         else:

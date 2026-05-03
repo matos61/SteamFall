@@ -367,7 +367,7 @@ class Player(Entity):
     def _update_animation(self) -> None:
         if not self.alive:
             self._anim.set_state("death")
-        elif self.iframes > 0 and self.iframes % 6 < 3:
+        elif self.iframes == PLAYER_IFRAMES:
             self._anim.set_state("hurt")
         elif self._windup_timer > 0 or self._attack_timer > 0:
             self._anim.set_state("attack")

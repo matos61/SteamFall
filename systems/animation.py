@@ -43,18 +43,31 @@ _STATE_FRAMES = {
 }
 
 
+_SHEET_NAME_MAP: dict[str, str] = {
+    "idle":   "Idle",
+    "walk":   "Walk",
+    "attack": "Attack",
+    "death":  "Die",
+    "hurt":   "Idle",   # fall back to idle sheet
+    "jump":   "Walk",   # fall back to walk sheet
+    "fall":   "Walk",   # fall back to walk sheet
+}
+
+
 def _make_frames(base_color: tuple, state: str,
                  width: int, height: int,
                  sprite_dir: str | None = None) -> list:
     """
     Build animation frames for *state*.
 
-    When *sprite_dir* is provided and `{sprite_dir}/{state}/` contains PNG
-    files, those are loaded and scaled to (width, height).  Otherwise returns
-    placeholder colored-rect surfaces.
+    Loading priority when *sprite_dir* is given:
+    1. Per-frame PNG subdirectory: `{sprite_dir}/{state}/*.png`
+    2. Horizontal sprite sheet:    `{sprite_dir}/Side_{State}.png`
+       Frames are square (frame width = sheet height); count is auto-detected.
+    3. Placeholder colored-rect fallback.
     """
-    # --- Attempt PNG load when sprite directory is provided ---
     if sprite_dir:
+        # --- Priority 1: per-frame subdirectory (P4-6) ---
         state_path = os.path.join(sprite_dir, state)
         if os.path.isdir(state_path):
             png_files = sorted(
@@ -72,7 +85,30 @@ def _make_frames(base_color: tuple, state: str,
                 if loaded:
                     return loaded
 
-    # --- Fallback: placeholder colored-rect frames ---
+        # --- Priority 2: horizontal sprite sheet (P5-1) ---
+        sheet_name = _SHEET_NAME_MAP.get(state)
+        if sheet_name:
+            sheet_path = os.path.join(sprite_dir, f"Side_{sheet_name}.png")
+            if os.path.isfile(sheet_path):
+                try:
+                    sheet = pygame.image.load(sheet_path).convert_alpha()
+                    sw, sh = sheet.get_size()
+                    # Frames are square: count = total_width // frame_height
+                    frame_count = (sw // sh) if sh > 0 else _STATE_FRAMES[state]
+                    if frame_count < 1:
+                        frame_count = _STATE_FRAMES[state]
+                    frame_w = sw // frame_count
+                    loaded = []
+                    for i in range(frame_count):
+                        sub = sheet.subsurface((i * frame_w, 0, frame_w, sh))
+                        img = pygame.transform.scale(sub, (width, height))
+                        loaded.append(img)
+                    if loaded:
+                        return loaded
+                except (pygame.error, FileNotFoundError, ValueError):
+                    pass
+
+    # --- Priority 3: placeholder colored-rect frames ---
     count  = _STATE_FRAMES[state]
     frames = []
     r, g, b = base_color
