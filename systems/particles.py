@@ -15,11 +15,10 @@ from settings import (SCREEN_WIDTH, SCREEN_HEIGHT,
                       PARTICLE_GRAVITY, PARTICLE_FRICTION,
                       HIT_PARTICLE_COUNT, HIT_PARTICLE_LIFE,
                       DEATH_PARTICLE_COUNT, DEATH_PARTICLE_LIFE,
-                      LANDING_PARTICLE_COUNT, LANDING_PARTICLE_COLOR,
+                      LANDING_PARTICLE_COUNT, LANDING_PARTICLE_LIFE, LANDING_PARTICLE_COLOR,
                       SOUL_SURGE_PARTICLE_COUNT, SOUL_SURGE_PARTICLE_COLOR,
                       OVERDRIVE_PARTICLE_COUNT, OVERDRIVE_PARTICLE_COLOR,
-                      CHECKPOINT_PARTICLE_COUNT, CHECKPOINT_PARTICLE_COLOR,
-                      PARTICLE_ABILITY_COUNT)
+                      CHECKPOINT_PARTICLE_COUNT, CHECKPOINT_PARTICLE_COLOR)
 
 
 class Particle:
@@ -126,7 +125,7 @@ class ParticleSystem:
             direction = -1 if i < half else 1
             vx   = direction * random.uniform(0.5, 2.0)
             vy   = random.uniform(-2.5, -0.5)
-            lt   = random.randint(8, 14)
+            lt   = LANDING_PARTICLE_LIFE
             size = random.randint(2, 4)
             self._particles.append(
                 Particle(x, y, vx, vy, LANDING_PARTICLE_COLOR, lt, size, gravity=False))

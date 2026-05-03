@@ -333,9 +333,10 @@ class GameplayScene(BaseScene):
             lore_id, text = entry
             if lore_id not in lore_found:
                 self.lore_items.append(LoreItem(lx, ly, lore_id, text))
-        self._lore_text   = ""
-        self._lore_timer  = 0
-        self._lore_font   = pygame.font.SysFont("georgia", 22)
+        self._lore_text            = ""
+        self._lore_timer           = 0
+        self._lore_waiting_dismiss = False
+        self._lore_font            = pygame.font.SysFont("georgia", 22)
 
         # --- Map ---
         self._map_open = False
@@ -442,6 +443,11 @@ class GameplayScene(BaseScene):
             if event.key in (pygame.K_SPACE, pygame.K_RETURN):
                 self._death_timer = 148
                 return
+
+        # HK-P5-I: player can dismiss lore overlay immediately with SPACE/RETURN
+        if self._lore_waiting_dismiss and event.key in (pygame.K_SPACE, pygame.K_RETURN):
+            self._lore_timer           = 0
+            self._lore_waiting_dismiss = False
 
         if self._paused:
             if event.key == pygame.K_ESCAPE:
@@ -712,8 +718,9 @@ class GameplayScene(BaseScene):
             if item.alive and item.rect.colliderect(self.player.rect):
                 result = item.collect(self.player, self.game)
                 if result:
-                    self._lore_text  = result
-                    self._lore_timer = LORE_DISPLAY_FRAMES
+                    self._lore_text            = result
+                    self._lore_timer           = LORE_DISPLAY_FRAMES
+                    self._lore_waiting_dismiss = True
             if item.alive:
                 remaining_lore.append(item)
         self.lore_items = remaining_lore
@@ -785,6 +792,7 @@ class GameplayScene(BaseScene):
             for dead_e in newly_dead:
                 particles.emit_death(dead_e.rect.centerx, dead_e.rect.centery,
                                      dead_e.color)
+                audio.play_sfx("enemy_death")
                 for drop in dead_e.get_drop_fragments():
                     if isinstance(drop, (HeatCore, SoulShard)):
                         self.drops.append(drop)
@@ -901,11 +909,18 @@ class GameplayScene(BaseScene):
             # P4-2/P4-3: emit particles, hitstop, and play SFX on the very first frame of death screen
             if self._death_timer == 1 and not self._death_particles_emitted:
                 self._death_particles_emitted = True
+                _dfaction = getattr(self.game, "player_faction", None)
+                if _dfaction == FACTION_MARKED:
+                    _death_color = (140, 80, 220)
+                elif _dfaction == FACTION_FLESHFORGED:
+                    _death_color = (220, 120, 20)
+                else:
+                    _death_color = RED
                 particles.emit(self.player.rect.centerx,
                                self.player.rect.centery,
                                count=DEATH_PARTICLE_COUNT // 2,
                                speed=3.0,
-                               color=RED,
+                               color=_death_color,
                                life=25,
                                spread=360)
                 hitstop.trigger(6)
@@ -1458,6 +1473,11 @@ class GameplayScene(BaseScene):
             # BUG-041: do not apply set_alpha to text; alpha is handled by the
             # SRCALPHA bg panel, preventing stacked-alpha dimming of text.
             surface.blit(rendered, (box_x + pad, box_y + pad + i * line_h))
+        if self._lore_waiting_dismiss:
+            hint_font = pygame.font.SysFont("monospace", 12)
+            hint = hint_font.render("SPACE — dismiss", True, GRAY)
+            surface.blit(hint, (box_x + box_w - hint.get_width() - pad,
+                                box_y + box_h - hint.get_height() - 4))
 
     def _draw_phase_announce(self, surface: pygame.Surface) -> None:
         """Draw the phase-transition banner centred on screen."""

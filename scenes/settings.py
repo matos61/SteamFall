@@ -83,6 +83,7 @@ class SettingsScene(BaseScene):
                                                self._sfx_vol + delta)), 1)
             self.game.audio.set_sfx_volume(self._sfx_vol)
             self.game.save_data["sfx_vol"] = self._sfx_vol
+            self.game.audio.play_sfx("hit")
         elif self._sel == 2:
             self._fullscreen = not self._fullscreen
             pygame.display.toggle_fullscreen()

@@ -251,7 +251,7 @@ MARKED_TINT_COLOR      = (100, 60, 160)       # Acolyte-purple enemy tint
 # --- P3-5: Collectible lore items ---
 LORE_ITEM_SIZE      = 16
 LORE_ITEM_COLOR     = (160, 140, 100)    # Parchment tone
-LORE_DISPLAY_FRAMES = 300                # 5 seconds at 60 FPS
+LORE_DISPLAY_FRAMES = 480                # 8 s auto-dismiss floor; player can dismiss with SPACE
 
 # --- Phase 4: Particle system ---
 # Core physics (aligned to P4-1 spec; HK-P4-A review restored to spec values)
@@ -284,12 +284,12 @@ CHECKPOINT_PARTICLE_COLOR = (200, 180, 80)   # warm gold
 PARTICLE_CHECKPOINT_COUNT = CHECKPOINT_PARTICLE_COUNT  # backwards-compat alias
 
 # Landing dust
-LANDING_PARTICLE_COUNT    = 4      # dust puffs emitted on landing
+LANDING_PARTICLE_COUNT    = 6      # was 4 — denser puff on harder landings
+LANDING_PARTICLE_LIFE     = 20     # explicit lifetime constant (replaces magic range)
 LANDING_PARTICLE_COLOR    = (120, 100, 70)   # warm tan dust
 PARTICLE_LAND_COUNT       = LANDING_PARTICLE_COUNT  # backwards-compat alias
 
-# Misc particle constants (ability, dust color kept for existing code)
-PARTICLE_ABILITY_COUNT    = 8      # particles per ability activation
+# Misc particle constants (dust color kept for existing code)
 PARTICLE_DUST_COLOR       = LANDING_PARTICLE_COLOR
 
 # --- P4-2: Death screen text ---
@@ -307,6 +307,7 @@ SOUND_DEATH        = "assets/sounds/death.wav"
 SOUND_CHECKPOINT   = "assets/sounds/checkpoint.wav"
 SOUND_ABILITY      = "assets/sounds/ability.wav"
 SOUND_BOSS_PHASE   = "assets/sounds/boss_phase.wav"
+SOUND_ENEMY_DEATH  = "assets/sounds/enemy_death.wav"
 MUSIC_LEVEL_1            = "assets/music/outer_district.ogg"
 MUSIC_LEVEL_5            = "assets/music/sanctum.ogg"
 MUSIC_BOSS               = "assets/music/boss.ogg"
@@ -319,9 +320,11 @@ SPRITE_DIR_PLAYER = "assets/sprites/player"
 SPRITE_DIR_ENEMY  = "assets/sprites/enemy"
 
 # --- P4-7: Tile sprites ---
-TILE_SHEET_LEVEL_1_2 = "assets/tiles/outer_district.png"
-TILE_SHEET_LEVEL_3_4 = "assets/tiles/foundry.png"
-TILE_SHEET_LEVEL_5   = "assets/tiles/sanctum.png"
+TILE_SHEET_LEVEL_1_2  = "assets/tiles/outer_district.png"
+TILE_SHEET_LEVEL_3_4  = "assets/tiles/foundry.png"
+TILE_SHEET_LEVEL_5    = "assets/tiles/sanctum.png"
+TILE_SHEET_LEVEL_6_8  = "assets/tiles/foundry.png"    # reuse foundry for faction-branch levels
+TILE_SHEET_LEVEL_9_10 = "assets/tiles/sanctum.png"    # convergence / final approach
 
 CREDITS_TEXT = [
     "Steamfall",

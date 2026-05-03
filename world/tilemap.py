@@ -26,7 +26,8 @@ import os
 import pygame
 from settings import (TILE_SIZE, TILE_COLOR, TILE_EDGE_COLOR,
                       CRUMBLE_COLOR, CRUMBLE_WARNING_COLOR,
-                      TILE_SHEET_LEVEL_1_2, TILE_SHEET_LEVEL_3_4, TILE_SHEET_LEVEL_5)
+                      TILE_SHEET_LEVEL_1_2, TILE_SHEET_LEVEL_3_4, TILE_SHEET_LEVEL_5,
+                      TILE_SHEET_LEVEL_6_8, TILE_SHEET_LEVEL_9_10)
 
 
 def _load_tile_sprite(path: str) -> pygame.Surface | None:
@@ -52,6 +53,12 @@ def _tile_sheet_for_level(level_name: str) -> pygame.Surface | None:
         return _load_tile_sprite(TILE_SHEET_LEVEL_3_4)
     if level_name == "level_5":
         return _load_tile_sprite(TILE_SHEET_LEVEL_5)
+    if level_name in ("level_6_marked", "level_6_fleshforged",
+                      "level_7_marked", "level_7_fleshforged",
+                      "level_8_marked", "level_8_fleshforged"):
+        return _load_tile_sprite(TILE_SHEET_LEVEL_6_8)
+    if level_name in ("level_9", "level_10"):
+        return _load_tile_sprite(TILE_SHEET_LEVEL_9_10)
     return None
 
 

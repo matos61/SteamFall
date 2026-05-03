@@ -14,18 +14,19 @@ import pygame
 from settings import (
     AUDIO_MUSIC_VOLUME, AUDIO_SFX_VOLUME,
     SOUND_ATTACK, SOUND_HIT, SOUND_JUMP, SOUND_DEATH,
-    SOUND_CHECKPOINT, SOUND_ABILITY, SOUND_BOSS_PHASE,
+    SOUND_CHECKPOINT, SOUND_ABILITY, SOUND_BOSS_PHASE, SOUND_ENEMY_DEATH,
 )
 
 # Key names for play_sfx()
 _SFX_KEYS = {
-    "attack":     SOUND_ATTACK,
-    "hit":        SOUND_HIT,
-    "jump":       SOUND_JUMP,
-    "death":      SOUND_DEATH,
-    "checkpoint": SOUND_CHECKPOINT,
-    "ability":    SOUND_ABILITY,
-    "boss_phase": SOUND_BOSS_PHASE,
+    "attack":       SOUND_ATTACK,
+    "hit":          SOUND_HIT,
+    "jump":         SOUND_JUMP,
+    "death":        SOUND_DEATH,
+    "checkpoint":   SOUND_CHECKPOINT,
+    "ability":      SOUND_ABILITY,
+    "boss_phase":   SOUND_BOSS_PHASE,
+    "enemy_death":  SOUND_ENEMY_DEATH,
 }
 
 
