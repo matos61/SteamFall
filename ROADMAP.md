@@ -1571,18 +1571,17 @@ Art assets were delivered in `Delivery/` on 2026-05-01. The sprite loading infra
 **Priority order for build-agent** (tackle in this order):
 
 1. ~~**P5-0b (pre-phase review)**~~ ✅ **DONE (2026-05-02)** — review-agent ticked BUG-032–041; found BUG-044/045/046. hk-agent found HK-P5-A through HK-P5-I.
-1a. **P5-0c (critical bug-fix sprint)** — fix BUG-044 (wrong `_iframes` attr) and BUG-046 (Architect bypass) before P5-1. BUG-045 cosmetic, fold in if trivial.
-2. **P5-1 (sprite sheet integration)** — extend `animation.py` to support sprite-sheet PNGs; create `assets/sprites/player/` and `assets/sprites/enemy/` from `Delivery/AnimationSheets/Warrior/` and `Delivery/AnimationSheets/Antraxis/`.
+1a. ~~**P5-0c (critical bug-fix sprint)**~~ ✅ **DONE (2026-05-03)** — BUG-044/045/046 all confirmed fixed in code (gameplay.py line 821, main_menu.py lines 128–130, gameplay.py lines 888–893).
+2. ~~**P5-1 (sprite sheet integration)**~~ ✅ **DONE (2026-05-03)** — `animation.py` sprite-sheet loader present; `assets/sprites/player/` and `assets/sprites/enemy/` populated from `Delivery/AnimationSheets/`; HK-P5-D and HK-P5-E fixes confirmed in `player.py` and `enemy.py`.
 3. ~~**P5-2 (tile asset integration)**~~ ✅ **DONE (2026-05-02)** — `assets/tiles/` created; `outer_district.png`, `foundry.png`, `sanctum.png` copied from `Delivery/Tiles/`. `assets/sprites/` directory also created (empty stub for P5-1).
 4. ~~**P5-3 (tutorial replacement)**~~ ✅ **DONE (2026-05-02)** — `Delivery/replacements/tutorial_minigame.py` applied; fixes tutorial attack hitbox to respect left-facing direction.
 5. ~~**P5-4 (dead code cleanup)**~~ ✅ **DONE (2026-05-02)** — `game/story.py` deleted; confirmed no imports remain.
+6. **P5-5 (HK feel sprint)** — polish pass covering HK-P5-A through HK-P5-I (minus D/E, already done in P5-1): dead import cleanup, landing dust tuning, faction death particles, tile sheet coverage levels 6–10, enemy death SFX, settings screen audio feedback, lore player-dismiss.
 
-_Orchestrator pre-check 2026-05-02:_
-- `assets/sprites/` and `assets/tiles/` do not yet exist — P5-1 and P5-2 unblocked once P5-0b is done.
-- `animation.py` has per-frame PNG subdirectory support (`sprite_dir`) but **lacks** sprite-sheet (`Side_{state}.png`) loading — P5-1 requires the sprite-sheet branch in `_make_frames()`.
-- `Delivery/replacements/tutorial_minigame.py` differs from live file: replacement fixes the tutorial attack hitbox to respect left-facing direction (was always hitting right). P5-3 **must** be applied.
-- `game/story.py` confirmed dead (15-line stub, never imported). P5-4 safe to execute any time.
-- P5-2, P5-3, P5-4 may run in parallel with P5-0b review (no .py file conflicts). P5-1 blocked until P5-0b complete.
+_Orchestrator re-check 2026-05-03:_
+- P5-0c verified done: `self.player.iframes = 9999` (line 821, no underscore); parallax uses `int(sx) - SCREEN_WIDTH` (line 130); LEVEL_10 right-edge guard added (line 890).
+- P5-1 verified done: `animation.py` has sprite-sheet branch (Priority 2 in `_make_frames`); `assets/sprites/player/` and `assets/sprites/enemy/` both populated with `Side_*.png` files; `player.py` passes `SPRITE_DIR_PLAYER`; `enemy.py` passes `SPRITE_DIR_ENEMY`; HK-P5-D fix at `player.py` line 370–371 (hurt set only when `iframes == PLAYER_IFRAMES`); HK-P5-E fix at `enemy.py` lines 90–93 (jump/fall state branches added).
+- Remaining open work: HK-P5-A, B, C, F, G, H, I (all in P5-5 scope).
 
 ---
 
@@ -1599,7 +1598,16 @@ _Run review-agent and hk-agent over all Phase 4 .py files to catch any issues be
 
 ---
 
-### Task P5-0c: Critical Bug-Fix Sprint (Phase 5 pre-start)
+### Task P5-0c: Critical Bug-Fix Sprint (Phase 5 pre-start) ✅ DONE (2026-05-03)
+
+_All three bugs confirmed fixed in code. Verified 2026-05-03 by orchestrator code inspection._
+
+**What was built:**
+- `scenes/gameplay.py` line 821: changed `self.player._iframes = 9999` → `self.player.iframes = 9999` (BUG-044).
+- `scenes/gameplay.py` lines 888–893: added `if self._architect and self._architect.alive: pass` guard before LEVEL_10 victory write (BUG-046).
+- `scenes/main_menu.py` lines 128–130: parallax ghost-copy uses `int(sx) - SCREEN_WIDTH` (not `* 2`); wrap uses `SCREEN_WIDTH * 2` correctly for the scroll space width (BUG-045).
+
+_Original spec (kept for reference):_
 
 _Unblocked by P5-0b completion. BUG-044 and BUG-046 are 🔴 critical and must be fixed before P5-1. BUG-045 is cosmetic — fold into the same commit._
 
@@ -1633,7 +1641,18 @@ _Unblocked by P5-0b completion. BUG-044 and BUG-046 are 🔴 critical and must b
 
 ---
 
-### Task P5-1: Sprite Sheet Integration
+### Task P5-1: Sprite Sheet Integration ✅ DONE (2026-05-03)
+
+_All deliverables confirmed present. Verified 2026-05-03 by orchestrator code inspection._
+
+**What was built:**
+- `systems/animation.py`: sprite-sheet branch added as Priority 2 in `_make_frames()` — loads `{sprite_dir}/Side_{State}.png`, auto-detects frame count from sheet width ÷ frame height, slices horizontally with `subsurface()`.
+- `assets/sprites/player/`: `Side_Attack.png`, `Side_Die.png`, `Side_Idle.png`, `Side_SpecialAttack.png`, `Side_Walk.png` — copied from `Delivery/AnimationSheets/Warrior/`.
+- `assets/sprites/enemy/`: `Side_Attack.png`, `Side_Die.png`, `Side_Idle.png`, `Side_Walk.png` — copied from `Delivery/AnimationSheets/Antraxis/`.
+- `entities/player.py` (HK-P5-D): `_update_animation()` sets "hurt" state only when `self.iframes == PLAYER_IFRAMES` (first iframe frame only); no repeated `set_state` call that would restart the PNG strip.
+- `entities/enemy.py` (HK-P5-E): airborne branches added — `not self.on_ground and self.vy < 0` → "jump"; `not self.on_ground and self.vy > 0` → "fall".
+
+_Original spec (kept for reference):_
 
 _Blocked until P5-0c complete. Also requires two animation code fixes (HK-P5-D, HK-P5-E) before sprites land — fold into same commit._
 
@@ -1743,6 +1762,86 @@ Delete `game/story.py` — a 15-line `StoryState` stub that is defined but never
 
 ---
 
+### Task P5-5: HK Feel Sprint — Phase 5 Polish
+
+_Unblocked by P5-1 completion. Covers all remaining HK-P5 improvements except D/E (already done in P5-1)._
+
+**Files to touch:**
+- `systems/particles.py` (HK-P5-A, HK-P5-B)
+- `settings.py` (HK-P5-A, HK-P5-B, HK-P5-F, HK-P5-G, HK-P5-I)
+- `scenes/gameplay.py` (HK-P5-C, HK-P5-G, HK-P5-I)
+- `world/tilemap.py` (HK-P5-F)
+- `scenes/settings.py` (HK-P5-H)
+- `systems/audio.py` (HK-P5-G)
+
+**What to build:**
+
+**HK-P5-A** `systems/particles.py` line 22: Remove `PARTICLE_ABILITY_COUNT` from the import list — the constant is defined in `settings.py` and imported but never referenced anywhere in `particles.py`. Also remove `PARTICLE_ABILITY_COUNT` from `settings.py` only if no other file uses it (grep first).
+
+**HK-P5-B** Landing dust tuning:
+```python
+# settings.py
+LANDING_PARTICLE_COUNT = 6     # was 4 — denser puff on harder landings
+LANDING_PARTICLE_LIFE  = 20    # NEW — explicit lifetime constant (replaces magic range)
+```
+In `systems/particles.py` `emit_landing()`: use `LANDING_PARTICLE_LIFE` as the `life` parameter instead of any hardcoded value.
+
+**HK-P5-C** Faction death particles — in `scenes/gameplay.py` at the death particle emit site (around line 904):
+```python
+faction = getattr(self.game, "player_faction", None)
+if faction == FACTION_MARKED:
+    death_color = (140, 80, 220)   # SOUL_SURGE_PARTICLE_COLOR purple
+elif faction == FACTION_FLESHFORGED:
+    death_color = (220, 120, 20)   # OVERDRIVE_PARTICLE_COLOR orange
+else:
+    death_color = RED
+particles.emit(..., color=death_color, ...)
+```
+
+**HK-P5-F** Tile sheet levels 6–10 — in `settings.py` add:
+```python
+TILE_SHEET_LEVEL_6_8  = "assets/tiles/foundry.png"    # reuse foundry for industrial faction levels
+TILE_SHEET_LEVEL_9_10 = "assets/tiles/sanctum.png"    # convergence / final approach
+```
+In `world/tilemap.py` `_tile_sheet_for_level()`, add branches:
+- levels 6–8 (any faction variant) → `TILE_SHEET_LEVEL_6_8`
+- levels 9 and 10 → `TILE_SHEET_LEVEL_9_10`
+
+**HK-P5-G** Enemy death SFX:
+```python
+# settings.py
+SOUND_ENEMY_DEATH = "assets/sounds/enemy_death.wav"
+```
+In `systems/audio.py`, load `"enemy_death"` alongside existing sounds. In `scenes/gameplay.py`, at the enemy-death particle emit site (the block that calls `particles.emit_death()`), add `audio.play_sfx("enemy_death")` immediately after.
+
+**HK-P5-H** Settings screen SFX feedback — in `scenes/settings.py`, after the `set_sfx_volume()` call in the SFX slider handle block, add:
+```python
+self.game.audio.play_sfx("hit")
+```
+This gives the player auditory confirmation that the SFX volume is active.
+
+**HK-P5-I** Lore player-dismiss:
+```python
+# settings.py
+LORE_DISPLAY_FRAMES = 480   # was 300 — 8 s floor while awaiting dismiss
+```
+In `scenes/gameplay.py` `on_enter()`: add `self._lore_waiting_dismiss = False`.
+When lore text is set, also set `self._lore_waiting_dismiss = True`.
+In `handle_event()`, intercept `K_SPACE` / `K_RETURN` when `self._lore_waiting_dismiss` is True: set `self._lore_timer = 0` and `self._lore_waiting_dismiss = False` to immediately dismiss the overlay (the fade-out at `lore_timer <= 60` is bypassed; just set `_lore_timer` to 0 to clear it instantly).
+In `_draw_lore_overlay()`, when `_lore_waiting_dismiss` is True, render a small `"SPACE — dismiss"` hint at the bottom-right of the lore box.
+
+**Acceptance criteria — done when:**
+- `particles.py` imports no unused constants.
+- Landing on a surface emits 6 dust particles with a 20-frame lifetime.
+- Marked player death emits purple particles; Fleshforged emits orange.
+- Levels 6–8 render tiles using `foundry.png` art; levels 9–10 use `sanctum.png`.
+- Killing any enemy plays a death SFX (no-op when file absent).
+- Adjusting SFX volume in the settings screen plays an audible click.
+- Collecting a lore item shows text until the player presses SPACE; `LORE_DISPLAY_FRAMES = 480` acts as auto-dismiss floor.
+- `python main.py` launches without ImportError.
+
+---
+
 ## HK Feel Improvements — Phase 5 (reviewed 2026-05-02)
 
 _Evaluated by hk-agent 2026-05-02; see `REVIEW_HK.md` for full analysis._
@@ -1752,14 +1851,14 @@ _Evaluated by hk-agent 2026-05-02; see `REVIEW_HK.md` for full analysis._
 | HK-P5-A | Remove dead `PARTICLE_ABILITY_COUNT` import in `particles.py` L22 (constant exists in `settings.py` but is never used) | ⏳ Phase 5 | Trivial | `systems/particles.py`, `settings.py` |
 | HK-P5-B | Landing dust: raise lifetime `(8,14)` → `(16,22)` frames; add `LANDING_PARTICLE_LIFE=20`; raise `LANDING_PARTICLE_COUNT` 4 → 6 | ⏳ Phase 5 | Trivial | `settings.py`, `systems/particles.py` |
 | HK-P5-C | Player death particles use plain `RED`; should be faction-colored (purple Marked / orange Fleshforged) to match death text | ⏳ Phase 5 | Minor | `scenes/gameplay.py` |
-| HK-P5-D | **Hurt animation flicker will strobe under real sprites** — `player.py` toggles "hurt"/"locomotion" states 7–8 times over 45 frames; `AnimationController.set_state()` resets `_frame_idx` to 0 each toggle, causing PNG frames to restart repeatedly. Fix: set "hurt" state only on first iframe frame (`iframes == PLAYER_IFRAMES`); rely on draw-layer outline for blink cue. **Must fix before P5-1 sprites land.** | ⏳ **P5-1 prereq** | Minor | `entities/player.py` |
-| HK-P5-E | **Enemy animation missing jump/fall states** — `enemy.py` state selector has no airborne branches; Jumper will display walk/idle during its entire hop arc with real sprites. Needs `not self.on_ground` + `vy` checks mirroring `player.py`. **Must fix before P5-1 sprites land.** | ⏳ **P5-1 prereq** | Minor | `entities/enemy.py` |
-| HK-P5-F | Tile sheet coverage stops at level 5 — `_tile_sheet_for_level()` returns `None` for levels 6–10; add three constants (`TILE_SHEET_LEVEL_6_8`, etc.) and branches | ⏳ Phase 5 | Minor | `world/tilemap.py`, `settings.py` |
-| HK-P5-G | No enemy death SFX — kill confirmations are silent; needs `SOUND_ENEMY_DEATH` constant and `audio.play_sfx()` call at enemy-death particle emit site | ⏳ Phase 5 | Minor | `settings.py`, `scenes/gameplay.py`, `systems/audio.py` |
-| HK-P5-H | Settings screen silent on volume change — add `audio.play_sfx("hit")` after each SFX slider adjustment for auditory feedback | ⏳ Phase 5 | Trivial | `scenes/settings.py` |
-| HK-P5-I | Lore auto-dismiss still active (deferred from P3, P4) — no player-dismiss pathway; raise `LORE_DISPLAY_FRAMES` 300 → 480 and add SPACE/KEYDOWN intercept in `gameplay.py handle_event` | ⏳ Phase 5 | Minor | `settings.py`, `scenes/gameplay.py` |
+| HK-P5-D | **Hurt animation flicker will strobe under real sprites** — fixed in P5-1 (2026-05-03). | ✅ P5-1 | Minor | `entities/player.py` |
+| HK-P5-E | **Enemy animation missing jump/fall states** — fixed in P5-1 (2026-05-03). | ✅ P5-1 | Minor | `entities/enemy.py` |
+| HK-P5-F | Tile sheet coverage stops at level 5 — `_tile_sheet_for_level()` returns `None` for levels 6–10; add three constants (`TILE_SHEET_LEVEL_6_8`, etc.) and branches | ⏳ P5-5 | Minor | `world/tilemap.py`, `settings.py` |
+| HK-P5-G | No enemy death SFX — kill confirmations are silent; needs `SOUND_ENEMY_DEATH` constant and `audio.play_sfx()` call at enemy-death particle emit site | ⏳ P5-5 | Minor | `settings.py`, `scenes/gameplay.py`, `systems/audio.py` |
+| HK-P5-H | Settings screen silent on volume change — add `audio.play_sfx("hit")` after each SFX slider adjustment for auditory feedback | ⏳ P5-5 | Trivial | `scenes/settings.py` |
+| HK-P5-I | Lore auto-dismiss still active (deferred from P3, P4) — no player-dismiss pathway; raise `LORE_DISPLAY_FRAMES` 300 → 480 and add SPACE/KEYDOWN intercept in `gameplay.py handle_event` | ⏳ P5-5 | Minor | `settings.py`, `scenes/gameplay.py` |
 
-**Items HK-P5-D and HK-P5-E are P5-1 prerequisites** — build-agent must fix both animation code issues *before* wiring sprite-sheet assets, or real PNG frames will strobe/be absent on airborne enemies.
+**HK-P5-D and HK-P5-E confirmed fixed in P5-1 (2026-05-03).** Remaining items (A, B, C, F, G, H, I) are assigned to P5-5.
 
 ---
 
@@ -1869,11 +1968,11 @@ _hk-agent 2026-04-29 Phase 4 feel pass (see `REVIEW_HK.md` for full analysis):_
 
 _Review-agent 2026-05-02 pass (P5-0b):_
 
-49. 🔴 **BUG-044** `gameplay.py` line ~821: BUG-036 invincibility fix uses `self.player._iframes = 9999` (dead attribute — `Entity` stores it as `self.iframes` with no underscore). Player is fully vulnerable during Architect defeat dialogue; Crawler minions can still kill and discard the victory state. Fix: change to `self.player.iframes = 9999`. Assign to build-agent in P5-0c.
+49. ✅ **BUG-044** `gameplay.py` line 821: `self.player._iframes = 9999` corrected to `self.player.iframes = 9999`. Fixed in P5-0c (2026-05-03); confirmed by orchestrator code inspection.
 
-50. ⚠️ **BUG-045** `scenes/main_menu.py` lines ~129–130: Parallax second-copy ghost draw uses `int(sx) - SCREEN_WIDTH * 2` offset — should be `int(sx) - SCREEN_WIDTH`. With `*2`, ghost shapes land far off-screen and the right-edge seam pops instead of scrolling smoothly. Cosmetic. Fix: change `SCREEN_WIDTH * 2` to `SCREEN_WIDTH` in the second draw call. Assign to build-agent in P5-0c.
+50. ✅ **BUG-045** `scenes/main_menu.py` lines 128–130: Parallax ghost-copy now uses `int(sx) - SCREEN_WIDTH`; wrap logic correctly uses `SCREEN_WIDTH * 2` for the scroll-space width. Fixed in P5-0c (2026-05-03); confirmed by orchestrator code inspection.
 
-51. 🔴 **BUG-046** `gameplay.py` lines ~871–893: LEVEL_10 right-edge exit check fires while the Architect is still alive — any player who walks to the rightmost wall bypasses the boss fight, writes `save_data["victory"] = True`, and transitions to SCENE_MAIN_MENU. The `not self._architect_victory_done` guard is True (not done) at this point, so it doesn't protect against early exit. Fix: add `if self._architect and self._architect.alive: pass` guard before writing victory. Assign to build-agent in P5-0c. — all ten bugs were confirmed fixed in code as of P4-0c (2026-04-29), but the `[ ]` markers in `REVIEW_BUGS.md` have not been ticked. Review-agent should update those checkboxes in its next session to keep the document accurate.
+51. ✅ **BUG-046** `gameplay.py` lines 888–893: LEVEL_10 right-edge exit now guarded by `if self._architect and self._architect.alive: pass` — boss must be defeated before victory is written. Fixed in P5-0c (2026-05-03); confirmed by orchestrator code inspection.
 
 ---
 

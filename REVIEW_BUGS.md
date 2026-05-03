@@ -703,14 +703,14 @@ The following are not bugs in existing code but are pre-conditions that could ca
 
 ---
 
-- [ ] **BUG-044: `gameplay.py` BUG-036 invincibility fix uses wrong attribute name `_iframes` instead of `iframes` — the player receives no actual invincibility during the Architect defeat sequence**
+- [x] **BUG-044: `gameplay.py` BUG-036 invincibility fix uses wrong attribute name `_iframes` instead of `iframes` — the player receives no actual invincibility during the Architect defeat sequence**
   - **File:** `scenes/gameplay.py`, line 821
   - **Problem:** The BUG-036 fix adds `self.player._iframes = 9999` to grant the player invincibility while the Architect defeat dialogue plays (so surviving Crawlers cannot kill the player). However, `Entity` stores invincibility as `self.iframes` (no leading underscore — see `entities/entity.py` lines 40, 63, 87). Setting `self.player._iframes = 9999` creates a new dead attribute that is never read by `Entity.update()`, `Entity.take_damage()`, or any other method. The actual `self.player.iframes` counter remains unchanged (typically 0), so the player is fully vulnerable during the defeat cutscene. A surviving Crawler minion can kill the player, triggering the normal death sequence and discarding the Architect victory state (same symptom as the original BUG-036).
   - **Minimal fix:** Change line 821 from `self.player._iframes = 9999` to `self.player.iframes = 9999`.
 
 ---
 
-- [ ] **BUG-045: `scenes/main_menu.py` parallax second-copy draw offset is `SCREEN_WIDTH * 2` too large — wrapped ghost copies of shapes land far off-screen instead of at the visible right seam**
+- [x] **BUG-045: `scenes/main_menu.py` parallax second-copy draw offset is `SCREEN_WIDTH * 2` too large — wrapped ghost copies of shapes land far off-screen instead of at the visible right seam**
   - **File:** `scenes/main_menu.py`, lines 129–130
   - **Problem:**
     ```python
@@ -723,7 +723,7 @@ The following are not bugs in existing code but are pre-conditions that could ca
 
 ---
 
-- [ ] **BUG-046: `gameplay.py` LEVEL_10 right-edge check grants victory and transitions to `SCENE_MAIN_MENU` even when the Architect is still alive — walking to the right wall bypasses the final boss**
+- [x] **BUG-046: `gameplay.py` LEVEL_10 right-edge check grants victory and transitions to `SCENE_MAIN_MENU` even when the Architect is still alive — walking to the right wall bypasses the final boss**
   - **File:** `scenes/gameplay.py`, lines 871–893
   - **Problem:**
     ```python
