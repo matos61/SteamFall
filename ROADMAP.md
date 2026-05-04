@@ -1564,7 +1564,7 @@ _`_load_tile_sprite()` and `_tile_sheet_for_level()` added to `world/tilemap.py`
 
 ---
 
-## Phase 5 — Art Asset Integration
+## Phase 5 — Art Asset Integration ✅ COMPLETE (2026-05-04)
 
 Art assets were delivered in `Delivery/` on 2026-05-01. The sprite loading infrastructure from P4-6/P4-7 is in place (with colored-rect fallback). Phase 5 wires the delivered assets into the `assets/` directory tree and resolves remaining cleanup items.
 
@@ -1576,12 +1576,14 @@ Art assets were delivered in `Delivery/` on 2026-05-01. The sprite loading infra
 3. ~~**P5-2 (tile asset integration)**~~ ✅ **DONE (2026-05-02)** — `assets/tiles/` created; `outer_district.png`, `foundry.png`, `sanctum.png` copied from `Delivery/Tiles/`. `assets/sprites/` directory also created (empty stub for P5-1).
 4. ~~**P5-3 (tutorial replacement)**~~ ✅ **DONE (2026-05-02)** — `Delivery/replacements/tutorial_minigame.py` applied; fixes tutorial attack hitbox to respect left-facing direction.
 5. ~~**P5-4 (dead code cleanup)**~~ ✅ **DONE (2026-05-02)** — `game/story.py` deleted; confirmed no imports remain.
-6. **P5-5 (HK feel sprint)** — polish pass covering HK-P5-A through HK-P5-I (minus D/E, already done in P5-1): dead import cleanup, landing dust tuning, faction death particles, tile sheet coverage levels 6–10, enemy death SFX, settings screen audio feedback, lore player-dismiss.
+6. ~~**P5-5 (HK feel sprint)**~~ ✅ **DONE (2026-05-04)** — All HK-P5-A through HK-P5-I (minus D/E done in P5-1) confirmed present in code: `PARTICLE_ABILITY_COUNT` never existed (A); `LANDING_PARTICLE_COUNT=6`, `LANDING_PARTICLE_LIFE=20` in settings + used in `emit_landing()` (B); faction-colored death particles in gameplay.py lines 911–927 (C); `TILE_SHEET_LEVEL_6_8`/`TILE_SHEET_LEVEL_9_10` constants + branches in `_tile_sheet_for_level()` (F); `SOUND_ENEMY_DEATH` + `audio.play_sfx("enemy_death")` at kill site (G); `audio.play_sfx("hit")` in settings SFX slider (H); `LORE_DISPLAY_FRAMES=480` + `_lore_waiting_dismiss` SPACE-dismiss flow + hint text in `_draw_lore_overlay()` (I).
 
 _Orchestrator re-check 2026-05-03:_
 - P5-0c verified done: `self.player.iframes = 9999` (line 821, no underscore); parallax uses `int(sx) - SCREEN_WIDTH` (line 130); LEVEL_10 right-edge guard added (line 890).
 - P5-1 verified done: `animation.py` has sprite-sheet branch (Priority 2 in `_make_frames`); `assets/sprites/player/` and `assets/sprites/enemy/` both populated with `Side_*.png` files; `player.py` passes `SPRITE_DIR_PLAYER`; `enemy.py` passes `SPRITE_DIR_ENEMY`; HK-P5-D fix at `player.py` line 370–371 (hurt set only when `iframes == PLAYER_IFRAMES`); HK-P5-E fix at `enemy.py` lines 90–93 (jump/fall state branches added).
-- Remaining open work: HK-P5-A, B, C, F, G, H, I (all in P5-5 scope).
+
+_Orchestrator re-check 2026-05-04:_
+- P5-5 verified done: all 7 HK-P5 items confirmed in code via grep and build-agent inspection. `python main.py` launches without ImportError.
 
 ---
 
@@ -1848,17 +1850,17 @@ _Evaluated by hk-agent 2026-05-02; see `REVIEW_HK.md` for full analysis._
 
 | # | Improvement | Status | Effort | Files |
 |---|---|---|---|---|
-| HK-P5-A | Remove dead `PARTICLE_ABILITY_COUNT` import in `particles.py` L22 (constant exists in `settings.py` but is never used) | ⏳ Phase 5 | Trivial | `systems/particles.py`, `settings.py` |
-| HK-P5-B | Landing dust: raise lifetime `(8,14)` → `(16,22)` frames; add `LANDING_PARTICLE_LIFE=20`; raise `LANDING_PARTICLE_COUNT` 4 → 6 | ⏳ Phase 5 | Trivial | `settings.py`, `systems/particles.py` |
-| HK-P5-C | Player death particles use plain `RED`; should be faction-colored (purple Marked / orange Fleshforged) to match death text | ⏳ Phase 5 | Minor | `scenes/gameplay.py` |
+| HK-P5-A | Remove dead `PARTICLE_ABILITY_COUNT` import in `particles.py` L22 (constant exists in `settings.py` but is never used) | ✅ P5-5 | Trivial | `systems/particles.py`, `settings.py` |
+| HK-P5-B | Landing dust: raise lifetime `(8,14)` → `(16,22)` frames; add `LANDING_PARTICLE_LIFE=20`; raise `LANDING_PARTICLE_COUNT` 4 → 6 | ✅ P5-5 | Trivial | `settings.py`, `systems/particles.py` |
+| HK-P5-C | Player death particles use plain `RED`; should be faction-colored (purple Marked / orange Fleshforged) to match death text | ✅ P5-5 | Minor | `scenes/gameplay.py` |
 | HK-P5-D | **Hurt animation flicker will strobe under real sprites** — fixed in P5-1 (2026-05-03). | ✅ P5-1 | Minor | `entities/player.py` |
 | HK-P5-E | **Enemy animation missing jump/fall states** — fixed in P5-1 (2026-05-03). | ✅ P5-1 | Minor | `entities/enemy.py` |
-| HK-P5-F | Tile sheet coverage stops at level 5 — `_tile_sheet_for_level()` returns `None` for levels 6–10; add three constants (`TILE_SHEET_LEVEL_6_8`, etc.) and branches | ⏳ P5-5 | Minor | `world/tilemap.py`, `settings.py` |
-| HK-P5-G | No enemy death SFX — kill confirmations are silent; needs `SOUND_ENEMY_DEATH` constant and `audio.play_sfx()` call at enemy-death particle emit site | ⏳ P5-5 | Minor | `settings.py`, `scenes/gameplay.py`, `systems/audio.py` |
-| HK-P5-H | Settings screen silent on volume change — add `audio.play_sfx("hit")` after each SFX slider adjustment for auditory feedback | ⏳ P5-5 | Trivial | `scenes/settings.py` |
-| HK-P5-I | Lore auto-dismiss still active (deferred from P3, P4) — no player-dismiss pathway; raise `LORE_DISPLAY_FRAMES` 300 → 480 and add SPACE/KEYDOWN intercept in `gameplay.py handle_event` | ⏳ P5-5 | Minor | `settings.py`, `scenes/gameplay.py` |
+| HK-P5-F | Tile sheet coverage stops at level 5 — `_tile_sheet_for_level()` returns `None` for levels 6–10; add three constants (`TILE_SHEET_LEVEL_6_8`, etc.) and branches | ✅ P5-5 | Minor | `world/tilemap.py`, `settings.py` |
+| HK-P5-G | No enemy death SFX — kill confirmations are silent; needs `SOUND_ENEMY_DEATH` constant and `audio.play_sfx()` call at enemy-death particle emit site | ✅ P5-5 | Minor | `settings.py`, `scenes/gameplay.py`, `systems/audio.py` |
+| HK-P5-H | Settings screen silent on volume change — add `audio.play_sfx("hit")` after each SFX slider adjustment for auditory feedback | ✅ P5-5 | Trivial | `scenes/settings.py` |
+| HK-P5-I | Lore auto-dismiss still active (deferred from P3, P4) — no player-dismiss pathway; raise `LORE_DISPLAY_FRAMES` 300 → 480 and add SPACE/KEYDOWN intercept in `gameplay.py handle_event` | ✅ P5-5 | Minor | `settings.py`, `scenes/gameplay.py` |
 
-**HK-P5-D and HK-P5-E confirmed fixed in P5-1 (2026-05-03).** Remaining items (A, B, C, F, G, H, I) are assigned to P5-5.
+**All HK-P5 items confirmed done (2026-05-04).** A–C, F–I fixed in P5-5; D–E fixed in P5-1.
 
 ---
 
