@@ -1864,6 +1864,35 @@ _Evaluated by hk-agent 2026-05-02; see `REVIEW_HK.md` for full analysis._
 
 ---
 
+## Phase 6 — Post-Ship Review ⏳ IN PROGRESS (2026-05-06)
+
+All five shipping phases are complete. The last review-agent pass was **2026-05-02** (P5-0b), which covered all Phase 4 code. Since then the following tasks landed without a review pass:
+
+- **P5-0c** (2026-05-03) — BUG-044/045/046 fixes in `scenes/gameplay.py` and `scenes/main_menu.py`.
+- **P5-1** (2026-05-03) — Sprite sheet integration: `systems/animation.py` extended with `_make_frames` sheet loader; `entities/player.py` and `entities/enemy.py` wired with `SPRITE_DIR_*`; HK-P5-D and HK-P5-E fixes (hurt-state strobe, jump/fall animation branches).
+- **P5-5** (2026-05-04) — HK feel sprint: `systems/particles.py`, `scenes/gameplay.py` (faction death particles, lore dismiss), `world/tilemap.py` (`_tile_sheet_for_level` levels 6–10), `scenes/settings.py` (SFX feedback), `systems/audio.py` (`enemy_death` SFX), `settings.py` (6 new/updated constants).
+
+**Priority order for agents:**
+
+1. **P6-0b (post-ship review)** ⏳ IN PROGRESS — review-agent and hk-agent re-read all .py files and append findings to their respective review files.
+
+---
+
+### Task P6-0b: Post-Ship Review ⏳ IN PROGRESS (2026-05-06)
+
+**Scope:** All .py files re-read. Focus on P5-0c patches, P5-1 sprite sheet loader, and P5-5 HK feel sprint code. Both passes launched in parallel by orchestrator 2026-05-06.
+
+**review-agent:** Append any new bugs discovered to `REVIEW_BUGS.md` starting at BUG-047. Verify all existing open flags are still accurate.
+
+**hk-agent:** Append any new feel gaps to `REVIEW_HK.md`. Verify all HK-P5 items are correctly implemented.
+
+**Acceptance criteria — done when:**
+- `REVIEW_BUGS.md` updated with any new bugs in P5 code (or a note that none were found).
+- `REVIEW_HK.md` updated with any new feel gaps in P5 code (or a note that none were found).
+- Any 🔴 critical bugs found are added to the Known Bugs section below and assigned to build-agent.
+
+---
+
 ## Known Bugs / Tech Debt
 
 _Legend: ✅ Fixed | ⚠️ Flagged / deferred | 🔴 Open_
