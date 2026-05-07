@@ -752,3 +752,43 @@ The following are not bugs in existing code but are pre-conditions that could ca
 
 ---
 
+# Bug Review — 2026-05-07
+
+**Scope:** All .py files re-read. Focus on files changed in P5-0c (BUG-044/045/046 fixes in `scenes/gameplay.py` and `scenes/main_menu.py`), P5-1 (sprite sheet integration in `systems/animation.py`; hurt-state strobe fix in `entities/player.py`; jump/fall animation branches in `entities/enemy.py`), and P5-5 (landing dust tuning and import cleanup in `systems/particles.py`; faction death particles and lore dismiss with SPACE in `scenes/gameplay.py`; tile sheet extension to levels 6–10 in `world/tilemap.py`; SFX feedback in `scenes/settings.py`; `enemy_death` SFX in `systems/audio.py`; 6 new/updated constants in `settings.py`). All other .py files re-read in full. Prior bugs BUG-001 through BUG-046 and FLAG-001 through FLAG-013 are already recorded.
+
+---
+
+## BUG-044, BUG-045, BUG-046 Verification (P5-0c)
+
+**BUG-044 (player invincibility during Architect defeat):** CONFIRMED FIXED. `scenes/gameplay.py` line 829 now reads `self.player.iframes = 9999` (no leading underscore). The fix matches the ROADMAP description.
+
+**BUG-045 (parallax ghost-copy offset):** CONFIRMED FIXED. `scenes/main_menu.py` line 130 now uses `int(sx) - SCREEN_WIDTH` (single screen width). The `SCREEN_WIDTH * 2` bug is gone.
+
+**BUG-046 (LEVEL_10 right-edge bypass):** CONFIRMED FIXED. `scenes/gameplay.py` lines 897–904 now guard the right-edge victory trigger behind `if self._architect and self._architect.alive: pass`.
+
+---
+
+## New Bugs
+
+---
+
+- [ ] **BUG-047** ⚠️ `entities/player.py` line 370: Hurt animation plays for exactly one frame, then immediately switches back. `_update_animation` sets state `"hurt"` when `self.iframes == PLAYER_IFRAMES` (i.e., exactly 45), which is only true on the first iframe frame. On frame 2 the counter is 44, so the `elif` is False and the state switches to whatever movement state applies. The `AnimationController.set_state` no-reset-on-same-state guard only helps when the state does not change; here it transitions away from "hurt" every frame after frame 1. The hurt animation (3 frames × 6-tick FPS = 18 frames to complete) never progresses past frame 0. This contradicts the P5-1 spec intent of "set hurt only on first iframe frame to avoid mid-animation reset" — the intent was to enter the state once and let it play, but the implementation exits the state immediately. Minimal fix: introduce a `self._hurt_latched` bool that is set True when `iframes == PLAYER_IFRAMES` and cleared when `iframes == 0`, then use `elif self._hurt_latched` in `_update_animation` so the hurt animation can run to completion.
+
+---
+
+- [ ] **BUG-048** 🔴 `scenes/gameplay.py` lines 447–450: The lore-dismiss SPACE handler does not `return` after dismissing. Execution falls through to the death-screen skip check at line 442 (`if self._death_timer > 60: if event.key in (SPACE, RETURN): self._death_timer = 148`). Because handle_event processes keys in sequence without early returns at every branch, pressing SPACE while `_lore_waiting_dismiss` is True AND `_death_timer > 60` simultaneously dismisses the lore overlay AND skips to the respawn sequence — overriding the player's intent. The scenario is rare (the player must collect a lore item and die to the same hit with `death_timer` already at 61+) but is technically reachable if the player is in an extended death state and a lore item was collected in the last run whose timer carried over (actually timers reset on `on_enter`, so this is not reachable in practice via overlapping state). However, the more concretely reachable bug is that a lore-dismiss SPACE also processes the map/pause/NPC/faction keys below it that are inside `else` branches (e.g., line 466 `if event.key == pygame.K_ESCAPE: self._paused = True` — SPACE ≠ ESC so that's fine) — but line 471 `if event.key == pygame.K_e:` is only reached for K_e. The actual crash-risk path: SPACE also does not trigger the upgrade-confirm (that needs RETURN, not SPACE). Upon careful analysis the fall-through is mostly safe for the current key layout, but is fragile code. Minimal fix: add `return` after line 450 (`self._lore_waiting_dismiss = False`) so the lore dismiss event is fully consumed.
+
+---
+
+- [ ] **BUG-049** ⚠️ `systems/animation.py` lines 96–98: The sprite-sheet loader computes `frame_count = (sw // sh) if sh > 0 else _STATE_FRAMES[state]`, assuming frames are **square** (frame width equals the sheet height). If an artist delivers a sheet where `frame_width ≠ sheet_height` (e.g., a `288 × 64` sheet with 48 × 64 px frames that should have 6 frames), the formula yields `288 // 64 = 4` frames instead of 6, and `frame_w = 72` px instead of 48 — every loaded frame is clipped incorrectly. There is no error or warning; the animation silently renders distorted frames. The constraint "frames are square" is documented only in the code comment; no asset pipeline enforces it. Minimal fix: at minimum add a `ValueError` log/warning when `sw % sh != 0` (sheet width is not divisible by sheet height) so artists catch the mismatch early.
+
+---
+
+- [ ] **BUG-050** ⚠️ `scenes/settings.py` line 88: Adjusting LEFT/RIGHT on the "Fullscreen" row calls `_adjust(delta)` which calls `pygame.display.toggle_fullscreen()` for **both** LEFT and RIGHT presses identically. If the player holds the LEFT or RIGHT arrow key, key-repeat fires multiple `_adjust` calls per second, toggling fullscreen on and off dozens of times rapidly. On some platforms this causes visual glitches or pygame display state corruption. A held key should not repeat-fire a toggle; toggles should be one-shot per press. Minimal fix: add `return` immediately after `pygame.display.toggle_fullscreen()` is called, or gate the toggle behind `if delta > 0` (only RIGHT turns on, LEFT does nothing) rather than firing on any direction.
+
+---
+
+- [ ] **BUG-051** ⚠️ `entities/enemy.py` line 87: After P5-1, enemies set `_anim.set_state("hurt")` for the entire iframe window (`iframes > 0`), which is correct. However, `Crawler.update()` calls `super().update(dt)` (which resolves to `Entity.update`, not `Enemy.update`) and then runs its own physics — but it never calls the `_anim` update block that `Enemy.update` contains (lines 81–98). `Crawler.draw()` calls `super().draw()` (resolving to `Entity.draw`, not `Enemy.draw`), which uses plain `pygame.draw.rect`. As a result, crawlers have no animation controller at all and silently bypass the P5-1 enemy animation code. No crash (Entity.draw does not reference `_anim`), but crawlers do not benefit from any sprite-sheet loading, hurt-flash animation, jump/fall states, or the `faction_tint` blending overlay that `Enemy.draw` provides. The tint-blending code in `Enemy.draw` (lines 202–208) is bypassed for Crawlers even in levels 6–8 where faction tint is set. Minimal fix: have `Crawler.update` call `Enemy.update` (via `super().update(dt, player, solid_rects)`) instead of `Entity.update`, and adjust `Crawler.draw` to call `Enemy.draw` instead of `Entity.draw` so the animation and tint logic apply.
+
+---
+
