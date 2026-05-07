@@ -13,7 +13,7 @@ import random
 import pygame
 from settings import (SCREEN_WIDTH, SCREEN_HEIGHT,
                       PARTICLE_GRAVITY, PARTICLE_FRICTION,
-                      HIT_PARTICLE_COUNT, HIT_PARTICLE_LIFE,
+                      HIT_PARTICLE_COUNT, HIT_PARTICLE_LIFE, HIT_PARTICLE_SPEED,
                       DEATH_PARTICLE_COUNT, DEATH_PARTICLE_LIFE,
                       LANDING_PARTICLE_COUNT, LANDING_PARTICLE_LIFE, LANDING_PARTICLE_COLOR,
                       SOUL_SURGE_PARTICLE_COUNT, SOUL_SURGE_PARTICLE_COLOR,
@@ -92,7 +92,8 @@ class ParticleSystem:
             # Arc facing the attacker's direction, spread ±90° around forward
             base  = 0.0 if facing == 1 else math.pi
             angle = base + random.uniform(-math.pi * 0.7, math.pi * 0.7)
-            speed = random.uniform(2.5, 5.5)
+            # HK-P6-I: use HIT_PARTICLE_SPEED constant instead of hardcoded range
+            speed = random.uniform(HIT_PARTICLE_SPEED * 0.6, HIT_PARTICLE_SPEED * 1.4)
             vx    = math.cos(angle) * speed
             vy    = math.sin(angle) * speed - 1.0   # slight upward bias
             lt    = HIT_PARTICLE_LIFE

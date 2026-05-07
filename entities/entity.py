@@ -70,8 +70,8 @@ class Entity:
 
     def die(self) -> None:
         self.alive = False
-        from systems.particles import particles
-        particles.emit_death(self.rect.centerx, self.rect.centery, self.color)
+        # NOTE: emit_death() is called by gameplay.py's newly-dead loop (once per kill).
+        # Do NOT call it here — doing so would double the particle count (HK-P6-E).
 
     # ------------------------------------------------------------------
 

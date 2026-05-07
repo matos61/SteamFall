@@ -448,6 +448,7 @@ class GameplayScene(BaseScene):
         if self._lore_waiting_dismiss and event.key in (pygame.K_SPACE, pygame.K_RETURN):
             self._lore_timer           = 0
             self._lore_waiting_dismiss = False
+            return  # BUG-048: prevent fall-through to death-screen skip on same frame
 
         if self._paused:
             if event.key == pygame.K_ESCAPE:
@@ -584,12 +585,21 @@ class GameplayScene(BaseScene):
             self.player.update(dt, solid_rects=solid)
 
             if prev_iframes == 0 and self.player.iframes > 0:
-                self._damage_flash = DAMAGE_FLASH_FRAMES
+                self._damage_flash  = DAMAGE_FLASH_FRAMES
+                self._screen_shake  = PLAYER_HIT_SHAKE_FRAMES  # HK-P6-G: camera shake on hit
+                # HK-P6-F: faction-colored hit burst instead of always RED
+                _faction = getattr(self.game, "player_faction", None)
+                if _faction == FACTION_MARKED:
+                    _hit_color = (140, 80, 220)
+                elif _faction == FACTION_FLESHFORGED:
+                    _hit_color = (220, 120, 20)
+                else:
+                    _hit_color = RED
                 # Player-hit sparks: radial 360° burst when player first takes damage
                 particles.emit(
                     self.player.rect.centerx, self.player.rect.centery,
                     HIT_PARTICLE_COUNT, HIT_PARTICLE_SPEED,
-                    RED, HIT_PARTICLE_LIFE, spread=360,
+                    _hit_color, HIT_PARTICLE_LIFE, spread=360,
                 )
             self._prev_iframes = self.player.iframes
             if self._damage_flash > 0:

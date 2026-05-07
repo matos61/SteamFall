@@ -26,7 +26,7 @@ _STATE_FPS = {
     "walk":   5,
     "jump":   12,
     "fall":   8,
-    "attack": 3,
+    "attack": 4,   # HK-P6-B: was 3 — clip now completes within the 16-frame hitbox window
     "hurt":   6,
     "death":  10,
 }
@@ -48,9 +48,12 @@ _SHEET_NAME_MAP: dict[str, str] = {
     "walk":   "Walk",
     "attack": "Attack",
     "death":  "Die",
-    "hurt":   "Idle",   # fall back to idle sheet
-    "jump":   "Walk",   # fall back to walk sheet
-    "fall":   "Walk",   # fall back to walk sheet
+    # HK-P6-A: explicit entries with graceful PNG-missing fallback handled in _make_frames.
+    # When Side_Hurt.png / Side_Jump.png / Side_Fall.png exist they will be used directly;
+    # when absent the loader falls through to the colored-rect fallback (no crash).
+    "hurt":   "Hurt",
+    "jump":   "Jump",
+    "fall":   "Fall",
 }
 
 
@@ -93,6 +96,11 @@ def _make_frames(base_color: tuple, state: str,
                 try:
                     sheet = pygame.image.load(sheet_path).convert_alpha()
                     sw, sh = sheet.get_size()
+                    # BUG-049: warn when sheet is not evenly divisible by frame height
+                    # so incorrect slicing is visible during development.
+                    if sh > 0 and sw % sh != 0:
+                        print(f"[animation] WARNING: {sheet_path} width {sw} is not "
+                              f"divisible by height {sh}; frame slicing may be wrong.")
                     # Frames are square: count = total_width // frame_height
                     frame_count = (sw // sh) if sh > 0 else _STATE_FRAMES[state]
                     if frame_count < 1:

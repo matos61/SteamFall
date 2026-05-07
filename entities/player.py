@@ -33,11 +33,14 @@ from settings import (
     FLESHFORGED_JUMP_MULT,    FLESHFORGED_JUMP_CUT,
     ABILITY_SLOTS_DEFAULT,
     SPRITE_DIR_PLAYER,
+    ABILITY_COST,
+    SOUL_SURGE_COOLDOWN, SOUL_SURGE_DAMAGE, SOUL_SURGE_RADIUS,
+    OVERDRIVE_DURATION,  OVERDRIVE_COOLDOWN,
+    LANDING_VY_THRESHOLD,
 )
 
 ATTACK_DAMAGE    = 20
 ATTACK_REACH     = 52    # Pixels the attack hitbox extends forward
-ABILITY_COST     = 30    # Resource cost per ability use
 
 
 class Player(Entity):
@@ -88,8 +91,11 @@ class Player(Entity):
         # Death state — holds us in a death pose before switching scenes
         self.death_timer = 0
 
-        # Landing dust: set > 0 on the frame the player lands
+        # Landing dust timer (used only for bookkeeping; visual is particle-based)
         self._land_timer = 0
+
+        # BUG-047: latch "hurt" animation for the full clip duration
+        self._hurt_latched = False
 
         # P2-5 upgrade bonuses (additive; set from gameplay.py via save_data)
         self.attack_damage_bonus: int   = 0
@@ -175,11 +181,13 @@ class Player(Entity):
         if solid_rects:
             move_and_collide(self, solid_rects)
 
-        # Landing detection — set dust timer on the frame we first touch ground
+        # Landing detection — set dust timer on the frame we first touch ground.
+        # HK-P6-C: only emit dust when falling fast enough to feel impactful.
         if not was_on_ground and self.on_ground:
             self._land_timer = 10
-            from systems.particles import particles
-            particles.emit_landing(self.rect.centerx, self.rect.bottom)
+            if self.vy >= LANDING_VY_THRESHOLD:
+                from systems.particles import particles
+                particles.emit_landing(self.rect.centerx, self.rect.bottom)
         if self._land_timer > 0:
             self._land_timer -= 1
 
@@ -325,24 +333,24 @@ class Player(Entity):
         """Marked ability: burst of arcane force in all directions."""
         if not self._spend_resource(ABILITY_COST):
             return
-        self._ability_cooldown = 90
+        self._ability_cooldown = SOUL_SURGE_COOLDOWN
         audio.play_sfx("ability")
         from systems.particles import particles
         particles.emit_soul_surge(self.rect.centerx, self.rect.centery)
         # Create four outward hitboxes (up, down, left, right)
         cx, cy = self.rect.center
-        size   = 80
+        size   = SOUL_SURGE_RADIUS
         for dx, dy in [(1,0),(-1,0),(0,1),(0,-1)]:
             hrect = pygame.Rect(cx + dx*20 - size//2,
                                 cy + dy*20 - size//2,
                                 size, size)
             self._surge_hitboxes.append(
-                AttackHitbox(hrect, damage=35, owner=self,
+                AttackHitbox(hrect, damage=SOUL_SURGE_DAMAGE, owner=self,
                              knockback_x=7.0, knockback_y=-5.0,
                              duration=12))
 
     def _activate_overdrive(self) -> None:
-        """Fleshforged ability: speed + damage boost for 3 seconds."""
+        """Fleshforged ability: speed + damage boost for a few seconds."""
         if not self._spend_resource(ABILITY_COST):
             return
         audio.play_sfx("ability")
@@ -350,8 +358,8 @@ class Player(Entity):
         particles.emit_overdrive(self.rect.centerx, self.rect.centery)
         self._overdrive        = True
         self._ability_active   = True
-        self._ability_timer    = 180   # 3 seconds at 60 fps
-        self._ability_cooldown = 240
+        self._ability_timer    = OVERDRIVE_DURATION
+        self._ability_cooldown = OVERDRIVE_COOLDOWN
 
     def _tick_ability(self) -> None:
         if self._ability_active:
@@ -365,9 +373,15 @@ class Player(Entity):
     # ------------------------------------------------------------------
 
     def _update_animation(self) -> None:
+        # BUG-047: latch "hurt" state for full clip; clear latch when iframes expire.
+        if self.iframes == PLAYER_IFRAMES:
+            self._hurt_latched = True
+        elif self.iframes == 0:
+            self._hurt_latched = False
+
         if not self.alive:
             self._anim.set_state("death")
-        elif self.iframes == PLAYER_IFRAMES:
+        elif self._hurt_latched:
             self._anim.set_state("hurt")
         elif self._windup_timer > 0 or self._attack_timer > 0:
             self._anim.set_state("attack")
@@ -432,20 +446,8 @@ class Player(Entity):
             arc_surf.fill((*GOLD, alpha))
             surface.blit(arc_surf, arc_rect.topleft)
 
-        # Landing dust puff — two small fading marks at ground level
-        if self._land_timer > 0:
-            alpha    = int(160 * self._land_timer / 10)
-            dust_w   = screen_rect.width + 14
-            dust_h   = 3
-            dust_y   = screen_rect.bottom - 1
-            dust_x   = screen_rect.left - 7
-            dust_s   = pygame.Surface((dust_w, dust_h), pygame.SRCALPHA)
-            dust_col = (180, 175, 200, alpha)
-            # Two short marks spread outward from the center
-            hw = dust_w // 3
-            pygame.draw.rect(dust_s, dust_col, (0,        0, hw, dust_h))
-            pygame.draw.rect(dust_s, dust_col, (dust_w - hw, 0, hw, dust_h))
-            surface.blit(dust_s, (dust_x, dust_y))
+        # HK-P6-D: _land_timer draw removed; particle system (emit_landing) is the
+        # canonical landing-dust effect now. _land_timer bookkeeping is kept in update().
 
         # Soul surge rings
         for hb in self._surge_hitboxes:

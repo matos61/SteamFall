@@ -85,9 +85,11 @@ class SettingsScene(BaseScene):
             self.game.save_data["sfx_vol"] = self._sfx_vol
             self.game.audio.play_sfx("hit")
         elif self._sel == 2:
-            self._fullscreen = not self._fullscreen
-            pygame.display.toggle_fullscreen()
-            self.game.save_data["fullscreen"] = self._fullscreen
+            # BUG-050: only toggle on a positive delta to prevent key-repeat flicker.
+            if delta > 0:
+                self._fullscreen = not self._fullscreen
+                pygame.display.toggle_fullscreen()
+                self.game.save_data["fullscreen"] = self._fullscreen
 
     # ------------------------------------------------------------------
 

@@ -292,6 +292,20 @@ PARTICLE_LAND_COUNT       = LANDING_PARTICLE_COUNT  # backwards-compat alias
 # Misc particle constants (dust color kept for existing code)
 PARTICLE_DUST_COLOR       = LANDING_PARTICLE_COLOR
 
+# --- P6-0c: Player hit screen shake ---
+PLAYER_HIT_SHAKE_FRAMES = 4     # Camera shake duration when player takes damage
+
+# --- P6-0c: Landing dust velocity gate ---
+LANDING_VY_THRESHOLD = 4.0      # Min fall speed to emit landing dust particles
+
+# --- P6-0c: Ability constants (extracted from player.py magic numbers) ---
+ABILITY_COST         = 30    # Resource cost per ability use
+SOUL_SURGE_COOLDOWN  = 90    # Frames between Soul Surge uses
+SOUL_SURGE_DAMAGE    = 35    # Damage dealt by each Soul Surge hitbox
+SOUL_SURGE_RADIUS    = 80    # Half-width of each Soul Surge hitbox
+OVERDRIVE_DURATION   = 180   # Frames Overdrive speed+damage boost lasts (3 s at 60 fps)
+OVERDRIVE_COOLDOWN   = 240   # Frames between Overdrive uses
+
 # --- P4-2: Death screen text ---
 DEATH_TEXT_MARKED      = "The ink fades..."
 DEATH_TEXT_FLESHFORGED = "The forge goes cold..."

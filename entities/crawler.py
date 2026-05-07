@@ -7,45 +7,53 @@
 #   • Deals touch damage via a persistent hitbox that covers its own rect.
 #   • 30 HP, 10 contact damage, dark green color.
 #
+# Inherits from Enemy so it participates in the animation state machine
+# (P4-6 / P5-1) and faction-tint blending (P3-2).  _update_ai() is
+# overridden to a no-op because the Crawler's movement logic lives directly
+# in update() rather than in the three-state patrol/chase/attack AI.
+#
 # Tile char: lowercase 'c' in the level grid.
 # =============================================================================
 
 import pygame
-from entities.entity import Entity
+from entities.enemy  import Enemy
 from systems.combat  import AttackHitbox
 from settings        import (CRAWLER_SPEED, CRAWLER_HP, CRAWLER_DAMAGE,
                               CRAWLER_COLOR, FACTION_MARKED)
 
 
-class Crawler(Entity):
+class Crawler(Enemy):
     """Ground-hugging auto-patrol enemy with touch damage."""
 
     def __init__(self, x: float, y: float):
-        super().__init__(x, y, width=32, height=22, color=CRAWLER_COLOR,
-                         max_health=CRAWLER_HP)
+        super().__init__(x, y, patrol_range=0, color=CRAWLER_COLOR)
+        # Override dimensions and stats after Enemy.__init__ sets its defaults
+        self.rect.width   = 32
+        self.rect.height  = 22
+        self.max_health   = CRAWLER_HP
+        self.health       = CRAWLER_HP
         self.vx           = CRAWLER_SPEED   # Start moving right
         self.facing       = 1
         self.faction_drop = FACTION_MARKED  # drops SoulShard on death
-        # Hitboxes list (re-created each frame to match current position)
-        self.hitboxes: list[AttackHitbox] = []
+
+    # ------------------------------------------------------------------
+
+    def _update_ai(self, player) -> None:
+        """Crawler does not use the three-state patrol/chase/attack AI."""
+        pass
 
     # ------------------------------------------------------------------
 
     def update(self, dt: int, player=None, solid_rects=None) -> None:
-        super().update(dt)
+        # Remember intended direction BEFORE physics may zero out vx on wall impact
+        intended_vx = self.vx
+
+        # Enemy.update() handles: Entity.update (iframes), hitbox clear,
+        # physics (gravity + collide), and animation state machine.
+        super().update(dt, player, solid_rects)
 
         if not self.alive:
             return
-
-        self.hitboxes.clear()
-
-        # Move horizontally; remember the vx we *intended* to use
-        intended_vx = self.vx
-
-        from systems.physics import apply_gravity, move_and_collide
-        apply_gravity(self)
-        if solid_rects:
-            move_and_collide(self, solid_rects)
 
         # Wall detection: physics zeroed out vx → flip direction
         if self.vx == 0 and intended_vx != 0:
@@ -57,6 +65,7 @@ class Crawler(Entity):
             self.vx = self.facing * CRAWLER_SPEED
 
         # Persistent touch-damage hitbox covering the entity rect
+        # (Enemy.update cleared hitboxes; re-add here after movement is resolved)
         self.hitboxes.append(
             AttackHitbox(self.rect.copy(), damage=CRAWLER_DAMAGE,
                          owner=self, knockback_x=4.0, knockback_y=-2.5,
@@ -75,6 +84,7 @@ class Crawler(Entity):
     # ------------------------------------------------------------------
 
     def draw(self, surface: pygame.Surface, camera) -> None:
+        # Enemy.draw() handles animation frames and faction-tint blending (BUG-051)
         super().draw(surface, camera)
 
         # Draw simple "legs" (two small rects below body) for flavour
