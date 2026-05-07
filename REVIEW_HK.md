@@ -1130,3 +1130,123 @@ This requires no new constants and is a minimal 4-line addition.
 | No enemy death SFX | `scenes/gameplay.py` L783–787; `systems/audio.py` L21–29 | Enemy kills are silent — no auditory kill confirmation | Add `SOUND_ENEMY_DEATH` constant; wire `audio.play_sfx("enemy_death")` in death loop |
 | Settings screen silent volume change | `scenes/settings.py` L83–86 | Adjusting SFX volume has no auditory preview | Call `audio.play_sfx("hit")` after each SFX volume adjustment |
 | Lore display no player-dismiss (P3 deferred × 2) | `scenes/gameplay.py` L715–721; `settings.py` L254 | Auto-dismiss still active; no SPACE shortcut; timer floor still 300 | Add `KEYDOWN` intercept in `handle_event`; raise `LORE_DISPLAY_FRAMES` to `480` as fallback |
+
+---
+
+## Phase 6 Feel Pass (2026-05-07)
+
+_Focus: P5-1 sprite-sheet integration and P5-5 particles/audio additions. Verifies HK-P5-A through HK-P5-I; identifies new feel gaps exposed or introduced by those two tasks._
+
+---
+
+### Status of HK-P5-A through HK-P5-I
+
+| Flag | File(s) changed | Status |
+|---|---|---|
+| HK-P5-A: `PARTICLE_ABILITY_COUNT` dead import | `settings.py`, `systems/particles.py` | **FIXED** — constant and import both removed |
+| HK-P5-B: Landing dust lifetime / count | `settings.py` L287–288, `systems/particles.py` L128 | **FIXED** — `LANDING_PARTICLE_COUNT = 6`, `LANDING_PARTICLE_LIFE = 20` used in `emit_landing` |
+| HK-P5-C: Player death faction color | `scenes/gameplay.py` L910–923 | **FIXED** — `_death_color` resolved from `player_faction`; `(140, 80, 220)` Marked / `(220, 120, 20)` Fleshforged |
+| HK-P5-D: Hurt animation one-shot | `entities/player.py` L370 | **FIXED** — `iframes == PLAYER_IFRAMES` gate fires once only |
+| HK-P5-E: Enemy jump/fall animation | `entities/enemy.py` L90–93 | **FIXED** — `not self.on_ground` branches added for `"jump"` / `"fall"` states |
+| HK-P5-F: Tile sheets levels 6–10 | `settings.py` L326–327, `world/tilemap.py` L59–61 | **FIXED** — `TILE_SHEET_LEVEL_6_8` (reuses foundry) and `TILE_SHEET_LEVEL_9_10` (reuses sanctum) mapped |
+| HK-P5-G: Enemy death SFX | `systems/audio.py` L29, `scenes/gameplay.py` L795 | **FIXED** — `audio.play_sfx("enemy_death")` wired in newly-dead loop |
+| HK-P5-H: Settings SFX preview | `scenes/settings.py` L86 | **FIXED** — `audio.play_sfx("hit")` called after SFX volume adjustment |
+| HK-P5-I: Lore player-dismiss | `scenes/gameplay.py` L338, L448–450, L723 | **FIXED** — `_lore_waiting_dismiss` flag added; SPACE/RETURN dismisses |
+
+All nine prior recommendations are confirmed implemented. The items below are new gaps found after reviewing the P5-1 and P5-5 changes.
+
+---
+
+### New Gaps — P5-1 (Sprite Sheet Integration)
+
+**HK-P6-A** `systems/animation.py` lines 51–53: Sprite-sheet fallback maps `"hurt"` to `"Idle"` sheet, `"jump"` to `"Walk"` sheet, and `"fall"` to `"Walk"` sheet. When real `Side_*.png` assets arrive, hurt will play idle frames and airborne states will play walk frames. In Hollow Knight every state has a distinct sprite — the Knight visibly curls during hurt and stretches during a high jump. Playing the wrong sheet degrades the tactile read of each physical event. Suggested change: add `"hurt": "Hurt"` and `"jump": "Jump"` and `"fall": "Fall"` to `_SHEET_NAME_MAP`, then fall through to the colored-rect fallback only if those sheet files are absent. The fallback already handles the missing-file case gracefully (`try/except` in `_make_frames` Priority 2 block). No constant change needed — this is a pure code change in `animation.py`.
+
+**HK-P6-B** `systems/animation.py` lines 24–32: `_STATE_FPS` sets `"attack": 3` (one animation tick per 3 game frames). With `PLAYER_ATTACK_DURATION = 12` frames and `WINDUP_FRAMES = 4` frames the total attack window is 16 frames. At 3 game-frames per animation frame, a 4-frame attack animation completes in exactly 12 frames — the active portion fits but the windup 4 frames show only one animation frame (frame 0, the windup frame). In HK, the attack animation is divided into a fast windup frame, a hold-extended frame, and a recovery frame. The current `"attack"` state has 4 placeholder frames at rate 3, meaning 12 game-frames are consumed by the animation — but the windup phase (`_windup_timer` 4 frames) runs the same `"attack"` state, so a player who lands a hit will see the animation cycle restart mid-attack because `set_state("attack")` is called every frame the condition is true. Since `set_state` only resets when state changes, this is actually fine — but the 3-frame tick rate means the attack finishes only 1–2 animation frames deep in a 12-frame hitbox window, producing a visual mismatch where the sprite looks "done" while the hitbox is still active. Suggested change: raise `_STATE_FPS["attack"]` from `3` to `4` so a 4-frame attack animation covers 16 frames (4 windup + 12 active), keeping sprite and hitbox in sync.
+
+**HK-P6-C** `entities/player.py` lines 179–184: Landing dust (`particles.emit_landing`) fires on every ground contact, including tiny hops where `vy` was barely above 0. In Hollow Knight, the Knight only raises dust after a meaningful fall (roughly equivalent to a `vy > 4` threshold at landing). Firing on every footstep — including the one-pixel oscillations caused by walking on uneven terrain — floods the particle system with low-signal dust puffs that train the player to ignore them. The original 2026-04-12 Phase 1 review explicitly called out tracking `prev_vy > 8` as the trigger. Suggested change: track `_prev_vy` in `player.py` and only call `particles.emit_landing()` when `abs(prev_vy) > 4.0`. Add a constant to `settings.py`:
+
+```python
+# settings.py — add near LANDING_PARTICLE_* constants
+LANDING_VY_THRESHOLD = 4.0   # minimum downward speed to trigger landing dust
+```
+
+In `player.py`, store velocity before physics each frame:
+```python
+# player.py update() — before apply_gravity():
+_prev_vy = self.vy
+```
+Then gate the emit call:
+```python
+# player.py landing detection block (around line 179):
+if not was_on_ground and self.on_ground and abs(_prev_vy) > LANDING_VY_THRESHOLD:
+    particles.emit_landing(self.rect.centerx, self.rect.bottom)
+```
+The `_land_timer` visual mark should also be gated the same way. Justification: HK's dust is a meaningful signal ("I fell far enough to matter"). At vy=0 the player is just standing still; the dust particle is noise.
+
+**HK-P6-D** `entities/player.py` lines 436–448: The `_land_timer` draw block in `player.draw()` renders a procedural 2-line dust mark at the player's feet, independent of the particle system dust already emitted by `particles.emit_landing()`. This means every landing produces both a particle burst (6 puffs drifting outward) and a 2-line sprite mark stuck to the player's bottom edge. The two effects fight: the particle burst is world-space and drifts away naturally, while the sprite mark is screen-space and fades in place. In HK, landing dust is a single coherent effect — one set of dust clouds that drift and fade. Suggested change: remove the `_land_timer` draw block from `player.draw()` (lines 436–448) entirely; the particle system alone provides the landing feedback. The `_land_timer` variable can also be removed from `__init__` and `update()` (lines 92, 180, 183–184). This simplifies the player draw path and eliminates the visual conflict. Justification: two overlapping dust effects at the same event emit double the visual noise for half the clarity; the particle system is the canonical effect.
+
+---
+
+### New Gaps — P5-5 (Particles / Audio Additions)
+
+**HK-P6-E** `entities/entity.py` line 74 and `scenes/gameplay.py` line 793: Enemy death emits `particles.emit_death()` twice — once in `Entity.die()` (called by `take_damage` when health drops to 0) and a second time in the `newly_dead` loop in `gameplay.py update()`. Both calls use the same center coordinates and the same `dead_e.color`. The result is a death burst with double density: `DEATH_PARTICLE_COUNT = 14` particles from `entity.die()` plus another 14 from `gameplay.py`, producing 28 particles per kill. The `hitstop.is_active()` guard at `gameplay.py` L790 prevents the gameplay loop from running during hitstop but `Entity.die()` is called from inside `_apply_hit` which runs before the hitstop guard. Suggested change: remove the `particles.emit_death()` call from `entity.py` line 74 entirely and let `gameplay.py`'s newly-dead loop be the sole emission site. The gameplay loop already has faction-tint context (`dead_e.color`) and can vary the color by enemy type when needed. This also enables future differentiation (e.g. boss death gets a larger burst). Justification: 28 particles vs. 14 is double the density HK's death bursts produce; denser than calibrated, and the double-emit is an unintentional side-effect of P5-5 adding the gameplay-loop emission on top of an existing entity-level one.
+
+**HK-P6-F** `scenes/gameplay.py` lines 588–593: When the player is hit, a red 360° particle burst (`color=RED`, `HIT_PARTICLE_COUNT=6`) is emitted. In HK, player-hit feedback is a bright white flash (already implemented via the damage vignette) plus an outward burst in a neutral or faction-colored palette — not red. Using `RED` for the player-hit burst is confusing because `RED` is also the enemy health-bar color and one of the combat HUD colors. A player taking damage from a Fleshforged-orange or Marked-purple enemy while seeing red sparks gets no faction signal — the sparks look like the player is bleeding. Suggested change: resolve the player-hit burst color from `player.faction`, matching the faction palette used by the death screen:
+
+```python
+# scenes/gameplay.py around line 588 — replace color=RED:
+_hit_color = (180, 140, 220) if faction == FACTION_MARKED else (220, 160, 80)
+particles.emit(
+    self.player.rect.centerx, self.player.rect.centery,
+    HIT_PARTICLE_COUNT, HIT_PARTICLE_SPEED,
+    _hit_color, HIT_PARTICLE_LIFE, spread=360,
+)
+```
+
+No new constants needed; these color values already appear in `gameplay.py` lines 1259 and 1262 for the death text. Justification: faction-colored impact sparks reinforce the player's identity and make damage feel personal rather than generic.
+
+**HK-P6-G** `scenes/gameplay.py` lines 586–593: Player-hit sparks fire when `prev_iframes == 0 and self.player.iframes > 0` but no `_screen_shake` is set at this site. Currently `_screen_shake` is only set at boss phase-transition events (lines 738 and 757, both set to `10`). In Hollow Knight, the camera shakes for 2–4 frames on every hit the Knight receives — a micro-shake that punctuates the impact without being disorienting. The infrastructure already exists (`_screen_shake` decay at L545–546, shake applied in `draw()` at L1019–1024). Suggested change: add a small shake on player hit:
+
+```python
+# scenes/gameplay.py around line 587 (inside the prev_iframes == 0 block):
+self._screen_shake = max(self._screen_shake, 4)   # don't reset a larger shake
+```
+
+Add a constant to `settings.py`:
+```python
+# settings.py — near DAMAGE_FLASH_FRAMES
+PLAYER_HIT_SHAKE_FRAMES = 4   # camera shake frames on player hit (0 = no shake)
+```
+Then reference it: `self._screen_shake = max(self._screen_shake, PLAYER_HIT_SHAKE_FRAMES)`. Justification: screen shake on player hit is the single most-cited "missing" feel element in HK analysis. It communicates impact weight more viscerally than any other single effect and is cheap to implement with the existing shake infrastructure.
+
+**HK-P6-H** `entities/player.py` line 328: Soul Surge ability cooldown is hardcoded as `self._ability_cooldown = 90` inside `_activate_soul_surge()`. Similarly `_ability_timer = 180` (Overdrive duration) and `_ability_cooldown = 240` (Overdrive cooldown) at lines 353–354 are hardcoded magic numbers. `ABILITY_COST = 30` (line 40) is a module-level constant but not in `settings.py`. None of these values appear in `settings.py`, making them invisible to tuning without code changes. By contrast, all enemy stats, all particle counts, and all physics constants are in `settings.py`. Suggested change: add the following to `settings.py`:
+
+```python
+# settings.py — add under Hollow Knight feel constants or ability section
+SOUL_SURGE_COOLDOWN    = 90    # frames between Soul Surge uses (was hardcoded in player.py L328)
+SOUL_SURGE_DAMAGE      = 35    # damage per directional hitbox (was hardcoded in player.py L340)
+SOUL_SURGE_SIZE        = 80    # AOE hitbox side length in px (was hardcoded in player.py L334)
+OVERDRIVE_DURATION     = 180   # frames Overdrive speed+dmg boost lasts (was hardcoded L353)
+OVERDRIVE_COOLDOWN     = 240   # frames between Overdrive uses (was hardcoded L354)
+ABILITY_COST           = 30    # resource cost per ability use (was module-level in player.py L40)
+```
+
+Justification: any future tuning pass (e.g. if HK-feel review recommends shortening Overdrive duration or raising Soul Surge AOE) requires a code edit rather than a constants edit. The settings.py-owns-all-tunable-values principle (stated in AGENTS.md build-agent rules) applies here. Keeping these in player.py creates a hidden tuning surface.
+
+**HK-P6-I** `systems/particles.py` lines 91–100: `emit_hit()` ignores the `HIT_PARTICLE_SPEED` constant defined in `settings.py` line 264 (`HIT_PARTICLE_SPEED = 4.0`). Instead the function hardcodes `speed = random.uniform(2.5, 5.5)`. The constant is consumed by `gameplay.py` line 591 (which calls `particles.emit()`, not `particles.emit_hit()`) but the dedicated hit-spark emitter — the one called from `combat.py` line 75 on every nail connection — uses its own hardcoded range. This means the canonical nail-connect sparks cannot be tuned from `settings.py`. The mid-range of `2.5–5.5` averages to `4.0`, which matches `HIT_PARTICLE_SPEED`, but the lower bound of 2.5 produces some very slow sparks that barely drift and look like dust. Suggested change: replace the hardcoded `uniform(2.5, 5.5)` in `emit_hit()` with `random.uniform(HIT_PARTICLE_SPEED * 0.6, HIT_PARTICLE_SPEED * 1.4)` — the range scales with the constant while preserving natural spread. This way raising `HIT_PARTICLE_SPEED` in `settings.py` scales the spark velocity as expected. Justification: the constant exists precisely to control this; the disconnect between the constant and the actual emitter will cause unexpected results if a tuner raises `HIT_PARTICLE_SPEED` in `settings.py` and sees no change in nail-connect sparks.
+
+---
+
+### Summary Table (2026-05-07)
+
+| Flag | File(s) | Key Issue | Recommended Change |
+|---|---|---|---|
+| HK-P6-A | `systems/animation.py` L51–53 | `"hurt"`, `"jump"`, `"fall"` all fall back to wrong sheets (`Idle` / `Walk`) when real sprites arrive | Map each state to its own sheet name in `_SHEET_NAME_MAP`; fall back to colored rect only if absent |
+| HK-P6-B | `systems/animation.py` L28 | `_STATE_FPS["attack"] = 3` — animation visually finishes before hitbox duration ends | Raise to `4` so 4-frame attack animation spans the full 16-frame attack+windup window |
+| HK-P6-C | `entities/player.py` L179–184 | Landing dust emits on every ground contact including zero-height hops | Add `LANDING_VY_THRESHOLD = 4.0` to `settings.py`; gate `emit_landing()` on `abs(prev_vy) > LANDING_VY_THRESHOLD` |
+| HK-P6-D | `entities/player.py` L436–448 | `_land_timer` draws a 2-line sprite mark on top of the particle-system dust — two conflicting effects | Remove `_land_timer` draw block; particle system alone is the authoritative landing effect |
+| HK-P6-E | `entities/entity.py` L74; `scenes/gameplay.py` L793 | Enemy death emits `emit_death()` twice (once in `Entity.die()`, once in gameplay loop) producing 28 particles instead of 14 | Remove `particles.emit_death()` from `Entity.die()`; gameplay loop is the sole emission site |
+| HK-P6-F | `scenes/gameplay.py` L592 | Player-hit burst uses hardcoded `RED` — no faction identity at the most impactful feedback moment | Resolve from `player.faction`: purple burst for Marked, orange for Fleshforged |
+| HK-P6-G | `scenes/gameplay.py` L586–593 | No `_screen_shake` set on player hit — infrastructure exists but unused for normal combat hits | Add `self._screen_shake = max(self._screen_shake, PLAYER_HIT_SHAKE_FRAMES)` on hit; add `PLAYER_HIT_SHAKE_FRAMES = 4` to `settings.py` |
+| HK-P6-H | `entities/player.py` L328, L340, L353–354; `settings.py` | Soul Surge cooldown (90), Overdrive duration (180), cooldown (240), damage (35), AOE size (80), and `ABILITY_COST` (30) all hardcoded — invisible to settings tuning | Move all to `settings.py` as named constants; reference from `player.py` |
+| HK-P6-I | `systems/particles.py` L95 | `emit_hit()` hardcodes `uniform(2.5, 5.5)` — ignores `HIT_PARTICLE_SPEED = 4.0` from `settings.py` | Replace with `uniform(HIT_PARTICLE_SPEED * 0.6, HIT_PARTICLE_SPEED * 1.4)` so constant governs spark speed |
