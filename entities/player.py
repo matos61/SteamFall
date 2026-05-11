@@ -34,7 +34,7 @@ from settings import (
     ABILITY_SLOTS_DEFAULT,
     SPRITE_DIR_PLAYER,
     ABILITY_COST,
-    SOUL_SURGE_COOLDOWN, SOUL_SURGE_DAMAGE, SOUL_SURGE_RADIUS,
+    SOUL_SURGE_COOLDOWN, SOUL_SURGE_DAMAGE, SOUL_SURGE_RADIUS, SOUL_SURGE_SIZE,
     OVERDRIVE_DURATION,  OVERDRIVE_COOLDOWN,
     LANDING_VY_THRESHOLD,
 )
@@ -90,9 +90,6 @@ class Player(Entity):
 
         # Death state — holds us in a death pose before switching scenes
         self.death_timer = 0
-
-        # Landing dust timer (used only for bookkeeping; visual is particle-based)
-        self._land_timer = 0
 
         # BUG-047: latch "hurt" animation for the full clip duration
         self._hurt_latched = False
@@ -181,15 +178,13 @@ class Player(Entity):
         if solid_rects:
             move_and_collide(self, solid_rects)
 
-        # Landing detection — set dust timer on the frame we first touch ground.
-        # HK-P6-C: only emit dust when falling fast enough to feel impactful.
+        # Landing detection — emit dust only when falling fast enough to feel impactful.
+        # HK-P6-C: gate on LANDING_VY_THRESHOLD so zero-height hops stay silent.
+        # HK-P6-D: _land_timer removed; particle system is the sole landing effect.
         if not was_on_ground and self.on_ground:
-            self._land_timer = 10
             if self.vy >= LANDING_VY_THRESHOLD:
                 from systems.particles import particles
                 particles.emit_landing(self.rect.centerx, self.rect.bottom)
-        if self._land_timer > 0:
-            self._land_timer -= 1
 
         # Coyote time: count down after leaving ground (walked off ledge)
         if was_on_ground and not self.on_ground:
@@ -446,8 +441,8 @@ class Player(Entity):
             arc_surf.fill((*GOLD, alpha))
             surface.blit(arc_surf, arc_rect.topleft)
 
-        # HK-P6-D: _land_timer draw removed; particle system (emit_landing) is the
-        # canonical landing-dust effect now. _land_timer bookkeeping is kept in update().
+        # HK-P6-D: _land_timer fully removed; particle system (emit_landing) is the
+        # sole canonical landing-dust effect.
 
         # Soul surge rings
         for hb in self._surge_hitboxes:

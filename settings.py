@@ -189,7 +189,10 @@ BOSS_DASH_COOLDOWN         = 110   # frames between dash opportunities
 BOSS_PROJ_SPREAD_VY        = 3     # vy offset for the upper/lower spread projectiles
 
 # Phase 3 — arena shrink walls
+ARENS_SHRINK_SPEED         = 0.5   # px/frame the walls move inward
+ARENS_SHRINK_AMOUNT        = 200   # max px each side shrinks inward
 ARENA_SHRINK_SPEED         = 0.5   # px/frame the walls move inward
+ARENS_SHRINK_AMOUNT        = 200   # max px each side shrinks inward
 ARENA_SHRINK_AMOUNT        = 200   # max px each side shrinks inward
 ARENA_WALL_COLOR           = (45, 25, 75)   # dark purple tile colour
 
@@ -303,6 +306,7 @@ ABILITY_COST         = 30    # Resource cost per ability use
 SOUL_SURGE_COOLDOWN  = 90    # Frames between Soul Surge uses
 SOUL_SURGE_DAMAGE    = 35    # Damage dealt by each Soul Surge hitbox
 SOUL_SURGE_RADIUS    = 80    # Half-width of each Soul Surge hitbox
+SOUL_SURGE_SIZE      = SOUL_SURGE_RADIUS   # AOE hitbox side length (alias for spec compliance)
 OVERDRIVE_DURATION   = 180   # Frames Overdrive speed+damage boost lasts (3 s at 60 fps)
 OVERDRIVE_COOLDOWN   = 240   # Frames between Overdrive uses
 
