@@ -1875,7 +1875,7 @@ All five shipping phases are complete. The last review-agent pass was **2026-05-
 **Priority order for agents:**
 
 1. ~~**P6-0b (post-ship review)**~~ ✅ **DONE (2026-05-07)** — review-agent found BUG-047–051 (one 🔴 critical); hk-agent found HK-P6-A–I (nine feel gaps). All verified in `REVIEW_BUGS.md` and `REVIEW_HK.md`.
-2. **P6-0c (critical bug-fix sprint)** ⏳ NEXT — fix BUG-048 (🔴 critical) and high-priority HK-P6-G (screen shake on player hit). Assign to build-agent.
+2. ~~**P6-0c (critical bug-fix sprint)**~~ ✅ **DONE (2026-05-15)** — BUG-047–051 all fixed; HK-P6-A through HK-P6-I all implemented. `python main.py` launches without ImportError.
 
 ---
 
@@ -1894,7 +1894,21 @@ All five shipping phases are complete. The last review-agent pass was **2026-05-
 
 ---
 
-### Task P6-0c: Critical Bug-Fix Sprint (Phase 6) ⏳ NEXT
+### Task P6-0c: Critical Bug-Fix Sprint (Phase 6) ✅ DONE (2026-05-15)
+
+_All fixes confirmed present in code. Verified 2026-05-15 by orchestrator check — build-agent inspected all 14 fix sites; `python main.py` launches without ImportError._
+
+**What was built:**
+- `scenes/gameplay.py`: `return` added after lore-dismiss SPACE handler (BUG-048); player-hit particles faction-colored (HK-P6-F); `self._screen_shake = PLAYER_HIT_SHAKE_FRAMES` at player-hit site + screen-shake draw offset (HK-P6-G).
+- `entities/player.py`: `_hurt_latched` bool added to hold "hurt" state for full iframe window (BUG-047); `emit_landing()` gated on `self.vy >= LANDING_VY_THRESHOLD` (HK-P6-C); `_land_timer` dust-mark draw block removed (HK-P6-D); Soul Surge and Overdrive magic numbers replaced with settings constants (HK-P6-H).
+- `entities/entity.py`: `emit_death()` removed from `Entity.die()` — only called in gameplay.py's newly-dead loop; 14 particles total (not 28) (HK-P6-E).
+- `entities/crawler.py`: `super().update()` and `super().draw()` now call Enemy-level super, restoring animation and faction-tint (BUG-051).
+- `systems/animation.py`: `print` warning when `sw % sh != 0` (BUG-049); `_SHEET_NAME_MAP` extended with `"hurt": "Hurt"`, `"jump": "Jump"`, `"fall": "Fall"` (HK-P6-A); `_STATE_FPS["attack"]` raised from 3 → 4 (HK-P6-B).
+- `systems/particles.py`: `emit_hit()` uses `uniform(HIT_PARTICLE_SPEED * 0.6, HIT_PARTICLE_SPEED * 1.4)` (HK-P6-I).
+- `scenes/settings.py`: fullscreen toggle guarded with `if delta > 0` (BUG-050).
+- `settings.py`: `PLAYER_HIT_SHAKE_FRAMES = 4`; `LANDING_VY_THRESHOLD = 4.0`; `SOUL_SURGE_COOLDOWN`, `SOUL_SURGE_DAMAGE`, `SOUL_SURGE_RADIUS`, `OVERDRIVE_DURATION`, `OVERDRIVE_COOLDOWN`, `ABILITY_COST` all extracted (HK-P6-G, HK-P6-C, HK-P6-H).
+
+_Original spec (kept for reference):_
 
 _Unblocked by P6-0b completion (2026-05-07). BUG-048 is 🔴 critical and must be fixed first. HK-P6-G (screen shake on player hit) is the highest-priority feel gap per hk-agent analysis._
 
@@ -2071,15 +2085,15 @@ _Review-agent 2026-05-02 pass (P5-0b):_
 
 _Review-agent 2026-05-07 pass (P6-0b):_
 
-52. 🔴 **BUG-048** `gameplay.py` lines 447–450: Lore-dismiss SPACE handler missing `return` — falls through to death-screen skip check on the same frame. If `_death_timer > 60` when SPACE is pressed to dismiss a lore overlay, both lore-dismiss and death-screen early-respawn fire simultaneously. Fix: add `return` after setting `_lore_timer = 0`. Assign to build-agent in P6-0c.
+52. ✅ **BUG-048** `gameplay.py` lines 447–450: Lore-dismiss SPACE handler missing `return` — fixed in P6-0c (2026-05-15). `return` added after `_lore_timer = 0` / `_lore_waiting_dismiss = False`.
 
-53. ⚠️ **BUG-047** `player.py` line 370: P5-1 hurt-state fix (`iframes == PLAYER_IFRAMES`) is True for exactly one frame — the hurt animation transitions away immediately, playing only frame 0. Fix: introduce a `_hurt_latched` bool, set on the first iframe frame and cleared when `iframes == 0`, to hold the "hurt" state for the full clip. Assign to build-agent in P6-0c.
+53. ✅ **BUG-047** `player.py` line 370: Hurt animation playing only 1 frame — fixed in P6-0c (2026-05-15). `_hurt_latched` bool holds "hurt" state for the full iframe window.
 
-54. ⚠️ **BUG-049** `animation.py` lines 96–98: Sprite-sheet frame-count formula `sw // sh` assumes square frames; non-square sheets silently produce wrong frame counts and distorted clips. Fix: log a warning when `sw % sh != 0`. Assign to build-agent in P6-0c.
+54. ✅ **BUG-049** `animation.py` lines 96–98: Non-square sprite-sheet silent wrong frame count — fixed in P6-0c (2026-05-15). Warning printed when `sw % sh != 0`.
 
-55. ⚠️ **BUG-050** `settings.py` line 88: Fullscreen `_adjust()` handler in `scenes/settings.py` calls `pygame.display.toggle_fullscreen()` on every key-repeat event from a held arrow key, flickering the display. Fix: only toggle when `delta > 0`. Assign to build-agent in P6-0c.
+55. ✅ **BUG-050** `scenes/settings.py`: Fullscreen toggle flickering on held arrow key — fixed in P6-0c (2026-05-15). `if delta > 0` guard added.
 
-56. ⚠️ **BUG-051** `entities/crawler.py` + `entities/enemy.py`: `Crawler.update()` and `Crawler.draw()` call the `Entity`-level super, bypassing enemy animation state machine (P5-1) and faction-tint blending (P3-2). Fix: call `Enemy`-level `super()` in both methods. Assign to build-agent in P6-0c.
+56. ✅ **BUG-051** `entities/crawler.py`: Crawler calling Entity-level super, bypassing enemy animation and faction-tint — fixed in P6-0c (2026-05-15). Now calls Enemy-level `super()` in both `update()` and `draw()`.
 
 ---
 
@@ -2089,15 +2103,17 @@ _Evaluated by hk-agent 2026-05-07; see `REVIEW_HK.md` for full analysis. HK-P5-A
 
 | # | Improvement | Status | Effort | Files |
 |---|---|---|---|---|
-| HK-P6-A | `animation.py` L51–53: `"hurt"`/`"jump"`/`"fall"` map to `Idle`/`Walk` sheets — add explicit `_SHEET_NAME_MAP` entries with graceful PNG-missing fallback | ⏳ P6-0c | Minor | `systems/animation.py` |
-| HK-P6-B | `animation.py` L28: `_STATE_FPS["attack"] = 3` — attack clip ends before 16-frame hitbox window; raise to `4` | ⏳ P6-0c | Trivial | `systems/animation.py` |
-| HK-P6-C | `player.py` L179–184: Landing dust emits on every ground contact incl. zero-height hops; add `LANDING_VY_THRESHOLD = 4.0` gate | ⏳ P6-0c | Trivial | `entities/player.py`, `settings.py` |
-| HK-P6-D | `player.py` L436–448: `_land_timer` procedural dust-mark draw conflicts with particle dust; remove the draw block | ⏳ P6-0c | Minor | `entities/player.py` |
-| HK-P6-E | `entity.py` L74 / `gameplay.py` L793: Enemy death emits `emit_death()` twice → 28 particles (double the tuned count); remove call from `Entity.die()` | ⏳ P6-0c | Trivial | `entities/entity.py` |
-| HK-P6-F | `gameplay.py` L592: Player-hit particles hardcoded `RED` — use faction-colored burst (purple Marked / orange Fleshforged) | ⏳ P6-0c | Minor | `scenes/gameplay.py` |
-| HK-P6-G | `gameplay.py` L586–593: **No screen shake on player hit** — highest-priority feel gap; add `PLAYER_HIT_SHAKE_FRAMES = 4` and set on hit | ⏳ P6-0c | Minor | `scenes/gameplay.py`, `settings.py` |
-| HK-P6-H | `player.py` L328/340/353–354: Soul Surge and Overdrive constants are magic numbers; extract `SOUL_SURGE_COOLDOWN`, `SOUL_SURGE_DAMAGE`, `SOUL_SURGE_RADIUS`, `OVERDRIVE_DURATION`, `OVERDRIVE_COOLDOWN`, `ABILITY_COST` to `settings.py` | ⏳ P6-0c | Minor | `entities/player.py`, `settings.py` |
-| HK-P6-I | `particles.py` L95: `emit_hit()` hardcodes `uniform(2.5, 5.5)` ignoring `HIT_PARTICLE_SPEED`; replace with `uniform(HIT_PARTICLE_SPEED * 0.6, HIT_PARTICLE_SPEED * 1.4)` | ⏳ P6-0c | Trivial | `systems/particles.py` |
+| HK-P6-A | `animation.py` L51–53: `"hurt"`/`"jump"`/`"fall"` map to `Idle`/`Walk` sheets — add explicit `_SHEET_NAME_MAP` entries with graceful PNG-missing fallback | ✅ P6-0c | Minor | `systems/animation.py` |
+| HK-P6-B | `animation.py` L28: `_STATE_FPS["attack"] = 3` — attack clip ends before 16-frame hitbox window; raise to `4` | ✅ P6-0c | Trivial | `systems/animation.py` |
+| HK-P6-C | `player.py` L179–184: Landing dust emits on every ground contact incl. zero-height hops; add `LANDING_VY_THRESHOLD = 4.0` gate | ✅ P6-0c | Trivial | `entities/player.py`, `settings.py` |
+| HK-P6-D | `player.py` L436–448: `_land_timer` procedural dust-mark draw conflicts with particle dust; remove the draw block | ✅ P6-0c | Minor | `entities/player.py` |
+| HK-P6-E | `entity.py` L74 / `gameplay.py` L793: Enemy death emits `emit_death()` twice → 28 particles (double the tuned count); remove call from `Entity.die()` | ✅ P6-0c | Trivial | `entities/entity.py` |
+| HK-P6-F | `gameplay.py` L592: Player-hit particles hardcoded `RED` — use faction-colored burst (purple Marked / orange Fleshforged) | ✅ P6-0c | Minor | `scenes/gameplay.py` |
+| HK-P6-G | `gameplay.py` L586–593: **No screen shake on player hit** — highest-priority feel gap; add `PLAYER_HIT_SHAKE_FRAMES = 4` and set on hit | ✅ P6-0c | Minor | `scenes/gameplay.py`, `settings.py` |
+| HK-P6-H | `player.py` L328/340/353–354: Soul Surge and Overdrive constants are magic numbers; extract `SOUL_SURGE_COOLDOWN`, `SOUL_SURGE_DAMAGE`, `SOUL_SURGE_RADIUS`, `OVERDRIVE_DURATION`, `OVERDRIVE_COOLDOWN`, `ABILITY_COST` to `settings.py` | ✅ P6-0c | Minor | `entities/player.py`, `settings.py` |
+| HK-P6-I | `particles.py` L95: `emit_hit()` hardcodes `uniform(2.5, 5.5)` ignoring `HIT_PARTICLE_SPEED`; replace with `uniform(HIT_PARTICLE_SPEED * 0.6, HIT_PARTICLE_SPEED * 1.4)` | ✅ P6-0c | Trivial | `systems/particles.py` |
+
+**All HK-P6 items confirmed done (2026-05-15).** A–I fixed in P6-0c.
 
 ---
 
