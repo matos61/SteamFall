@@ -1250,3 +1250,249 @@ Justification: any future tuning pass (e.g. if HK-feel review recommends shorten
 | HK-P6-G | `scenes/gameplay.py` L586–593 | No `_screen_shake` set on player hit — infrastructure exists but unused for normal combat hits | Add `self._screen_shake = max(self._screen_shake, PLAYER_HIT_SHAKE_FRAMES)` on hit; add `PLAYER_HIT_SHAKE_FRAMES = 4` to `settings.py` |
 | HK-P6-H | `entities/player.py` L328, L340, L353–354; `settings.py` | Soul Surge cooldown (90), Overdrive duration (180), cooldown (240), damage (35), AOE size (80), and `ABILITY_COST` (30) all hardcoded — invisible to settings tuning | Move all to `settings.py` as named constants; reference from `player.py` |
 | HK-P6-I | `systems/particles.py` L95 | `emit_hit()` hardcodes `uniform(2.5, 5.5)` — ignores `HIT_PARTICLE_SPEED = 4.0` from `settings.py` | Replace with `uniform(HIT_PARTICLE_SPEED * 0.6, HIT_PARTICLE_SPEED * 1.4)` so constant governs spark speed |
+
+---
+
+# HK Feel Review — 2026-05-16
+
+**Scope:** Full re-read of all .py files. P6-0c changes verified. Prior HK-P6-A through HK-P6-I all confirmed done. This pass starts at HK-P7-A.
+
+## HK-P5 and HK-P6 Confirmation
+
+All nine HK-P5-A through HK-P5-I items confirmed present in the code. Below is a one-sentence confirmation for each key P6-0c feel item from the task brief:
+
+- **Screen shake on player hit:** `PLAYER_HIT_SHAKE_FRAMES = 4` in `settings.py` line 299; `self._screen_shake = PLAYER_HIT_SHAKE_FRAMES` wired in `gameplay.py` line 589 inside the `prev_iframes == 0` block — confirmed.
+- **Faction-colored player-hit particles:** `gameplay.py` lines 591–603 resolve `_hit_color` from `player_faction` (purple for Marked, orange for Fleshforged, `RED` fallback) and pass it to `particles.emit()` — confirmed.
+- **`_hurt_latched` holding hurt state for full iframe window:** `player.py` lines 372–380 set `_hurt_latched = True` when `iframes == PLAYER_IFRAMES` and clear it when `iframes == 0`; `_update_animation` drives the `"hurt"` state from the latch, not from a frame-mod condition — confirmed.
+- **`emit_landing()` gated on `LANDING_VY_THRESHOLD = 4.0`:** `player.py` line 185 checks `self.vy >= LANDING_VY_THRESHOLD` before calling `particles.emit_landing()` — confirmed.
+- **`_land_timer` procedural dust-mark draw removed:** `player.draw()` contains no `_land_timer` draw block; particle system is the sole landing effect — confirmed.
+- **Soul Surge and Overdrive magic numbers extracted:** `settings.py` lines 305–311 define `ABILITY_COST`, `SOUL_SURGE_COOLDOWN`, `SOUL_SURGE_DAMAGE`, `SOUL_SURGE_RADIUS`, `OVERDRIVE_DURATION`, `OVERDRIVE_COOLDOWN`; all are imported and used in `player.py` — confirmed.
+- **`emit_hit()` uses `HIT_PARTICLE_SPEED * 0.6 / * 1.4` range:** `particles.py` line 96 uses `random.uniform(HIT_PARTICLE_SPEED * 0.6, HIT_PARTICLE_SPEED * 1.4)` — confirmed.
+- **`_SHEET_NAME_MAP` extended with `"hurt"/"jump"/"fall"`:** `animation.py` lines 54–57 map all three states to `"Hurt"`, `"Jump"`, `"Fall"` sheet names — confirmed.
+- **`_STATE_FPS["attack"]` raised from 3 to 4:** `animation.py` line 29 shows `"attack": 4` — confirmed.
+
+## New Feel Gaps
+
+| # | Improvement | Status | Effort | Files |
+|---|---|---|---|---|
+| HK-P7-A | Camera lerp speed too slow — camera lags behind Overdrive dashes | ⏳ Phase 7 | Low | `core/camera.py` L19 |
+| HK-P7-B | No wall-nail sparks when attack connects with a solid tile | ⏳ Phase 7 | Medium | `systems/physics.py`, `scenes/gameplay.py`, `systems/particles.py` |
+| HK-P7-C | Enemy base attack cooldown hardcoded in `_do_attack` — invisible to settings tuning | ⏳ Phase 7 | Low | `entities/enemy.py` L146, `settings.py` |
+| HK-P7-D | Boss phase-3 projectile spread cooldown hardcoded — cannot be tuned from settings | ⏳ Phase 7 | Low | `entities/boss.py` L181, `settings.py` |
+| HK-P7-E | Camera has no horizontal dead zone or look-ahead in the facing direction | ⏳ Phase 7 | Medium | `core/camera.py` L24–35 |
+| HK-P7-F | Attack chain rate too slow for HK-style nail feel — `PLAYER_ATTACK_COOLDOWN = 25` forces 41-frame swing-to-swing minimum | ⏳ Phase 7 | Low | `settings.py` L75, `entities/player.py` L307 |
+| HK-P7-G | Soul Surge hitboxes do not visually or audibly distinguish a miss from an enemy-not-in-range activation | ⏳ Phase 7 | Low | `entities/player.py` L327–345 |
+| HK-P7-H | Overdrive speed boost (×1.6) is not signaled to enemies — crawlers and enemies do not react to faster player approach | ⏳ Phase 7 | Low | `entities/player.py` L216, `settings.py` |
+
+---
+
+### HK-P7-A — Camera Lerp Speed Too Slow for Overdrive Dashes
+
+**File:** `/home/user/SteamFall/core/camera.py` line 19.
+
+**Current value:** `self.lerp_speed = 0.12`
+
+At `lerp_speed = 0.12`, the camera closes 12% of the distance to the target each frame. For a player moving at base speed (5 px/frame), this produces a comfortable 1–2 px lag — imperceptible. However when Overdrive is active (`OVERDRIVE_DURATION = 180` frames, speed `PLAYER_SPEED * 1.6 = 8.0` px/frame), the camera can lag 30–50 px behind the player's leading edge before it catches up. On a 1280 px wide screen this is not disorienting, but on a tight horizontal corridor the player may run off the visible screen edge toward hazards that the camera has not yet revealed. Hollow Knight's camera uses a lerp of approximately 0.15–0.18 in standard traversal and snaps faster (~0.25) during dashes. The snap behavior is because HK's Mothwing Cloak covers ~220 px in 10 frames — the camera must keep pace or the dash loses its sense of speed. Steamfall's Overdrive is slower but sustained (180 frames), meaning the cumulative lag compounds.
+
+**Suggested change:**
+```python
+# core/camera.py line 19
+self.lerp_speed = 0.15   # was 0.12 — closes lag on Overdrive dashes; still smooth for base walk
+```
+
+This raises the catch-up rate from 12% to 15% per frame, reducing the Overdrive lag from ~50 px to ~35 px while keeping walk movement visually smooth. An alternative is to read `player._overdrive` and apply a higher lerp when active, but a flat raise to `0.15` achieves 90% of the benefit with zero code change. Justification: in HK, the camera staying ahead of the player during fast movement is a core feel pillar — "the Knight should always feel like they are moving toward something, not away from something."
+
+---
+
+### HK-P7-B — No Wall-Nail Sparks on Attack-Wall Collision
+
+**File:** `/home/user/SteamFall/systems/physics.py` lines 37–48; `/home/user/SteamFall/scenes/gameplay.py` hitbox loop lines 667–669; `/home/user/SteamFall/systems/particles.py`.
+
+**Current code:** `move_and_collide` in `physics.py` lines 42–48 zeroes `vx` on horizontal wall contact but emits nothing. No spark emit site exists in the player attack path when the swing arc extends into a tile rather than an enemy.
+
+In Hollow Knight, swinging the nail into a wall produces a distinct spark and a short recoil — the player can hear and see the difference between "hit enemy" and "hit wall." This is the single most-cited tactile gap from the original 2026-04-12 review and has not been addressed in any pass since. It remains the highest-priority missing feedback for melee feel. Currently, if the player swings at a wall nothing happens — the hitbox passes through solid geometry without any signal. The `AttackHitbox.check_hits()` path only tests against entity targets, not tiles, so no sound, no spark, and no recoil apply on a wall swing.
+
+**Suggested change:**
+
+1. In `gameplay.py` at the hitbox-update loop (around line 669), after `hb.check_hits(living_enemies)` and `hb.update()`, add a tile-collision check: if `hb.rect.collidelist(solid)` returns a non-negative index and no entity was hit this frame, emit a small wall-spark burst:
+
+```python
+# gameplay.py — inside the player hitbox loop, after hb.check_hits():
+if hb.alive and hb.rect.collidelist(solid) >= 0 and not hb._already_hit:
+    # Wall hit — no entity was struck but the swing connected with geometry
+    wx = hb.rect.centerx
+    wy = hb.rect.centery
+    particles.emit(wx, wy, count=4, speed=HIT_PARTICLE_SPEED * 0.8,
+                   color=(200, 200, 160), life=10, spread=120)
+    audio.play_sfx("hit")
+```
+
+2. No new constant needed — reuse `HIT_PARTICLE_SPEED` at 0.8× to produce slower, more grounded sparks against a wall vs. a living hit. The 4-count and 10-frame lifetime are deliberately shorter than enemy sparks (6 count, 18 frames) to signal "not a kill hit."
+
+Note: `hb._already_hit` is a set of entity IDs. When empty (`not hb._already_hit`) and the rect overlaps a tile, the swing is a pure wall contact. This avoids double-emitting sparks when an attack simultaneously hits an enemy standing next to a wall.
+
+Justification: HK's wall-nail spark is the primary "combat grammar" signal that tells new players their swing range and teaches them to position precisely. Without it, players cannot develop the spatial intuition that makes nail combat feel skilled.
+
+---
+
+### HK-P7-C — Enemy Base Attack Cooldown Hardcoded in `_do_attack`
+
+**File:** `/home/user/SteamFall/entities/enemy.py` line 146.
+
+**Current code:** `self._attack_cooldown = 60   # One attack per second`
+
+The base `Enemy._do_attack` hardcodes 60 frames (1 second) between swings. This constant is not referenced in `settings.py` and cannot be tuned without modifying `enemy.py` directly. Every other enemy timing constant has been extracted to `settings.py` (see `ENEMY_PATROL_SPEED`, `ENEMY_CHASE_SPEED`, `ENEMY_SIGHT_RANGE`, `ENEMY_ATTACK_RANGE`, `ENEMY_ATTACK_DAMAGE`, `ENEMY_IFRAMES` — all in `settings.py` lines 85–89 and 67). The attack cooldown is the one remaining hardcode. At 60 frames this attack cadence means a stationary enemy inside attack range deals damage once per second — slow enough that the player can trade blows freely without much tension. In HK, standard enemies attack every 20–40 frames (~0.33–0.67s), creating genuine pressure to dodge after landing hits. The current 1-second cadence makes touch-damage (body contact via `gameplay.py` lines 687–693, which deals `ENEMY_ATTACK_DAMAGE // 2 = 7` HP) more threatening than the melee swing, which inverts the intended priority (body contact should be a lesser hazard than a deliberate melee attack).
+
+**Suggested change:**
+```python
+# settings.py — add alongside other ENEMY_ constants (around line 89)
+ENEMY_ATTACK_COOLDOWN = 50   # Frames between base enemy melee attacks (was hardcoded 60 in enemy.py)
+```
+
+```python
+# entities/enemy.py line 146 — replace hardcode:
+# was: self._attack_cooldown = 60
+self._attack_cooldown = ENEMY_ATTACK_COOLDOWN   # import from settings
+```
+
+50 frames (~0.83s) tightens the cadence slightly while remaining forgiving enough for new players. The constant is visible from `settings.py` for future tuning. Justification: extracting the last hidden tuning value from `enemy.py` completes the settings.py-owns-all-tunable-values principle and enables the per-phase boss attack cooldown escalation (boss.py already overrides `attack_cd` to 35 in phase 2 — the base class value is currently invisible to the same tuning discipline).
+
+---
+
+### HK-P7-D — Boss Phase-3 Projectile Spread Cooldown Hardcoded
+
+**File:** `/home/user/SteamFall/entities/boss.py` line 181.
+
+**Current code:** `self._proj_cooldown = 160`
+
+The Warden's phase-3 projectile spread fires every 160 frames (~2.67 s at 60 FPS). This value is hardcoded inside `_update_ai`, not extractable from `settings.py`. Every other Boss timing value has a named constant: `BOSS_DASH_SPEED`, `BOSS_DASH_FRAMES`, `BOSS_DASH_COOLDOWN`, `BOSS_PROJ_SPREAD_VY` — all in `settings.py` lines 183–190. The spread cooldown is the one orphaned value. At 2.67 s, the fan spread fires only approximately twice during a typical 30-second phase-3 fight — it barely registers as a pattern. In HK, phase-3 boss attacks fire on a cadence designed to force the player to maintain constant motion, typically 1.0–1.5 s between pattern volleys. A 2.67s cooldown allows the player to reach a comfortable position and wait — the spread becomes a reactive dodge rather than a sustained pattern-read challenge.
+
+**Suggested change:**
+```python
+# settings.py — add alongside other BOSS_ constants (around line 190)
+BOSS_PROJ_SPREAD_CD = 120   # Frames between Warden phase-3 spread shots (was hardcoded 160)
+```
+
+```python
+# entities/boss.py line 181 — replace hardcode:
+# was: self._proj_cooldown = 160
+self._proj_cooldown = BOSS_PROJ_SPREAD_CD   # import from settings
+```
+
+Reducing to 120 frames (2.0 s) fires the fan spread 50% more often in phase 3, creating genuine need to read the pattern while still allowing ~2 full attack windows between spreads. The constant is now tunable from `settings.py`. Justification: a hardcoded boss cooldown is a design blind spot — future reviewers comparing feel to HK would not be able to tune it without hunting through the boss source, and the current 2.67s interval is too slow to create the "phase 3 is noticeably harder" perception that phase transitions require.
+
+---
+
+### HK-P7-E — Camera Has No Horizontal Dead Zone or Facing Look-Ahead
+
+**File:** `/home/user/SteamFall/core/camera.py` lines 24–35.
+
+**Current code:**
+```python
+target_x = target.rect.centerx - SCREEN_WIDTH // 2
+target_y = target.rect.centery - SCREEN_HEIGHT // 2
+self.offset.x += (target_x - self.offset.x) * self.lerp_speed
+```
+
+The camera always targets the exact center of the player's `rect`. This means any horizontal movement — including the single-pixel oscillations from FRICTION decay when `vx` approaches zero — moves the target point and causes the camera to chase it. In Hollow Knight, the camera has a horizontal dead zone of approximately 8–12% of the screen width (~100–150 px at 1280 px) inside which left-right movement does not scroll the camera. The dead zone is what allows the Knight to make small adjustments and look at nearby terrain without the world jittering. Additionally, HK offsets the camera target 80–120 px in the player's facing direction, so more of the upcoming space is visible than the space already traversed. This look-ahead is particularly important for Steamfall's Ranged enemy: the player currently cannot see a Ranged enemy's bolts until they are already on screen, because the camera is centered on the player with no forward bias. Both features (dead zone and look-ahead) are independently valuable.
+
+**Suggested changes:**
+
+Add two constants to `settings.py`:
+```python
+# settings.py — add near camera/screen constants
+CAMERA_DEAD_ZONE_X  = 80    # Horizontal px half-width of camera dead zone (player can move ±80 px without scrolling)
+CAMERA_LOOK_AHEAD_X = 100   # Px the camera leads in the player's facing direction
+```
+
+Modify `core/camera.py` `follow()`:
+```python
+def follow(self, target) -> None:
+    # Look-ahead: bias target toward player's facing direction
+    look_x = target.rect.centerx + CAMERA_LOOK_AHEAD_X * getattr(target, "facing", 1)
+    target_x = look_x - SCREEN_WIDTH // 2
+    target_y = target.rect.centery - SCREEN_HEIGHT // 2
+
+    # Dead zone: only update offset.x when target_x is outside current dead zone
+    current_center_x = self.offset.x + SCREEN_WIDTH // 2
+    if abs(target_x + SCREEN_WIDTH // 2 - current_center_x) > CAMERA_DEAD_ZONE_X:
+        self.offset.x += (target_x - self.offset.x) * self.lerp_speed
+    self.offset.y += (target_y - self.offset.y) * self.lerp_speed
+
+    self.offset.x = max(0, min(self.offset.x, self.world_w - SCREEN_WIDTH))
+    self.offset.y = max(0, min(self.offset.y, self.world_h - SCREEN_HEIGHT))
+```
+
+Justification: HK's camera look-ahead is one of its most-praised feel details. The player almost never runs into enemies without first seeing them in the camera frame. In Steamfall, Ranged enemies at `RANGED_SIGHT_RANGE = 380 px` can already be firing bolts before the camera reveals them. The dead zone eliminates micro-jitter during FRICTION deceleration and makes the world feel planted rather than floating.
+
+---
+
+### HK-P7-F — Attack Chain Rate Too Slow for HK-Style Nail Feel
+
+**File:** `/home/user/SteamFall/settings.py` line 75; `/home/user/SteamFall/entities/player.py` line 307.
+
+**Current values:** `PLAYER_ATTACK_COOLDOWN = 25`, `WINDUP_FRAMES = 4`, `PLAYER_ATTACK_DURATION = 12`.
+
+The earliest moment the player can begin the next swing is after the current swing's cooldown: the press of Z starts the windup (`_windup_timer = WINDUP_FRAMES = 4`), then the active swing runs `PLAYER_ATTACK_DURATION = 12` frames, and `_attack_cooldown = PLAYER_ATTACK_COOLDOWN = 25` counts down in parallel starting from the press. Because the cooldown starts on press (line 307) and the windup lasts 4 frames before the hitbox exists, the next attack is available at frame `max(4 + 12, 25) = 25` frames after the first press — the cooldown is the binding constraint. This gives a swing-to-swing minimum of 25 frames (0.42 s), permitting roughly 2.4 attacks per second at maximum rate. In Hollow Knight, the nail swing allows approximately 3 attacks per second on a well-positioned target (20-frame cycle). The gap is 25% fewer attacks per second, which compounds to roughly 1.5× longer time-to-kill on the same enemy health pool. At `ENEMY_ATTACK_DAMAGE = 15` and `PLAYER_MAX_HEALTH = 100` this is unlikely to create lethality problems, but the subjective feel of the attack cadence is noticeably slower than HK. The windup pause (`WINDUP_FRAMES = 4`) already adds commitment — the cooldown does not need to be as long as it is to maintain attack weight.
+
+**Suggested change:**
+```python
+# settings.py line 75
+PLAYER_ATTACK_COOLDOWN = 18   # was 25 — 18 frames ≈ 3.3 attacks/s max; closer to HK nail cadence
+```
+
+At 18 frames the swing-to-swing minimum becomes `max(4 + 12, 18) = 18` frames — the cooldown remains binding but the cadence rises to ~3.3 attacks per second, matching HK's nail feel. The windup (4 frames) still enforces commitment; combos still require positioning. Justification: HK's nail mastery is about timing and positioning, not rate-limiting — the high attack rate rewards skilled play while the windup punishes reckless button-mashing. Steamfall currently has the commitment (windup) but not the reward (fast follow-through), making skilled play feel unrewarding compared to cautious play.
+
+---
+
+### HK-P7-G — Soul Surge Gives No Feedback When Activated Without Enemies in Range
+
+**File:** `/home/user/SteamFall/entities/player.py` lines 327–345.
+
+**Current code:** `_activate_soul_surge()` always deducts `ABILITY_COST = 30` resource, plays the `"ability"` SFX, emits `SOUL_SURGE_PARTICLE_COUNT = 10` particles, and creates four `AttackHitbox` objects — regardless of whether any enemy is within `SOUL_SURGE_RADIUS = 80` px. If the player activates Soul Surge in an empty room, 30 soul is spent and the particle burst plays identically to a hit that connects with four enemies. In Hollow Knight, the Vengeful Spirit / Desolate Dive / Howling Wraiths all share a design principle: the spell's visual feedback communicates both activation *and* outcome. Vengeful Spirit produces a projectile that visually travels to its target; the player knows it hit because they see the impact. Soul Surge in Steamfall is an AOE that fires once and disappears — if no hit lands, the only signal is the absence of hitstop. Because `hitstop.trigger(4)` fires per-hit inside `combat.py` line 79, a miss produces zero hitstop and the resource drains silently. New players will repeatedly Soul Surge into empty space and not understand why the ability feels wasteful.
+
+**Suggested change:** Add a no-hit feedback path in `_activate_soul_surge` — if `_surge_hitboxes` land zero confirmed hits after their `duration = 12` frames expire, emit a brief "miss pulse" particle effect at the player's position (3–4 dim grey particles, no sound). This requires tracking whether any surge hitbox confirmed a hit:
+
+```python
+# entities/player.py — add a flag on surge activation
+self._surge_hit_confirmed = False
+
+# In _tick_ability or at the point where _surge_hitboxes expire (when all duration <= 0):
+if not self._surge_hit_confirmed and self._ability_just_expired:
+    from systems.particles import particles
+    particles.emit(self.rect.centerx, self.rect.centery,
+                   count=3, speed=1.5, color=(80, 60, 120), life=12, spread=360)
+```
+
+The "miss pulse" is intentionally dim and small — it signals "the ability fired but found nothing" without implying it was powerful. The existing `emit_soul_surge` burst already communicates activation; the miss pulse communicates outcome. Justification: HK's design principle is that every player-initiated action has a legible outcome signal. A resource costing 30/100 soul should always tell the player whether the spend was worthwhile.
+
+---
+
+### HK-P7-H — Overdrive Speed Boost Not Reflected in Enemy Sight/Chase Behavior
+
+**File:** `/home/user/SteamFall/entities/player.py` line 216; `/home/user/SteamFall/settings.py` line 66.
+
+**Current code:** `speed = PLAYER_SPEED * (1.6 if self._overdrive else 1.0)` in `player.py` line 216. Enemy AI uses `ENEMY_SIGHT_RANGE = 260` and `ENEMY_CHASE_SPEED = 2.5` regardless of player state.
+
+During Overdrive, the player moves at 8 px/frame vs. `ENEMY_CHASE_SPEED = 2.5` px/frame — the player is 3.2× faster than a chasing enemy. An enemy in chase state can never close distance; the player can freely disengage from any fight by activating Overdrive. In Hollow Knight, the Shade Cloak (dash) is similarly fast but lasts only ~12 frames — it is a tool for repositioning, not sustained outrunning. Overdrive at 180 frames (3 seconds) creates a 3-second invincibility-by-speed window against all non-projectile enemies. This undermines the threat of melee enemies in the faction branch levels (6–8) where the intended design is that ShieldGuard, Jumper, and Crawler combinations create sustained pressure. A player who activates Overdrive can trivially clear a room by running through it at 8 px/frame, outpacing every enemy's chase speed by a 3× margin, and picking off stragglers with the 30% damage bonus. This is disproportionately more powerful than HK's movement abilities, which create openings rather than removing threats entirely.
+
+**Suggested change:** Rather than capping Overdrive speed (which would reduce its "rewarding to use" feel), add a behavioral reaction in enemies when the player is moving very fast: increase `ENEMY_CHASE_SPEED` by 30% when the player's `abs(vx) > PLAYER_SPEED * 1.4` (i.e. during Overdrive). This can be gated in `Enemy._do_chase` via a player-state read:
+
+```python
+# settings.py — add near ENEMY_ constants
+ENEMY_CHASE_SPEED_OVERDRIVE = 3.2   # was 2.5 — enemies react to Overdrive speed; gap shrinks but never closes
+```
+
+```python
+# entities/enemy.py _do_chase — add player-speed awareness:
+def _do_chase(self, player) -> None:
+    direction = 1 if player.rect.centerx > self.rect.centerx else -1
+    # React to player Overdrive: raise chase speed to maintain threat (but player still faster)
+    chase_spd = (ENEMY_CHASE_SPEED_OVERDRIVE
+                 if abs(player.vx) > PLAYER_SPEED * 1.4
+                 else ENEMY_CHASE_SPEED)
+    self.vx     = direction * chase_spd
+    self.facing = direction
+```
+
+At `ENEMY_CHASE_SPEED_OVERDRIVE = 3.2` the player at 8 px/frame still outruns the enemy (3.2 vs. 8), but the gap shrinks from 5.5 px/frame to 4.8 px/frame — enemies feel more urgent without becoming impossible to escape. More importantly, the player can no longer casually stand still during Overdrive and attack while enemies walk toward them at their normal 2.5 px/frame patrol speed — enemies now lunge at 3.2 px/frame, maintaining tactical pressure. Justification: Overdrive should feel like a powerful tool that opens combat opportunities, not a mode that removes enemy threat entirely. The reward for activating Overdrive should be the 30% damage bonus and the repositioning speed — not a complete suspension of melee pressure.

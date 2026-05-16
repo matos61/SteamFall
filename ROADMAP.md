@@ -2152,6 +2152,23 @@ Review-agent 2026-05-16 pass found two bugs in P6-0c code that need immediate at
 
 ---
 
+## HK Feel Improvements — Phase 7 (reviewed 2026-05-16)
+
+_Evaluated by hk-agent 2026-05-16; see `REVIEW_HK.md` for full analysis. HK-P6-A through HK-P6-I all confirmed done._
+
+| # | Improvement | Status | Effort | Files |
+|---|---|---|---|---|
+| HK-P7-A | Camera lerp `0.12` lags visibly during Overdrive dashes; raise to `0.15` | ⏳ Phase 7 | Trivial | `core/camera.py` L19 |
+| HK-P7-B | No wall-nail sparks when swing hits a solid tile; add 4-particle emit on tile wall contact during attack | ⏳ Phase 7 | Minor | `systems/physics.py`, `scenes/gameplay.py` |
+| HK-P7-C | Enemy base attack cooldown hardcoded `60` in `enemy.py` L146; extract `ENEMY_ATTACK_COOLDOWN = 50` to settings | ⏳ Phase 7 | Trivial | `entities/enemy.py`, `settings.py` |
+| HK-P7-D | Boss phase-3 spread cooldown hardcoded `160` in `boss.py` L181; extract `BOSS_PROJ_SPREAD_CD = 120` to settings | ⏳ Phase 7 | Trivial | `entities/boss.py`, `settings.py` |
+| HK-P7-E | Camera has no dead zone or look-ahead; add `CAMERA_DEAD_ZONE_X = 80` and `CAMERA_LOOK_AHEAD_X = 100` | ⏳ Phase 7 | Moderate | `core/camera.py`, `settings.py` |
+| HK-P7-F | `PLAYER_ATTACK_COOLDOWN = 25` gives ~2.4 attacks/s vs HK's ~3; lower to `18` | ⏳ Phase 7 | Trivial | `settings.py` L75 |
+| HK-P7-G | Soul Surge gives no feedback on miss — resource drains silently; emit dim 3-particle "miss pulse" when no hit confirmed | ⏳ Phase 7 | Minor | `entities/player.py` |
+| HK-P7-H | Overdrive 3x speed advantage removes all enemy melee threat for 3 s; add `ENEMY_CHASE_SPEED_OVERDRIVE = 3.2` applied when player moving fast | ⏳ Phase 7 | Minor | `settings.py`, `entities/enemy.py` |
+
+---
+
 ## Agent Coordination Notes
 
 | File / Directory | Owner Agent | Notes |
