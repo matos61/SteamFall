@@ -1864,7 +1864,7 @@ _Evaluated by hk-agent 2026-05-02; see `REVIEW_HK.md` for full analysis._
 
 ---
 
-## Phase 6 — Post-Ship Review ⏳ IN PROGRESS (2026-05-06)
+## Phase 6 — Post-Ship Review ✅ COMPLETE (2026-05-16)
 
 All five shipping phases are complete. The last review-agent pass was **2026-05-02** (P5-0b), which covered all Phase 4 code. Since then the following tasks landed without a review pass:
 
