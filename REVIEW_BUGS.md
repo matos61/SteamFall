@@ -792,3 +792,25 @@ The following are not bugs in existing code but are pre-conditions that could ca
 
 ---
 
+# Bug Review — 2026-05-16
+
+**Scope:** All .py files re-read. Focus on P6-0c patch files (see above). BUG-047–051 confirmed fixed (checkboxes ticked). This pass starts at BUG-052.
+
+## Verification: BUG-047 through BUG-051
+
+**BUG-047 (`_hurt_latched` bool):** CONFIRMED FIXED. `entities/player.py` lines 94–95 declare `self._hurt_latched = False` in `__init__`, and `_update_animation` (lines 372–375) sets it True when `iframes == PLAYER_IFRAMES` and clears it when `iframes == 0`. The `elif self._hurt_latched:` branch at line 379 keeps the state latched for the full clip duration.
+
+**BUG-048 (lore-dismiss fall-through):** CONFIRMED FIXED. `scenes/gameplay.py` line 451 now has `return` immediately after clearing `_lore_waiting_dismiss`, preventing any further key processing in the same event dispatch.
+
+**BUG-049 (sq-frame warning):** CONFIRMED FIXED. `systems/animation.py` lines 101–103 now print a warning when `sw % sh != 0` before proceeding with frame slicing, making non-square sheets detectable during development.
+
+**BUG-050 (fullscreen key-repeat):** CONFIRMED FIXED. `scenes/settings.py` lines 88–89 now guard the toggle behind `if delta > 0:`, so only the RIGHT key fires it and LEFT is a no-op; key-repeat on LEFT can no longer cause flicker.
+
+**BUG-051 (Crawler super() call level):** CONFIRMED FIXED. `entities/crawler.py` line 53 calls `super().update(dt, player, solid_rects)` which resolves to `Enemy.update`, correctly invoking the animation state machine and faction-tint blending. `Crawler.draw` (line 88) calls `super().draw(surface, camera)` which resolves to `Enemy.draw`, so sprite frames and tint overlays now apply to Crawlers.
+
+## New Bugs
+
+- [ ] **BUG-052** 🔴 `entities/player.py` line 185: `LANDING_VY_THRESHOLD` gate is checked **after** `move_and_collide` has already zeroed out `self.vy`. In `systems/physics.py` line 58, landing sets `entity.vy = 0` before returning. So at line 185 of `player.py`, `self.vy` is always `0` on a landing frame, and `0 >= LANDING_VY_THRESHOLD` (4.0) is always False. Landing-dust particles are **never emitted**, regardless of fall speed — the HK-P6-C feature is silently broken. Minimal fix: capture fall speed before physics runs: add `_pre_land_vy = self.vy` before `apply_gravity(self)` (or after gravity but before `move_and_collide`), then check `if _pre_land_vy >= LANDING_VY_THRESHOLD:` at line 185.
+
+- [ ] **BUG-053** ⚠️ `settings.py` lines 192–196: The arena-shrink block defines `ARENS_SHRINK_SPEED` (typo, missing 'A') and `ARENS_SHRINK_AMOUNT` twice (lines 193 and 195), with the second assignment overwriting the first. The correctly-spelled `ARENA_SHRINK_SPEED` and `ARENA_SHRINK_AMOUNT` are also defined (lines 194 and 196) and are the names actually used by `gameplay.py`. The two `ARENS_*` typo constants are dead — never imported anywhere — but line 195 silently re-assigns `ARENS_SHRINK_AMOUNT`, creating a confusing 5-line block with 3 redundant entries. No functional crash (the live code uses the correct `ARENA_*` names), but a future developer doing `from settings import *` could be confused. Minimal fix: remove lines 192–193 and 195 (the three `ARENS_*` dead constants), leaving only the two canonical `ARENA_SHRINK_SPEED` and `ARENA_SHRINK_AMOUNT` lines.
+
