@@ -174,6 +174,7 @@ class Player(Entity):
         was_on_ground = self.on_ground
 
         from systems.physics import apply_gravity, move_and_collide
+        _pre_land_vy = self.vy
         apply_gravity(self)
         if solid_rects:
             move_and_collide(self, solid_rects)
@@ -182,7 +183,7 @@ class Player(Entity):
         # HK-P6-C: gate on LANDING_VY_THRESHOLD so zero-height hops stay silent.
         # HK-P6-D: _land_timer removed; particle system is the sole landing effect.
         if not was_on_ground and self.on_ground:
-            if self.vy >= LANDING_VY_THRESHOLD:
+            if _pre_land_vy >= LANDING_VY_THRESHOLD:
                 from systems.particles import particles
                 particles.emit_landing(self.rect.centerx, self.rect.bottom)
 

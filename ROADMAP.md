@@ -2095,6 +2095,12 @@ _Review-agent 2026-05-07 pass (P6-0b):_
 
 56. ✅ **BUG-051** `entities/crawler.py`: Crawler calling Entity-level super, bypassing enemy animation and faction-tint — fixed in P6-0c (2026-05-15). Now calls Enemy-level `super()` in both `update()` and `draw()`.
 
+_Review-agent 2026-05-16 pass (P7-0b):_
+
+57. ✅ **BUG-052** `entities/player.py` line 185: `LANDING_VY_THRESHOLD` gate (`self.vy >= 4.0`) is checked **after** `move_and_collide` has already zeroed `self.vy` on landing (physics.py line 58 sets `entity.vy = 0` when grounded). The condition is always `0 >= 4.0 = False`. Landing-dust particles are never emitted regardless of fall speed — the HK-P6-C feature is silently dead. Fix: capture `_pre_land_vy = self.vy` immediately before calling `apply_gravity(self)` in `player.update()`, then compare `_pre_land_vy >= LANDING_VY_THRESHOLD` at the emit-landing site. Assign to build-agent in P7-0c.
+
+58. ✅ **BUG-053** `settings.py` lines 192–196: Three dead constants with typo name `ARENS_SHRINK_*` (missing second 'A') sit alongside the correct `ARENA_SHRINK_*` constants; `ARENS_SHRINK_AMOUNT` is even assigned twice. No functional impact (gameplay.py imports only the correctly-spelled names), but pollutes the namespace and confuses future readers. Fix: remove the three `ARENS_*` lines; keep only `ARENA_SHRINK_SPEED` and `ARENA_SHRINK_AMOUNT`. Assign to build-agent in P7-0c.
+
 ---
 
 ## HK Feel Improvements — Phase 6 (reviewed 2026-05-07)
@@ -2114,6 +2120,35 @@ _Evaluated by hk-agent 2026-05-07; see `REVIEW_HK.md` for full analysis. HK-P5-A
 | HK-P6-I | `particles.py` L95: `emit_hit()` hardcodes `uniform(2.5, 5.5)` ignoring `HIT_PARTICLE_SPEED`; replace with `uniform(HIT_PARTICLE_SPEED * 0.6, HIT_PARTICLE_SPEED * 1.4)` | ✅ P6-0c | Trivial | `systems/particles.py` |
 
 **All HK-P6 items confirmed done (2026-05-15).** A–I fixed in P6-0c.
+
+---
+
+## Phase 7 — Hotfix ✅ COMPLETE (2026-05-16)
+
+Review-agent 2026-05-16 pass found two bugs in P6-0c code that need immediate attention before the next full phase.
+
+**Priority order for build-agent:**
+
+1. ~~**P7-0c (hotfix sprint)**~~ ✅ **DONE (2026-05-16)** — BUG-052 and BUG-053 both fixed. Landing-dust now emits correctly; dead `ARENS_*` constants removed.
+
+---
+
+### Task P7-0c: Hotfix Sprint (Phase 7) ✅ DONE (2026-05-16)
+
+**Files to touch:**
+- `entities/player.py` (BUG-052)
+- `settings.py` (BUG-053)
+
+**Fixes required:**
+
+- 🔴 **BUG-052** `entities/player.py` line 185: `LANDING_VY_THRESHOLD` gate is always `False` because `self.vy` is already 0 after physics resolves. Fix: add `_pre_land_vy = self.vy` immediately before `apply_gravity(self)` is called in `player.update()`. Then at line 185, replace `if self.vy >= LANDING_VY_THRESHOLD:` with `if _pre_land_vy >= LANDING_VY_THRESHOLD:`.
+
+- ⚠️ **BUG-053** `settings.py` lines 192–196: Remove the three dead `ARENS_SHRINK_*` typo constants (lines with `ARENS_SHRINK_SPEED`, and the two `ARENS_SHRINK_AMOUNT` assignments). Keep only the correctly-spelled `ARENA_SHRINK_SPEED` and `ARENA_SHRINK_AMOUNT`.
+
+**Acceptance criteria — done when:**
+- Landing from a meaningful fall (fall speed ≥ 4.0 px/frame) emits landing-dust particles; zero-height hops do not.
+- `settings.py` contains no `ARENS_*` constants; `ARENA_SHRINK_SPEED` and `ARENA_SHRINK_AMOUNT` remain.
+- `python main.py` launches without ImportError.
 
 ---
 
