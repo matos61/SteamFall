@@ -24,7 +24,8 @@ from settings        import (BOSS_MAX_HEALTH, BOSS_PHASE2_THRESH,
                               BOSS_PHASE3_THRESH, ENEMY_ATTACK_DAMAGE,
                               ENEMY_ATTACK_RANGE,
                               BOSS_DASH_SPEED, BOSS_DASH_FRAMES,
-                              BOSS_DASH_COOLDOWN, BOSS_PROJ_SPREAD_VY)
+                              BOSS_DASH_COOLDOWN, BOSS_PROJ_SPREAD_VY,
+                              BOSS_PROJ_SPREAD_CD)
 
 _MAX_RAGE_FLASH = 60   # Normalise alpha against this cap
 
@@ -178,7 +179,7 @@ class Boss(Enemy):
 
         # Phase 3: 3-way projectile spread on separate cooldown
         if self.phase == 3 and self._proj_cooldown == 0:
-            self._proj_cooldown = 160
+            self._proj_cooldown = BOSS_PROJ_SPREAD_CD
             self._fire_spread(player)
 
     # ------------------------------------------------------------------

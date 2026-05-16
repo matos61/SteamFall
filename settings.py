@@ -72,7 +72,7 @@ PLAYER_MAX_SOUL   = 100    # Marked resource (arcane energy)
 PLAYER_MAX_HEAT   = 100    # Fleshforged resource (heat/overdrive)
 PLAYER_IFRAMES    = 45     # Invincibility frames after taking a hit
 PLAYER_ATTACK_DURATION = 12   # Frames the attack hitbox stays active
-PLAYER_ATTACK_COOLDOWN = 25   # Frames between attacks
+PLAYER_ATTACK_COOLDOWN = 18   # was 25 — ~3 attacks/s, closer to HK nail cadence
 
 # --- Hollow Knight feel constants ---
 ATTACK_RECOIL_VX    = 1.5    # Horizontal pushback when player attacks (nail recoil)
@@ -340,6 +340,16 @@ TILE_SHEET_LEVEL_3_4  = "assets/tiles/foundry.png"
 TILE_SHEET_LEVEL_5    = "assets/tiles/sanctum.png"
 TILE_SHEET_LEVEL_6_8  = "assets/tiles/foundry.png"    # reuse foundry for faction-branch levels
 TILE_SHEET_LEVEL_9_10 = "assets/tiles/sanctum.png"    # convergence / final approach
+
+# --- Phase 7 HK feel improvements ---
+ENEMY_ATTACK_COOLDOWN      = 50     # was hardcoded 60 in enemy.py — ~0.83 s between swings
+BOSS_PROJ_SPREAD_CD        = 120    # was hardcoded 160 in boss.py — tighter phase-3 pressure
+CAMERA_DEAD_ZONE_X         = 80     # px horizontal dead zone before camera starts tracking
+CAMERA_LOOK_AHEAD_X        = 100    # px camera leads the player in facing direction
+ENEMY_CHASE_SPEED_OVERDRIVE = 3.2   # chase speed when player is in Overdrive (vs normal 2.5)
+WALL_SPARK_COUNT           = 4      # sparks emitted when attack nail clips a solid tile
+WALL_SPARK_SPEED           = 3.0    # initial speed of wall-nail sparks
+WALL_SPARK_LIFE            = 8      # lifetime in frames
 
 CREDITS_TEXT = [
     "Steamfall",

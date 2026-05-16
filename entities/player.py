@@ -102,6 +102,11 @@ class Player(Entity):
         # P1-8 / BUG-019: ability gate — restored from save_data by gameplay.py
         self.ability_slots: int = ABILITY_SLOTS_DEFAULT
 
+        # HK-P7-G: set True when Soul Surge fires; gameplay.py checks miss after hitbox pass
+        self._surge_just_activated: bool = False
+        # HK-P7-B: set True once wall sparks emit per swing; reset on new attack start
+        self._wall_spark_emitted: bool = False
+
         # Animation state machine
         self._anim = AnimationController(color, width=30, height=54,
                                          sprite_dir=SPRITE_DIR_PLAYER)
@@ -304,8 +309,9 @@ class Player(Entity):
             # Nail recoil: push player back opposite the swing direction
             self.vx = -self.facing * ATTACK_RECOIL_VX
             # Begin windup telegraph before hitbox activates
-            self._windup_timer    = WINDUP_FRAMES
-            self._attack_cooldown = PLAYER_ATTACK_COOLDOWN
+            self._windup_timer        = WINDUP_FRAMES
+            self._attack_cooldown     = PLAYER_ATTACK_COOLDOWN
+            self._wall_spark_emitted  = False   # reset per swing
             audio.play_sfx("attack")
 
     # ------------------------------------------------------------------
@@ -329,6 +335,7 @@ class Player(Entity):
         """Marked ability: burst of arcane force in all directions."""
         if not self._spend_resource(ABILITY_COST):
             return
+        self._surge_just_activated = True
         self._ability_cooldown = SOUL_SURGE_COOLDOWN
         audio.play_sfx("ability")
         from systems.particles import particles

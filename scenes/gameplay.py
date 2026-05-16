@@ -668,6 +668,28 @@ class GameplayScene(BaseScene):
             hb.check_hits(living_enemies)
             hb.update()
 
+        # HK-P7-B: Wall-nail sparks — emit when attack hitbox clips a solid tile
+        if self.player.hitboxes and not self.player._wall_spark_emitted:
+            for hb in self.player.hitboxes:
+                for tile in self.tilemap.tiles:
+                    if hb.rect.colliderect(tile):
+                        particles.emit(hb.rect.centerx, hb.rect.centery,
+                                       WALL_SPARK_COUNT, WALL_SPARK_SPEED,
+                                       GOLD, WALL_SPARK_LIFE, spread=180)
+                        self.player._wall_spark_emitted = True
+                        break
+                if self.player._wall_spark_emitted:
+                    break
+
+        # HK-P7-G: Soul Surge miss pulse — dim burst when no enemy is hit
+        if self.player._surge_just_activated:
+            self.player._surge_just_activated = False
+            hit_confirmed = any(len(hb._already_hit) > 0
+                                for hb in self.player._surge_hitboxes)
+            if not hit_confirmed:
+                particles.emit(self.player.rect.centerx, self.player.rect.centery,
+                               3, 1.5, (80, 50, 120), 10)
+
         # --- Combat: enemies hit player ---
         for enemy in living_enemies:
             for hb in enemy.hitboxes:

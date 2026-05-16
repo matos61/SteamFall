@@ -15,7 +15,9 @@ from entities.entity   import Entity
 from systems.combat    import AttackHitbox
 from settings          import (ENEMY_PATROL_SPEED, ENEMY_CHASE_SPEED,
                                 ENEMY_SIGHT_RANGE, ENEMY_ATTACK_RANGE,
-                                ENEMY_ATTACK_DAMAGE, FLESHFORGED_COLOR, RED,
+                                ENEMY_ATTACK_DAMAGE, ENEMY_ATTACK_COOLDOWN,
+                                ENEMY_CHASE_SPEED_OVERDRIVE,
+                                FLESHFORGED_COLOR, RED,
                                 ENEMY_IFRAMES,
                                 FACTION_FLESHFORGED, FACTION_MARKED,
                                 FACTION_TINT_BLEND, FLESHFORGED_TINT_COLOR,
@@ -134,7 +136,9 @@ class Enemy(Entity):
 
     def _do_chase(self, player) -> None:
         direction = 1 if player.rect.centerx > self.rect.centerx else -1
-        self.vx     = direction * ENEMY_CHASE_SPEED
+        speed = ENEMY_CHASE_SPEED_OVERDRIVE if getattr(player, '_overdrive', False) \
+                else ENEMY_CHASE_SPEED
+        self.vx     = direction * speed
         self.facing = direction
 
     def _do_attack(self, player) -> None:
@@ -143,7 +147,7 @@ class Enemy(Entity):
         if self._attack_cooldown > 0:
             return
 
-        self._attack_cooldown = 60   # One attack per second
+        self._attack_cooldown = ENEMY_ATTACK_COOLDOWN
 
         # Build hitbox extending in the facing direction
         direction = 1 if player.rect.centerx > self.rect.centerx else -1
