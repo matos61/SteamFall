@@ -2097,7 +2097,7 @@ _Review-agent 2026-05-07 pass (P6-0b):_
 
 _Review-agent 2026-05-18 pass (P8-0b):_
 
-59. 🔴 **BUG-054** `entities/player.py` line 380: `_hurt_latched` is never set True because `super().update(dt)` decrements `iframes` from 45 → 44 before `_update_animation()` runs; the check `iframes == PLAYER_IFRAMES` (45) is permanently False. The BUG-047 hurt-animation fix is silently dead. Fix: change to `iframes == PLAYER_IFRAMES - 1`. Assign to build-agent in P8-0c.
+59. ✅ **BUG-054** `entities/player.py` line 380: `_hurt_latched` was never set True because `super().update(dt)` decrements `iframes` 45 → 44 before `_update_animation()` runs; check `iframes == PLAYER_IFRAMES` (45) was permanently False. Fixed in P8-0c (2026-05-18): changed to `iframes == PLAYER_IFRAMES - 1`.
 
 _Review-agent 2026-05-16 pass (P7-0b):_
 
@@ -2182,7 +2182,7 @@ _Launched by orchestrator 2026-05-18. Addresses all outstanding HK-P7 feel impro
 **Priority order for build-agent** (tackle in this order):
 
 1. ~~**P8-0b (pre-phase review)**~~ ✅ **DONE (2026-05-18)** — BUG-052/053 confirmed fixed; BUG-054 found (🔴); HK-P8-A through HK-P8-H documented.
-2. **P8-0c (critical bug-fix sprint)** ⏳ PENDING — build-agent to fix BUG-054 + HK-P8-D/F/G/H (see task below).
+2. ~~**P8-0c (critical bug-fix sprint)**~~ ✅ **DONE (2026-05-18)** — BUG-054 fixed; HK-P8-D/F/H done; HK-P8-G deferred (SOUL_SURGE_SIZE still imported by player.py).
 3. ~~**P8-1 (HK feel sprint)**~~ ✅ **DONE (2026-05-16)** — HK-P7-A through HK-P7-H all implemented in commit `4b4488d` (confirmed by orchestrator code inspection 2026-05-18).
 4. **P8-2 (HK feel sprint — camera / Overdrive / lore)** ⏳ PENDING — implement HK-P8-A, B, C, E after P8-0c.
 
@@ -2252,9 +2252,9 @@ In `entities/enemy.py` `_do_chase()`, check if the player's `abs(vx) >= PLAYER_S
 
 ---
 
-### Task P8-0c: Critical Bug-Fix Sprint (Phase 8) ⏳ PENDING
+### Task P8-0c: Critical Bug-Fix Sprint (Phase 8) ✅ DONE (2026-05-18)
 
-_Unblocked by P8-0b completion (2026-05-18). BUG-054 is 🔴 critical. HK-P8-D/F/G/H are minor correctness fixes to fold in._
+_BUG-054 fixed; HK-P8-D/F/H done. HK-P8-G deferred: `SOUL_SURGE_SIZE` is still imported by `entities/player.py` (line 37) even though unused; removing it from `settings.py` would break the import. Requires a two-file cleanup (remove from settings.py AND from player.py import list) — assigned to P8-2._
 
 **Files to touch:**
 - `entities/player.py` (BUG-054)
@@ -2330,11 +2330,11 @@ _Evaluated by hk-agent 2026-05-18; see `REVIEW_HK.md` for full analysis. HK-P7-A
 | HK-P8-A | `player.py`: `_pre_land_vy` captured before `apply_gravity` — threshold off by one gravity tick; move capture to after gravity, before collision | ⏳ P8-2 | Trivial | `entities/player.py` |
 | HK-P8-B | `shield_guard.py`: attack cooldown 75 hardcoded; extract `SHIELD_GUARD_ATTACK_COOLDOWN = 75` to settings | ⏳ P8-2 | Trivial | `entities/shield_guard.py`, `settings.py` |
 | HK-P8-C | `camera.py`: Y axis has no dead zone; add `CAMERA_DEAD_ZONE_Y = 40` mirroring the X dead-zone logic | ⏳ P8-2 | Minor | `core/camera.py`, `settings.py` |
-| HK-P8-D | `combat.py` L79: `hitstop.trigger(4)` ignores `HITSTOP_FRAMES` constant; use it + add `HITSTOP_DEATH_FRAMES = 6` | ⏳ P8-0c | Trivial | `systems/combat.py`, `settings.py` |
+| HK-P8-D | `combat.py` L79: `hitstop.trigger(4)` ignores `HITSTOP_FRAMES` constant; use it + add `HITSTOP_DEATH_FRAMES = 6` | ✅ P8-0c (2026-05-18) | Trivial | `systems/combat.py`, `settings.py` |
 | HK-P8-E | No Overdrive particle trail for 180-frame duration — only activation burst; emit 1 shimmer every `OVERDRIVE_TRAIL_INTERVAL = 6` frames | ⏳ P8-2 | Minor | `entities/player.py`, `settings.py` |
-| HK-P8-F | `voice_player.py`: ignores `AUDIO_SFX_VOLUME`; full-volume voice plays even when SFX is muted | ⏳ P8-0c | Minor | `systems/voice_player.py` |
-| HK-P8-G | `settings.py`: `SOUL_SURGE_SIZE` is a dead alias for `SOUL_SURGE_RADIUS`; never imported elsewhere | ⏳ P8-0c | Trivial | `settings.py` |
-| HK-P8-H | `gameplay.py`: `_lore_waiting_dismiss` does not pause `player.update()` — Overdrive/regen tick during lore reading | ⏳ P8-0c | Minor | `scenes/gameplay.py` |
+| HK-P8-F | `voice_player.py`: ignores `AUDIO_SFX_VOLUME`; full-volume voice plays even when SFX is muted | ✅ P8-0c (2026-05-18) | Minor | `systems/voice_player.py` |
+| HK-P8-G | `settings.py` + `player.py`: `SOUL_SURGE_SIZE` imported but unused in `player.py`; remove from both files | ⏳ P8-2 | Trivial | `settings.py`, `entities/player.py` |
+| HK-P8-H | `gameplay.py`: `_lore_waiting_dismiss` does not pause `player.update()` — Overdrive/regen tick during lore reading | ✅ P8-0c (2026-05-18) | Minor | `scenes/gameplay.py` |
 
 ---
 
