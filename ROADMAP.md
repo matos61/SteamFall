@@ -2158,14 +2158,91 @@ _Evaluated by hk-agent 2026-05-16; see `REVIEW_HK.md` for full analysis. HK-P6-A
 
 | # | Improvement | Status | Effort | Files |
 |---|---|---|---|---|
-| HK-P7-A | Camera lerp `0.12` lags visibly during Overdrive dashes; raise to `0.15` | ⏳ Phase 7 | Trivial | `core/camera.py` L19 |
-| HK-P7-B | No wall-nail sparks when swing hits a solid tile; add 4-particle emit on tile wall contact during attack | ⏳ Phase 7 | Minor | `systems/physics.py`, `scenes/gameplay.py` |
-| HK-P7-C | Enemy base attack cooldown hardcoded `60` in `enemy.py` L146; extract `ENEMY_ATTACK_COOLDOWN = 50` to settings | ⏳ Phase 7 | Trivial | `entities/enemy.py`, `settings.py` |
-| HK-P7-D | Boss phase-3 spread cooldown hardcoded `160` in `boss.py` L181; extract `BOSS_PROJ_SPREAD_CD = 120` to settings | ⏳ Phase 7 | Trivial | `entities/boss.py`, `settings.py` |
-| HK-P7-E | Camera has no dead zone or look-ahead; add `CAMERA_DEAD_ZONE_X = 80` and `CAMERA_LOOK_AHEAD_X = 100` | ⏳ Phase 7 | Moderate | `core/camera.py`, `settings.py` |
-| HK-P7-F | `PLAYER_ATTACK_COOLDOWN = 25` gives ~2.4 attacks/s vs HK's ~3; lower to `18` | ⏳ Phase 7 | Trivial | `settings.py` L75 |
-| HK-P7-G | Soul Surge gives no feedback on miss — resource drains silently; emit dim 3-particle "miss pulse" when no hit confirmed | ⏳ Phase 7 | Minor | `entities/player.py` |
-| HK-P7-H | Overdrive 3x speed advantage removes all enemy melee threat for 3 s; add `ENEMY_CHASE_SPEED_OVERDRIVE = 3.2` applied when player moving fast | ⏳ Phase 7 | Minor | `settings.py`, `entities/enemy.py` |
+| HK-P7-A | Camera lerp `0.12` lags visibly during Overdrive dashes; raise to `0.15` | ✅ P7-HK (2026-05-16) | Trivial | `core/camera.py` L19 |
+| HK-P7-B | No wall-nail sparks when swing hits a solid tile; add 4-particle emit on tile wall contact during attack | ✅ P7-HK (2026-05-16) | Minor | `systems/physics.py`, `scenes/gameplay.py` |
+| HK-P7-C | Enemy base attack cooldown hardcoded `60` in `enemy.py` L146; extract `ENEMY_ATTACK_COOLDOWN = 50` to settings | ✅ P7-HK (2026-05-16) | Trivial | `entities/enemy.py`, `settings.py` |
+| HK-P7-D | Boss phase-3 spread cooldown hardcoded `160` in `boss.py` L181; extract `BOSS_PROJ_SPREAD_CD = 120` to settings | ✅ P7-HK (2026-05-16) | Trivial | `entities/boss.py`, `settings.py` |
+| HK-P7-E | Camera has no dead zone or look-ahead; add `CAMERA_DEAD_ZONE_X = 80` and `CAMERA_LOOK_AHEAD_X = 100` | ✅ P7-HK (2026-05-16) | Moderate | `core/camera.py`, `settings.py` |
+| HK-P7-F | `PLAYER_ATTACK_COOLDOWN = 25` gives ~2.4 attacks/s vs HK's ~3; lower to `18` | ✅ P7-HK (2026-05-16) | Trivial | `settings.py` L75 |
+| HK-P7-G | Soul Surge gives no feedback on miss — resource drains silently; emit dim 3-particle "miss pulse" when no hit confirmed | ✅ P7-HK (2026-05-16) | Minor | `entities/player.py` |
+| HK-P7-H | Overdrive 3x speed advantage removes all enemy melee threat for 3 s; add `ENEMY_CHASE_SPEED_OVERDRIVE = 3.2` applied when player moving fast | ✅ P7-HK (2026-05-16) | Minor | `settings.py`, `entities/enemy.py` |
+
+**All HK-P7 items confirmed done (2026-05-16).** A–H implemented in commit `4b4488d`.
+
+---
+
+## Phase 8 — Feel Polish Sprint ⏳ IN PROGRESS
+
+_Launched by orchestrator 2026-05-18. Addresses all outstanding HK-P7 feel improvements from the Phase 7 review pass (2026-05-16). Pre-phase review runs in parallel with the implementation sprint._
+
+**Priority order for build-agent** (tackle in this order):
+
+1. **P8-0b (pre-phase review)** ⏳ IN PROGRESS — review-agent and hk-agent running in parallel (2026-05-18).
+2. **P8-0c (critical bug-fix sprint)** ⏳ PENDING — blocked until P8-0b results are in.
+3. ~~**P8-1 (HK feel sprint)**~~ ✅ **DONE (2026-05-16)** — HK-P7-A through HK-P7-H all implemented in commit `4b4488d` (confirmed by orchestrator code inspection 2026-05-18).
+
+---
+
+### Task P8-0b: Pre-Phase Review ⏳ IN PROGRESS
+
+_Review-agent and hk-agent launched in parallel 2026-05-18. Scope: all .py files, focus on P7-0c patches (`entities/player.py` BUG-052, `settings.py` BUG-053)._
+
+**Acceptance criteria — done when:**
+- `REVIEW_BUGS.md` updated with any new bugs in P7 code (or a note that none were found).
+- `REVIEW_HK.md` updated with any new feel gaps (or a note that none were found).
+- Any 🔴 critical bugs found are added to the Known Bugs section below and assigned to build-agent.
+
+---
+
+### Task P8-1: HK Feel Sprint — Camera / Combat / Constants ✅ DONE (2026-05-16)
+
+_All HK-P7-A through HK-P7-H implemented in commit `4b4488d`. Confirmed by orchestrator code inspection 2026-05-18: all constants in `settings.py`, camera lerp/dead-zone/look-ahead in `core/camera.py`, `ENEMY_ATTACK_COOLDOWN` in `entities/enemy.py`, `BOSS_PROJ_SPREAD_CD` in `entities/boss.py`._
+
+**Files to touch:**
+- `core/camera.py` (HK-P7-A, HK-P7-E)
+- `settings.py` (HK-P7-A, HK-P7-C, HK-P7-D, HK-P7-E, HK-P7-F, HK-P7-H)
+- `entities/enemy.py` (HK-P7-C, HK-P7-H)
+- `entities/boss.py` (HK-P7-D)
+- `scenes/gameplay.py` (HK-P7-B)
+- `entities/player.py` (HK-P7-G)
+
+**What to build:**
+
+**HK-P7-A** `core/camera.py` line 19: Raise lerp constant from `0.12` to `0.15`. The lag is most visible during Overdrive dashes where the player rockets away from the camera center.
+
+**HK-P7-B** Wall-nail sparks — in `scenes/gameplay.py`, during the frame(s) when `player._attack_timer > 0`, check if the player's forward melee rect (`hitbox.rect` or a facing-extended rect) overlaps any solid tile in `tilemap.tiles`. If overlap occurs and a `_wall_spark_emitted` flag is False, call `self._particles.emit(contact_x, contact_y, 4, HIT_PARTICLE_SPEED, (220, 200, 80), HIT_PARTICLE_LIFE)` and set `_wall_spark_emitted = True`. Reset the flag when `_attack_timer == 0`.
+
+**HK-P7-C** `entities/enemy.py` line ~146: Replace the hardcoded attack cooldown `60` with `ENEMY_ATTACK_COOLDOWN`. Add `ENEMY_ATTACK_COOLDOWN = 50` to `settings.py` and import it in `enemy.py`.
+
+**HK-P7-D** `entities/boss.py` line ~181: Replace the hardcoded phase-3 spread cooldown `160` with `BOSS_PROJ_SPREAD_CD`. Add `BOSS_PROJ_SPREAD_CD = 120` to `settings.py` and import it in `boss.py`.
+
+**HK-P7-E** Camera dead zone + look-ahead — add to `settings.py`:
+```python
+CAMERA_DEAD_ZONE_X  = 80    # px — suppress pan when player near screen center
+CAMERA_LOOK_AHEAD_X = 100   # px — bias target toward player's facing direction
+```
+In `core/camera.py` update target calculation:
+- Compute `look_target = player.rect.centerx + player.facing * CAMERA_LOOK_AHEAD_X`.
+- Only lerp toward it when `abs(look_target - self.offset.x - SCREEN_WIDTH//2) > CAMERA_DEAD_ZONE_X`.
+
+**HK-P7-F** `settings.py`: Lower `PLAYER_ATTACK_COOLDOWN` from `25` to `18` frames (~3.3 attacks/s, matching HK nail cadence).
+
+**HK-P7-G** Soul Surge miss pulse — in `entities/player.py` `_handle_ability()`, after the Soul Surge AoE collision loop, add a `_surge_hit_count` counter incremented for each enemy hit. If `_surge_hit_count == 0` after the loop, emit 3 dim particles at player center: `self.game_ref.particles.emit(cx, cy, 3, 2.0, (80, 40, 130), 14)` (muted purple, short life). Note: if `player.py` does not hold a particles reference, pass one via `gameplay.py` or emit from the gameplay update loop by checking `_surge_just_fired and _surge_hit_count == 0`.
+
+**HK-P7-H** Enemy chase speed during Overdrive — add to `settings.py`:
+```python
+ENEMY_CHASE_SPEED_OVERDRIVE = 3.2
+```
+In `entities/enemy.py` `_do_chase()`, check if the player's `abs(vx) >= PLAYER_SPEED * 2` (Overdrive-speed threshold). If True, use `ENEMY_CHASE_SPEED_OVERDRIVE` as the step speed instead of `ENEMY_CHASE_SPEED`.
+
+**Acceptance criteria — done when:**
+- Camera lerp is 0.15; look-ahead biases target 100 px toward facing; dead zone suppresses micro-jitter within 80 px of center.
+- Hitting a solid tile during melee emits 4 gold sparks once per swing.
+- `ENEMY_ATTACK_COOLDOWN = 50` used in `enemy.py` (not hardcoded 60).
+- `BOSS_PROJ_SPREAD_CD = 120` used in `boss.py` (not hardcoded 160).
+- Soul Surge with no enemy hit emits 3 dim purple particles.
+- Enemy chase speed scales to 3.2 when player is moving at Overdrive velocity.
+- `python main.py` launches without ImportError.
 
 ---
 
