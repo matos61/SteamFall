@@ -675,7 +675,7 @@ class GameplayScene(BaseScene):
                     if hb.rect.colliderect(tile):
                         particles.emit(hb.rect.centerx, hb.rect.centery,
                                        WALL_SPARK_COUNT, WALL_SPARK_SPEED,
-                                       GOLD, WALL_SPARK_LIFE, spread=180)
+                                       WALL_SPARK_COLOR, WALL_SPARK_LIFE, spread=180)
                         self.player._wall_spark_emitted = True
                         break
                 if self.player._wall_spark_emitted:
@@ -688,7 +688,7 @@ class GameplayScene(BaseScene):
                                 for hb in self.player._surge_hitboxes)
             if not hit_confirmed:
                 particles.emit(self.player.rect.centerx, self.player.rect.centery,
-                               3, 1.5, (80, 50, 120), 10)
+                               3, 2.0, (80, 40, 130), 14)
 
         # --- Combat: enemies hit player ---
         for enemy in living_enemies:

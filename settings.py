@@ -347,9 +347,10 @@ BOSS_PROJ_SPREAD_CD        = 120    # was hardcoded 160 in boss.py — tighter p
 CAMERA_DEAD_ZONE_X         = 80     # px horizontal dead zone before camera starts tracking
 CAMERA_LOOK_AHEAD_X        = 100    # px camera leads the player in facing direction
 ENEMY_CHASE_SPEED_OVERDRIVE = 3.2   # chase speed when player is in Overdrive (vs normal 2.5)
-WALL_SPARK_COUNT           = 4      # sparks emitted when attack nail clips a solid tile
-WALL_SPARK_SPEED           = 3.0    # initial speed of wall-nail sparks
-WALL_SPARK_LIFE            = 8      # lifetime in frames
+WALL_SPARK_COUNT           = 4              # sparks emitted when attack nail clips a solid tile
+WALL_SPARK_COLOR           = (220, 200, 80) # bright gold — distinct from enemy hit sparks
+WALL_SPARK_SPEED           = 3.0            # initial speed of wall-nail sparks
+WALL_SPARK_LIFE            = 8              # lifetime in frames
 
 CREDITS_TEXT = [
     "Steamfall",

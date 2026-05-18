@@ -13,7 +13,8 @@
 import pygame
 from entities.entity   import Entity
 from systems.combat    import AttackHitbox
-from settings          import (ENEMY_PATROL_SPEED, ENEMY_CHASE_SPEED,
+from settings          import (PLAYER_SPEED,
+                                ENEMY_PATROL_SPEED, ENEMY_CHASE_SPEED,
                                 ENEMY_SIGHT_RANGE, ENEMY_ATTACK_RANGE,
                                 ENEMY_ATTACK_DAMAGE, ENEMY_ATTACK_COOLDOWN,
                                 ENEMY_CHASE_SPEED_OVERDRIVE,
@@ -136,8 +137,10 @@ class Enemy(Entity):
 
     def _do_chase(self, player) -> None:
         direction = 1 if player.rect.centerx > self.rect.centerx else -1
-        speed = ENEMY_CHASE_SPEED_OVERDRIVE if getattr(player, '_overdrive', False) \
-                else ENEMY_CHASE_SPEED
+        # HK-P7-H: use overdrive speed when player is moving at Overdrive-level velocity
+        speed = (ENEMY_CHASE_SPEED_OVERDRIVE
+                 if abs(getattr(player, 'vx', 0)) >= PLAYER_SPEED * 2
+                 else ENEMY_CHASE_SPEED)
         self.vx     = direction * speed
         self.facing = direction
 
