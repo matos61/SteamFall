@@ -810,7 +810,45 @@ The following are not bugs in existing code but are pre-conditions that could ca
 
 ## New Bugs
 
-- [ ] **BUG-052** 🔴 `entities/player.py` line 185: `LANDING_VY_THRESHOLD` gate is checked **after** `move_and_collide` has already zeroed out `self.vy`. In `systems/physics.py` line 58, landing sets `entity.vy = 0` before returning. So at line 185 of `player.py`, `self.vy` is always `0` on a landing frame, and `0 >= LANDING_VY_THRESHOLD` (4.0) is always False. Landing-dust particles are **never emitted**, regardless of fall speed — the HK-P6-C feature is silently broken. Minimal fix: capture fall speed before physics runs: add `_pre_land_vy = self.vy` before `apply_gravity(self)` (or after gravity but before `move_and_collide`), then check `if _pre_land_vy >= LANDING_VY_THRESHOLD:` at line 185.
+- [x] **BUG-052** 🔴 `entities/player.py` line 185: `LANDING_VY_THRESHOLD` gate is checked **after** `move_and_collide` has already zeroed out `self.vy`. In `systems/physics.py` line 58, landing sets `entity.vy = 0` before returning. So at line 185 of `player.py`, `self.vy` is always `0` on a landing frame, and `0 >= LANDING_VY_THRESHOLD` (4.0) is always False. Landing-dust particles are **never emitted**, regardless of fall speed — the HK-P6-C feature is silently broken. Minimal fix: capture fall speed before physics runs: add `_pre_land_vy = self.vy` before `apply_gravity(self)` (or after gravity but before `move_and_collide`), then check `if _pre_land_vy >= LANDING_VY_THRESHOLD:` at line 185.
 
-- [ ] **BUG-053** ⚠️ `settings.py` lines 192–196: The arena-shrink block defines `ARENS_SHRINK_SPEED` (typo, missing 'A') and `ARENS_SHRINK_AMOUNT` twice (lines 193 and 195), with the second assignment overwriting the first. The correctly-spelled `ARENA_SHRINK_SPEED` and `ARENA_SHRINK_AMOUNT` are also defined (lines 194 and 196) and are the names actually used by `gameplay.py`. The two `ARENS_*` typo constants are dead — never imported anywhere — but line 195 silently re-assigns `ARENS_SHRINK_AMOUNT`, creating a confusing 5-line block with 3 redundant entries. No functional crash (the live code uses the correct `ARENA_*` names), but a future developer doing `from settings import *` could be confused. Minimal fix: remove lines 192–193 and 195 (the three `ARENS_*` dead constants), leaving only the two canonical `ARENA_SHRINK_SPEED` and `ARENA_SHRINK_AMOUNT` lines.
+- [x] **BUG-053** ⚠️ `settings.py` lines 192–196: The arena-shrink block defines `ARENS_SHRINK_SPEED` (typo, missing 'A') and `ARENS_SHRINK_AMOUNT` twice (lines 193 and 195), with the second assignment overwriting the first. The correctly-spelled `ARENA_SHRINK_SPEED` and `ARENA_SHRINK_AMOUNT` are also defined (lines 194 and 196) and are the names actually used by `gameplay.py`. The two `ARENS_*` typo constants are dead — never imported anywhere — but line 195 silently re-assigns `ARENS_SHRINK_AMOUNT`, creating a confusing 5-line block with 3 redundant entries. No functional crash (the live code uses the correct `ARENA_*` names), but a future developer doing `from settings import *` could be confused. Minimal fix: remove lines 192–193 and 195 (the three `ARENS_*` dead constants), leaving only the two canonical `ARENA_SHRINK_SPEED` and `ARENA_SHRINK_AMOUNT` lines.
+
+---
+
+# Bug Review — 2026-05-18
+
+**Scope:** All .py files re-read. Focus on P7-0c patch files (`entities/player.py` — `_pre_land_vy` capture for BUG-052 fix; `settings.py` — removal of three dead `ARENS_SHRINK_*` typo constants for BUG-053 fix). BUG-052 and BUG-053 confirmed fixed and ticked above. This pass starts at BUG-054.
+
+---
+
+## Verification: BUG-052 and BUG-053 (P7-0c)
+
+**BUG-052 (`_pre_land_vy` capture):** CONFIRMED FIXED. `entities/player.py` line 182 now reads `_pre_land_vy = self.vy` placed **before** `apply_gravity(self)` at line 183. This captures the end-of-previous-frame fall velocity before physics zeros it out. Line 191 then correctly checks `if _pre_land_vy >= LANDING_VY_THRESHOLD:` to gate landing-dust emission.
+
+**BUG-053 (dead `ARENS_*` typo constants):** CONFIRMED FIXED. `settings.py` no longer contains any `ARENS_SHRINK_*` entries. Only the correctly-spelled `ARENA_SHRINK_SPEED` and `ARENA_SHRINK_AMOUNT` are present.
+
+---
+
+## New Bugs
+
+---
+
+- [ ] **BUG-054** 🔴 `entities/player.py` lines 168 and 380: The `_hurt_latched` mechanism introduced by the BUG-047 fix is broken by an off-by-one in decrement ordering — `_hurt_latched` is never set True and the hurt animation never plays.
+
+  **Root cause:** `Player.update()` calls `super().update(dt)` at line 168 first. `Entity.update()` (line 87–88 of `entities/entity.py`) decrements `self.iframes` by 1 on that same call: when the player takes a hit, `iframes` is set to `PLAYER_IFRAMES` (45) by `take_damage`, then immediately decremented to 44 by `super().update(dt)`. `Player._update_animation()` is called at line 212, **after** this decrement. Inside `_update_animation()` (line 380), the latch check reads:
+  ```python
+  if self.iframes == PLAYER_IFRAMES:   # 44 == 45 → always False
+      self._hurt_latched = True
+  ```
+  Because `iframes` is already 44 at this point, the condition is never true on the first hit frame. `_hurt_latched` stays False, the `elif self._hurt_latched:` branch at line 387 is never entered, and the hurt animation never activates. The BUG-047 fix is effectively reverted by the ordering of `super().update(dt)` relative to `_update_animation()`.
+
+  **Effect:** The player's hurt animation (3-frame clip) is completely suppressed. The only hit feedback visible is the strobe effect from `Entity.draw()` (white flash every 4 frames while `iframes > 0`), which is separate from the animation state machine.
+
+  **Minimal fix:** In `_update_animation()` (line 380), change the latch-entry condition from `PLAYER_IFRAMES` to `PLAYER_IFRAMES - 1` (i.e., 44), since that is the value `iframes` holds on the first post-decrement frame after a hit:
+  ```python
+  if self.iframes == PLAYER_IFRAMES - 1:   # 44 == 44 → True on first hit frame
+      self._hurt_latched = True
+  ```
+  Alternative fix: move the `_hurt_latched = True` assignment into `take_damage()` (before `super().update()` ever runs) so it is set at the moment of impact rather than detected one frame later.
 

@@ -2095,6 +2095,10 @@ _Review-agent 2026-05-07 pass (P6-0b):_
 
 56. ✅ **BUG-051** `entities/crawler.py`: Crawler calling Entity-level super, bypassing enemy animation and faction-tint — fixed in P6-0c (2026-05-15). Now calls Enemy-level `super()` in both `update()` and `draw()`.
 
+_Review-agent 2026-05-18 pass (P8-0b):_
+
+59. 🔴 **BUG-054** `entities/player.py` line 380: `_hurt_latched` is never set True because `super().update(dt)` decrements `iframes` from 45 → 44 before `_update_animation()` runs; the check `iframes == PLAYER_IFRAMES` (45) is permanently False. The BUG-047 hurt-animation fix is silently dead. Fix: change to `iframes == PLAYER_IFRAMES - 1`. Assign to build-agent in P8-0c.
+
 _Review-agent 2026-05-16 pass (P7-0b):_
 
 57. ✅ **BUG-052** `entities/player.py` line 185: `LANDING_VY_THRESHOLD` gate (`self.vy >= 4.0`) is checked **after** `move_and_collide` has already zeroed `self.vy` on landing (physics.py line 58 sets `entity.vy = 0` when grounded). The condition is always `0 >= 4.0 = False`. Landing-dust particles are never emitted regardless of fall speed — the HK-P6-C feature is silently dead. Fix: capture `_pre_land_vy = self.vy` immediately before calling `apply_gravity(self)` in `player.update()`, then compare `_pre_land_vy >= LANDING_VY_THRESHOLD` at the emit-landing site. Assign to build-agent in P7-0c.
@@ -2177,20 +2181,22 @@ _Launched by orchestrator 2026-05-18. Addresses all outstanding HK-P7 feel impro
 
 **Priority order for build-agent** (tackle in this order):
 
-1. **P8-0b (pre-phase review)** ⏳ IN PROGRESS — review-agent and hk-agent running in parallel (2026-05-18).
-2. **P8-0c (critical bug-fix sprint)** ⏳ PENDING — blocked until P8-0b results are in.
+1. ~~**P8-0b (pre-phase review)**~~ ✅ **DONE (2026-05-18)** — BUG-052/053 confirmed fixed; BUG-054 found (🔴); HK-P8-A through HK-P8-H documented.
+2. **P8-0c (critical bug-fix sprint)** ⏳ PENDING — build-agent to fix BUG-054 + HK-P8-D/F/G/H (see task below).
 3. ~~**P8-1 (HK feel sprint)**~~ ✅ **DONE (2026-05-16)** — HK-P7-A through HK-P7-H all implemented in commit `4b4488d` (confirmed by orchestrator code inspection 2026-05-18).
+4. **P8-2 (HK feel sprint — camera / Overdrive / lore)** ⏳ PENDING — implement HK-P8-A, B, C, E after P8-0c.
 
 ---
 
-### Task P8-0b: Pre-Phase Review ⏳ IN PROGRESS
+### Task P8-0b: Pre-Phase Review ✅ DONE (2026-05-18)
 
-_Review-agent and hk-agent launched in parallel 2026-05-18. Scope: all .py files, focus on P7-0c patches (`entities/player.py` BUG-052, `settings.py` BUG-053)._
+_Review-agent and hk-agent completed in parallel. BUG-052 and BUG-053 confirmed fixed. One new 🔴 critical bug found (BUG-054). Eight HK feel gaps identified (HK-P8-A through HK-P8-H)._
 
-**Acceptance criteria — done when:**
-- `REVIEW_BUGS.md` updated with any new bugs in P7 code (or a note that none were found).
-- `REVIEW_HK.md` updated with any new feel gaps (or a note that none were found).
-- Any 🔴 critical bugs found are added to the Known Bugs section below and assigned to build-agent.
+**review-agent findings:**
+- BUG-052 and BUG-053 ticked ✅ (P7-0c fixes confirmed).
+- 🔴 **BUG-054** `entities/player.py` line 380: `_hurt_latched` is never set True because `super().update(dt)` decrements `iframes` from 45 → 44 before `_update_animation()` runs; the check `iframes == PLAYER_IFRAMES` (45) is permanently False. The BUG-047 hurt-animation fix is silently dead. Fix: change to `iframes == PLAYER_IFRAMES - 1`.
+
+**hk-agent findings:** HK-P7-A through HK-P7-H all confirmed implemented. Eight new feel gaps (HK-P8-A through HK-P8-H) documented in `REVIEW_HK.md`.
 
 ---
 
@@ -2243,6 +2249,92 @@ In `entities/enemy.py` `_do_chase()`, check if the player's `abs(vx) >= PLAYER_S
 - Soul Surge with no enemy hit emits 3 dim purple particles.
 - Enemy chase speed scales to 3.2 when player is moving at Overdrive velocity.
 - `python main.py` launches without ImportError.
+
+---
+
+### Task P8-0c: Critical Bug-Fix Sprint (Phase 8) ⏳ PENDING
+
+_Unblocked by P8-0b completion (2026-05-18). BUG-054 is 🔴 critical. HK-P8-D/F/G/H are minor correctness fixes to fold in._
+
+**Files to touch:**
+- `entities/player.py` (BUG-054)
+- `systems/combat.py` (HK-P8-D)
+- `systems/voice_player.py` (HK-P8-F)
+- `settings.py` (HK-P8-D, HK-P8-G)
+- `scenes/gameplay.py` (HK-P8-H)
+
+**Fixes required:**
+
+- 🔴 **BUG-054** `entities/player.py` line 380: Change `if self.iframes == PLAYER_IFRAMES:` to `if self.iframes == PLAYER_IFRAMES - 1:`. The base `update()` decrements `iframes` before `_update_animation()` runs, so the check for the first damage frame must compare against the post-decrement value (44 when `PLAYER_IFRAMES = 45`). Without this fix `_hurt_latched` is never set True and the hurt animation introduced by BUG-047's fix never plays.
+
+- ⚠️ **HK-P8-D** `systems/combat.py` line 79: The hitstop trigger hardcodes `4` instead of using `HITSTOP_FRAMES`. Change to `hitstop.trigger(HITSTOP_FRAMES)` and import `HITSTOP_FRAMES` from `settings`. Also add `HITSTOP_DEATH_FRAMES = 6` to `settings.py` for the player-death path (pre-hook for future use).
+
+- ⚠️ **HK-P8-F** `systems/voice_player.py`: In `VoicePlayer.play()`, after `ch = pygame.mixer.find_channel(True)` and before `ch.play(sound)`, add `ch.set_volume(self._sfx_volume)` where `self._sfx_volume` is sourced from the `AudioManager` instance (e.g., pass `game.audio._sfx_volume` or store a reference). This makes voice lines respect the SFX volume slider.
+
+- ⚠️ **HK-P8-G** `settings.py`: Remove the `SOUL_SURGE_SIZE` alias (it is identical to `SOUL_SURGE_RADIUS` and nothing uses it). Grep first: `grep -r "SOUL_SURGE_SIZE" --include="*.py"` — if nothing imports it, delete the line.
+
+- ⚠️ **HK-P8-H** `scenes/gameplay.py`: Add a lore-pause guard early in `update()`. After the existing NPC-dialogue early-return block, add:
+  ```python
+  if self._lore_waiting_dismiss:
+      self._tick_transition()   # still tick any active transition
+      return
+  ```
+  This prevents Overdrive timer drain and soul/heat regen ticking while the player is reading lore — consistent with how NPC dialogue and pause menu already freeze game logic.
+
+**Acceptance criteria — done when:**
+- Hurt animation visibly plays for its full clip duration after taking damage.
+- `hitstop.trigger(HITSTOP_FRAMES)` used in `combat.py` (not hardcoded `4`).
+- Voice lines respect the SFX volume slider; muted SFX silences voice.
+- `SOUL_SURGE_SIZE` alias removed from `settings.py`; no file imports it.
+- Overdrive timer and resource regen do not tick while a lore overlay is displayed.
+- `python main.py` launches without ImportError.
+
+---
+
+### Task P8-2: HK Feel Sprint — Camera / Overdrive / Lore ⏳ PENDING
+
+_Blocked until P8-0c complete. Implements HK-P8-A, B, C, E._
+
+**Files to touch:**
+- `entities/player.py` (HK-P8-A)
+- `settings.py` (HK-P8-B, HK-P8-C)
+- `entities/shield_guard.py` (HK-P8-B)
+- `core/camera.py` (HK-P8-C)
+- `entities/player.py` or `scenes/gameplay.py` (HK-P8-E)
+
+**What to build:**
+
+**HK-P8-A** `entities/player.py`: Move `_pre_land_vy = self.vy` to immediately **after** `apply_gravity(self)` is called (so gravity is included in the pre-collision velocity) but **before** `move_and_collide(self, solid_rects)`. This ensures the captured velocity reflects the full falling speed (including the current frame's gravity increment) rather than the previous frame's value. The fix makes the `LANDING_VY_THRESHOLD` check accurate for all player variants.
+
+**HK-P8-B** `entities/shield_guard.py` + `settings.py`: Add `SHIELD_GUARD_ATTACK_COOLDOWN = 75` to `settings.py`. In `shield_guard.py` `_do_attack()`, replace the hardcoded `75` (or equivalent cooldown constant) with `SHIELD_GUARD_ATTACK_COOLDOWN`. This makes the cooldown tunable from `settings.py` without touching entity code.
+
+**HK-P8-C** `core/camera.py` + `settings.py`: Add `CAMERA_DEAD_ZONE_Y = 40` to `settings.py`. In `camera.py`, apply the same dead-zone logic to the Y axis that HK-P7-E applied to X: only lerp the Y offset when `abs(dy) > CAMERA_DEAD_ZONE_Y`. This suppresses minor Y jitter from uneven terrain without making the camera feel slow during deliberate vertical movement.
+
+**HK-P8-E** Overdrive particle trail: Add `OVERDRIVE_TRAIL_INTERVAL = 6` to `settings.py`. In `entities/player.py` `_tick_ability()` (or wherever the Overdrive active-duration is ticked), when `_overdrive_timer > 0` and `_overdrive_timer % OVERDRIVE_TRAIL_INTERVAL == 0`, emit 1 heat-shimmer particle (color `OVERDRIVE_PARTICLE_COLOR`, speed 1.5, direction upward ±30°, life 10) using the particle system reference.
+
+**Acceptance criteria — done when:**
+- Landing dust threshold is accurate for all factions (gravity included in `_pre_land_vy`).
+- `SHIELD_GUARD_ATTACK_COOLDOWN = 75` in `settings.py` used in `shield_guard.py`.
+- Camera Y axis has a 40 px dead zone suppressing terrain jitter.
+- Overdrive emits a 1-particle heat-shimmer trail every 6 frames while active.
+- `python main.py` launches without ImportError.
+
+---
+
+## HK Feel Improvements — Phase 8 (reviewed 2026-05-18)
+
+_Evaluated by hk-agent 2026-05-18; see `REVIEW_HK.md` for full analysis. HK-P7-A through HK-P7-H all confirmed done._
+
+| # | Improvement | Status | Effort | Files |
+|---|---|---|---|---|
+| HK-P8-A | `player.py`: `_pre_land_vy` captured before `apply_gravity` — threshold off by one gravity tick; move capture to after gravity, before collision | ⏳ P8-2 | Trivial | `entities/player.py` |
+| HK-P8-B | `shield_guard.py`: attack cooldown 75 hardcoded; extract `SHIELD_GUARD_ATTACK_COOLDOWN = 75` to settings | ⏳ P8-2 | Trivial | `entities/shield_guard.py`, `settings.py` |
+| HK-P8-C | `camera.py`: Y axis has no dead zone; add `CAMERA_DEAD_ZONE_Y = 40` mirroring the X dead-zone logic | ⏳ P8-2 | Minor | `core/camera.py`, `settings.py` |
+| HK-P8-D | `combat.py` L79: `hitstop.trigger(4)` ignores `HITSTOP_FRAMES` constant; use it + add `HITSTOP_DEATH_FRAMES = 6` | ⏳ P8-0c | Trivial | `systems/combat.py`, `settings.py` |
+| HK-P8-E | No Overdrive particle trail for 180-frame duration — only activation burst; emit 1 shimmer every `OVERDRIVE_TRAIL_INTERVAL = 6` frames | ⏳ P8-2 | Minor | `entities/player.py`, `settings.py` |
+| HK-P8-F | `voice_player.py`: ignores `AUDIO_SFX_VOLUME`; full-volume voice plays even when SFX is muted | ⏳ P8-0c | Minor | `systems/voice_player.py` |
+| HK-P8-G | `settings.py`: `SOUL_SURGE_SIZE` is a dead alias for `SOUL_SURGE_RADIUS`; never imported elsewhere | ⏳ P8-0c | Trivial | `settings.py` |
+| HK-P8-H | `gameplay.py`: `_lore_waiting_dismiss` does not pause `player.update()` — Overdrive/regen tick during lore reading | ⏳ P8-0c | Minor | `scenes/gameplay.py` |
 
 ---
 

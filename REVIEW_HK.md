@@ -1496,3 +1496,346 @@ def _do_chase(self, player) -> None:
 ```
 
 At `ENEMY_CHASE_SPEED_OVERDRIVE = 3.2` the player at 8 px/frame still outruns the enemy (3.2 vs. 8), but the gap shrinks from 5.5 px/frame to 4.8 px/frame — enemies feel more urgent without becoming impossible to escape. More importantly, the player can no longer casually stand still during Overdrive and attack while enemies walk toward them at their normal 2.5 px/frame patrol speed — enemies now lunge at 3.2 px/frame, maintaining tactical pressure. Justification: Overdrive should feel like a powerful tool that opens combat opportunities, not a mode that removes enemy threat entirely. The reward for activating Overdrive should be the 30% damage bonus and the repositioning speed — not a complete suspension of melee pressure.
+
+---
+
+# HK Feel Review — 2026-05-18
+
+**Scope:** Full re-read of every .py file in the project. Phase 7 (2026-05-16) changes verified against live code. HK-P7-A through HK-P7-H all confirmed implemented. This pass adds HK-P8-A through HK-P8-H.
+
+---
+
+## HK-P7 Confirmation (2026-05-18)
+
+All eight HK-P7 items are confirmed implemented. Evidence from live code:
+
+| Flag | Evidence |
+|---|---|
+| HK-P7-A: Camera lerp 0.15 | `core/camera.py` line 20: `self.lerp_speed = 0.15` (comment: "was 0.12") |
+| HK-P7-B: Wall-nail sparks | `settings.py` lines 350–352 define `WALL_SPARK_COUNT = 4`, `WALL_SPARK_SPEED = 3.0`, `WALL_SPARK_LIFE = 8`; `entities/player.py` line 108 has `_wall_spark_emitted: bool = False`; `scenes/gameplay.py` lines 672–682 emit wall sparks when player hitbox overlaps a solid tile |
+| HK-P7-C: `ENEMY_ATTACK_COOLDOWN` extracted | `settings.py` line 345: `ENEMY_ATTACK_COOLDOWN = 50`; `entities/enemy.py` line 19 imports it; `entities/enemy.py` line 150 uses `ENEMY_ATTACK_COOLDOWN` |
+| HK-P7-D: `BOSS_PROJ_SPREAD_CD` extracted | `settings.py` line 346: `BOSS_PROJ_SPREAD_CD = 120`; `entities/boss.py` line 28 imports it; `entities/boss.py` line 182 uses `BOSS_PROJ_SPREAD_CD` |
+| HK-P7-E: Camera dead zone + look-ahead | `settings.py` lines 347–348: `CAMERA_DEAD_ZONE_X = 80`, `CAMERA_LOOK_AHEAD_X = 100`; `core/camera.py` lines 11–12 import both; `core/camera.py` lines 27–35 implement dead-zone and look-ahead logic |
+| HK-P7-F: Attack cooldown tightened | `settings.py` line 75: `PLAYER_ATTACK_COOLDOWN = 18` (comment: "was 25 — ~3 attacks/s, closer to HK nail cadence") |
+| HK-P7-G: Soul Surge miss pulse | `entities/player.py` line 106 has `_surge_just_activated: bool = False`; `scenes/gameplay.py` lines 685–691 detect zero-hit surge and emit dim purple pulse (3 particles at speed 1.5) |
+| HK-P7-H: Enemy reacts to Overdrive speed | `settings.py` line 349: `ENEMY_CHASE_SPEED_OVERDRIVE = 3.2`; `entities/enemy.py` line 19 imports it; `entities/enemy.py` lines 139–141 apply it in `_do_chase` when `player._overdrive` is True |
+
+---
+
+## New Gaps
+
+### HK-P8-A — `_pre_land_vy` uses `self.vy` before gravity is applied — threshold fires too early
+
+**File:** `entities/player.py` lines 182–191.
+
+**Current code:**
+```python
+_pre_land_vy = self.vy
+apply_gravity(self)
+if solid_rects:
+    move_and_collide(self, solid_rects)
+
+if not was_on_ground and self.on_ground:
+    if _pre_land_vy >= LANDING_VY_THRESHOLD:
+        ...
+```
+
+`_pre_land_vy` is captured from `self.vy` before `apply_gravity` runs, meaning it holds the velocity from the **end of the previous frame** rather than the peak downward speed entering the collision. On the frame of landing, `apply_gravity` adds `GRAVITY * gravity_mult` (~0.75 for Marked) to `self.vy` before `move_and_collide` zeros it — but `_pre_land_vy` never sees that frame's gravity contribution. For a player falling at exactly `LANDING_VY_THRESHOLD = 4.0` px/frame at the end of frame N-1, `_pre_land_vy` is 4.0, the gate passes, and dust is emitted correctly. However, if the fall terminates in the same frame that `vy` crosses the threshold (i.e., the player was at 3.7 at the end of frame N-1 and would have been ~4.45 after gravity on frame N), `_pre_land_vy` sees 3.7, the gate fails, and no dust is emitted despite what would feel like a meaningful landing. The commit note on this code ("Phase 7: `_pre_land_vy` added to fix landing-dust threshold") suggests this was an intentional fix, but the placement before `apply_gravity` means the threshold effectively operates at `LANDING_VY_THRESHOLD - GRAVITY * gravity_mult` ≈ 3.25 for Marked (not 4.0 as the constant implies). This is not a severe feel gap but it is an implementation inconsistency that will confuse future tuning of `LANDING_VY_THRESHOLD`.
+
+**Suggested change:** Move `_pre_land_vy` capture to after `apply_gravity` so the velocity reflects the speed at which the player actually entered the collision:
+
+```python
+# entities/player.py — reorder the three lines:
+apply_gravity(self)
+_pre_land_vy = self.vy          # capture AFTER gravity, BEFORE collision
+if solid_rects:
+    move_and_collide(self, solid_rects)
+```
+
+With this order `_pre_land_vy` holds the downward speed the player had at collision entry, making `LANDING_VY_THRESHOLD = 4.0` mean exactly what it says: dust fires when the player was travelling at 4 px/frame or faster downward into the ground. No constant change needed.
+
+**Justification:** Hollow Knight's landing dust is gated on a meaningful fall height. The threshold constant should map directly to physics intuition. The current placement creates a ~0.75 px/frame dead band below the stated threshold that is invisible to designers tuning `LANDING_VY_THRESHOLD` in `settings.py`.
+
+---
+
+### HK-P8-B — `ShieldGuard._do_attack` hardcodes cooldown 75 — bypasses `ENEMY_ATTACK_COOLDOWN`
+
+**File:** `entities/shield_guard.py` line 67.
+
+**Current code:**
+```python
+def _do_attack(self, player) -> None:
+    self.vx = 0
+    if self._attack_cooldown > 0:
+        return
+    self._attack_cooldown = 75
+```
+
+HK-P7-C extracted the base enemy attack cooldown to `ENEMY_ATTACK_COOLDOWN = 50` in `settings.py` and updated `entities/enemy.py` line 150. However `ShieldGuard._do_attack` overrides `_do_attack` without referencing `ENEMY_ATTACK_COOLDOWN` — it hardcodes 75. The same pattern applies in `entities/jumper.py` line 93 (`self._attack_cooldown = 50`) and `entities/boss.py` lines 165 and 136 (which correctly use local variables, but without settings constants for the ShieldGuard-specific value). The ShieldGuard's 75-frame cooldown (~1.25 s between shield bashes) is deliberately longer than the base enemy's 50 frames, which is correct design — but the value is invisible to settings tuning. Any reviewer comparing enemy aggression from `settings.py` would not see this discrepancy.
+
+**Suggested change:**
+```python
+# settings.py — add alongside SHIELD_GUARD_* constants (near line 151)
+SHIELD_GUARD_ATTACK_COOLDOWN = 75   # Frames between ShieldGuard shield bashes (longer than base 50)
+```
+
+```python
+# entities/shield_guard.py line 67 — replace:
+# was: self._attack_cooldown = 75
+self._attack_cooldown = SHIELD_GUARD_ATTACK_COOLDOWN
+```
+
+**Justification:** The HK-P7-C principle — settings.py owns all tunable timing values — is inconsistently applied if the base enemy cooldown is in settings but the shield enemy's deliberate exception is hardcoded. A designer tuning aggression in `settings.py` would correctly find `ENEMY_ATTACK_COOLDOWN = 50` and update it, not knowing the ShieldGuard's override is buried in source. This is the same class of issue that HK-P7-C already fixed for the base enemy.
+
+---
+
+### HK-P8-C — Camera has no vertical dead zone — minor vertical terrain micro-jitter
+
+**File:** `core/camera.py` lines 38–39.
+
+**Current code:**
+```python
+# Y follows without a dead zone
+self.offset.y += (target_y - self.offset.y) * self.lerp_speed
+```
+
+HK-P7-E added a horizontal dead zone (`CAMERA_DEAD_ZONE_X = 80`) and look-ahead, which eliminated horizontal micro-jitter. However the vertical axis has no dead zone. On uneven terrain where the player oscillates slightly in Y (e.g., walking across a platform of single-tile height variations), the camera tracks every sub-pixel Y movement at `lerp_speed = 0.15`, producing a gentle but continuous vertical drift. In Hollow Knight the camera has a small vertical dead zone (~30–40 px) as well — the Knight can drop from a small ledge without the camera scrolling down, and can jump through a small arch without the camera scrolling up. This keeps the camera stable during routine traversal while still following large vertical movements (jumps, falls). Without it, every single-tile drop causes the camera to ease downward ~5 px and then ease back up — a subtle distraction.
+
+**Suggested change:**
+```python
+# settings.py — add alongside CAMERA_DEAD_ZONE_X
+CAMERA_DEAD_ZONE_Y = 40    # px vertical dead zone before camera tracks Y movement
+```
+
+```python
+# core/camera.py follow() — replace the Y lerp line:
+# was: self.offset.y += (target_y - self.offset.y) * self.lerp_speed
+dy = target_y - self.offset.y
+if abs(dy) > CAMERA_DEAD_ZONE_Y:
+    move_y = dy - CAMERA_DEAD_ZONE_Y * (1 if dy > 0 else -1)
+    self.offset.y += move_y * self.lerp_speed
+```
+
+This mirrors the exact logic already in place for the X axis (lines 33–35 of `camera.py`). `CAMERA_DEAD_ZONE_Y = 40` is intentionally smaller than the X value (80) because vertical movement is more significant in a platformer — the camera should follow jumps and falls while ignoring small oscillations.
+
+**Justification:** The horizontal dead zone already exists and the vertical axis uses an identical lerp pattern. The asymmetry (dead zone on X, none on Y) is not a deliberate design choice — the Phase 7 brief specified "dead zone" without specifying axis, and the implementation only handled X. Completing the dead zone on Y is a natural extension of the same HK-feel principle.
+
+---
+
+### HK-P8-D — `HITSTOP_FRAMES = 4` constant in `settings.py` is never used by any code
+
+**File:** `settings.py` line 110; `systems/combat.py` line 79; `scenes/gameplay.py` line 958.
+
+**Current code:**
+```python
+# settings.py line 110
+HITSTOP_FRAMES = 4    # Default freeze-frame count when a hit lands
+```
+
+```python
+# systems/combat.py line 79
+hitstop.trigger(4)   # hardcoded 4
+```
+
+```python
+# scenes/gameplay.py line 958
+hitstop.trigger(6)   # player death — hardcoded 6
+```
+
+`HITSTOP_FRAMES = 4` is defined in `settings.py` and appears nowhere else in the codebase. `combat.py` hardcodes `4` in its `trigger()` call (line 79), and `gameplay.py` hardcodes `6` for the death hitstop (line 958). Boss phase-transition hitstops use `12` and `20` directly in `boss.py` (lines 111–117). In Hollow Knight the hitstop duration is a critical tuning lever — different enemy types warrant different freeze lengths (boss hits feel heavier than standard enemy hits). Steamfall has a settings constant for it but no code actually reads it.
+
+**Suggested change:** Wire the constant to the default nail-connect hitstop in `combat.py`:
+
+```python
+# settings.py — line 110 stays as-is:
+HITSTOP_FRAMES = 4    # Default freeze-frame count when a hit lands
+
+# systems/combat.py line 13 — add import:
+from settings import HITSTOP_FRAMES
+
+# systems/combat.py line 79 — replace hardcode:
+# was: hitstop.trigger(4)
+hitstop.trigger(HITSTOP_FRAMES)
+```
+
+Additionally add a `HITSTOP_DEATH_FRAMES = 6` constant and use it in `gameplay.py` line 958:
+```python
+# settings.py
+HITSTOP_DEATH_FRAMES = 6   # Freeze frames on player death blow (longer for weight)
+```
+
+**Justification:** `HITSTOP_FRAMES` was added to `settings.py` precisely so the nail impact freeze could be tuned from one place. A reviewer increasing it to 6 in `settings.py` for a heavier feel would see no change in the game because `combat.py` ignores the constant. This is the exact class of invisible tuning surface that the HK feel reviews have flagged in every pass. At minimum the nail-connect path should read the constant — boss-specific overrides can remain hardcoded in `boss.py` since they express intentional phase escalation.
+
+---
+
+### HK-P8-E — Overdrive active state has no persistent particle trail — boost feel disappears after initial activation burst
+
+**File:** `entities/player.py` lines 355–365; `settings.py` lines 278–279.
+
+**Current behavior:** `_activate_overdrive()` calls `particles.emit_overdrive(self.rect.centerx, self.rect.centery)` once on activation — 8 heat-shimmer particles rising upward. After that single burst, the only visual signal that Overdrive is active is a thin orange rect outline drawn over the player sprite (`player.py` line 426). For the remaining 179 frames of the 180-frame duration, there is no continuous feedback.
+
+In Hollow Knight, sustained ability states (Shade Soul charged, Joni's Blessing glow, Fragile Strength aura) maintain a continuous particle or shader effect throughout the active window. A player unfamiliar with the HUD cooldown pips may not know Overdrive is still active 2 seconds after the initial burst — especially if the orange outline is subtle against a background tile. The spec calls out "Overdrive duration" as a focus area and the current single-burst approach does not fulfil the "ability active" visual grammar.
+
+**Suggested change:** Add a per-frame particle trail during Overdrive. In `player.py` `_tick_ability()`, emit one or two small heat-shimmer particles on every ~6th frame while `_overdrive` is True:
+
+```python
+# entities/player.py _tick_ability() — inside the if self._ability_active block:
+if self._overdrive and self._ability_timer % 6 == 0:
+    from systems.particles import particles
+    particles.emit(self.rect.centerx, self.rect.bottom,
+                   count=1, speed=1.5,
+                   color=OVERDRIVE_PARTICLE_COLOR, life=12, spread=90)
+```
+
+Add a constant to `settings.py`:
+```python
+# settings.py — alongside OVERDRIVE_PARTICLE_COUNT
+OVERDRIVE_TRAIL_INTERVAL = 6    # Emit one trail particle every N frames during Overdrive
+```
+
+The trail uses `spread=90` (upward cone only) at `count=1`, so it adds only ~1 particle every 6 frames — ~30 extra particles over the full 180-frame duration. This is negligible performance impact and keeps the particle pool well within normal combat density.
+
+**Justification:** HK's Fragile/Unbreakable Strength charm has a faint golden shimmer while active; Shade Cloak emits darkness on every dash. Visual persistence is how the player builds timing intuition for ability duration without constantly watching the HUD. The current orange outline is too subtle when the player is fighting: the outline blends with combat spark colors and is easy to miss. A small upward trail of heat-shimmer particles, matching the existing `OVERDRIVE_PARTICLE_COLOR`, provides clear ongoing confirmation at a cost of one particle per 6 frames.
+
+---
+
+### HK-P8-F — `voice_player.py` is imported but `VoicePlayer()` never receives volume control from the audio system
+
+**File:** `systems/voice_player.py` lines 46–72; `systems/audio.py`; `scenes/settings.py` lines 79–90.
+
+The `VoicePlayer` plays voice lines on a dedicated mixer channel (`_VOICE_CHANNEL = 7`) but ignores the `AUDIO_SFX_VOLUME` setting and provides no volume control API. The Settings scene adjusts music volume (channel 0, managed by `pygame.mixer.music`) and SFX volume (Sound objects via `AudioManager.set_sfx_volume`). Voice lines play through `pygame.mixer.Channel(7)` at whatever volume `pygame.mixer.Sound` was loaded at — typically 1.0. If the player sets SFX volume to 0.3 in the settings screen, voice lines continue to play at full volume.
+
+This is a feel gap because voice lines (faction prologues) are the primary narrative delivery mechanism. A player who has reduced SFX volume to hear music better, or who has SFX muted, will still hear full-volume voice playback — exactly the scenario where the mismatch is most jarring.
+
+**Suggested change:** Add a volume setter to `VoicePlayer` that the settings scene can call alongside the SFX volume adjustment:
+
+```python
+# systems/voice_player.py — add method:
+def set_volume(self, v: float) -> None:
+    """Apply volume to all cached voice sounds and the live channel."""
+    v = max(0.0, min(1.0, v))
+    for snd in self._cache.values():
+        snd.set_volume(v)
+```
+
+Wire it in `AudioManager.set_sfx_volume`:
+```python
+# systems/audio.py set_sfx_volume — after setting Sound volumes, also set voice volume:
+# (requires importing the voice singleton — create a module-level voice_player instance
+#  or pass it as a dependency)
+```
+
+Alternatively, since voice playback is only used in prologue/ending scenes, the simpler fix is to set the channel volume inside `VoicePlayer.play()`:
+
+```python
+# systems/voice_player.py play() — after ch.play(snd):
+# Read current SFX volume from the audio singleton
+from systems.audio import audio
+try:
+    ch.set_volume(audio._sfx_volume)
+except Exception:
+    pass
+```
+
+**Justification:** HK respects the player's volume settings uniformly across all audio types. Violating this contract — even for "optional" assets like voice lines — breaks the trust that the settings screen reflects the actual game state. The fix is low-risk (voice files are gracefully absent anyway; the change only affects behavior when files are present).
+
+---
+
+### HK-P8-G — `SOUL_SURGE_SIZE` is defined as an alias for `SOUL_SURGE_RADIUS` but `_activate_soul_surge` uses `SOUL_SURGE_RADIUS` directly, making `SOUL_SURGE_SIZE` a dead constant
+
+**File:** `settings.py` lines 305–306; `entities/player.py` lines 344–350.
+
+**Current code:**
+```python
+# settings.py lines 305-306
+SOUL_SURGE_RADIUS    = 80    # Half-width of each Soul Surge hitbox
+SOUL_SURGE_SIZE      = SOUL_SURGE_RADIUS   # AOE hitbox side length (alias for spec compliance)
+```
+
+```python
+# entities/player.py lines 344-345
+size   = SOUL_SURGE_RADIUS
+for dx, dy in [(1,0),(-1,0),(0,1),(0,-1)]:
+    hrect = pygame.Rect(cx + dx*20 - size//2,
+                        cy + dy*20 - size//2,
+                        size, size)
+```
+
+`SOUL_SURGE_SIZE` was added as a "spec compliance alias" but `player.py` imports and uses `SOUL_SURGE_RADIUS` directly (line 37 imports `SOUL_SURGE_RADIUS, SOUL_SURGE_SIZE` but only `SOUL_SURGE_RADIUS` appears in `_activate_soul_surge`). The alias is a dead constant — identical to `HK-P5-A` (`PARTICLE_ABILITY_COUNT` dead import) which was resolved in that pass. Having two names for the same value while only one is used in code creates maintenance confusion: a future designer may modify `SOUL_SURGE_SIZE` in `settings.py` expecting it to change the AOE radius, and see no effect because the code reads `SOUL_SURGE_RADIUS`.
+
+**Suggested change:** Remove the alias. In `settings.py`, rename `SOUL_SURGE_RADIUS` to `SOUL_SURGE_SIZE` (the spec-facing name) and update the import in `player.py`:
+
+```python
+# settings.py — remove SOUL_SURGE_RADIUS; keep only SOUL_SURGE_SIZE = 80
+SOUL_SURGE_SIZE = 80    # AOE hitbox side-length in px for each directional Soul Surge hitbox
+```
+
+```python
+# entities/player.py — replace SOUL_SURGE_RADIUS with SOUL_SURGE_SIZE in the import and usage:
+size = SOUL_SURGE_SIZE
+```
+
+Or, if the "radius" semantic is preferred in code, keep `SOUL_SURGE_RADIUS` and delete the alias `SOUL_SURGE_SIZE`. Either way the duplication should be eliminated.
+
+**Justification:** Dead constants with misleading names (the alias name implies it is the canonical spec name) are a direct maintenance hazard. HK-P5-A identified and removed `PARTICLE_ABILITY_COUNT` for the same reason. The same principle applies here.
+
+---
+
+### HK-P8-H — Resource passive regen fires even during dialogue freeze and boss intro — breaks pacing
+
+**File:** `entities/player.py` line 211; `scenes/gameplay.py` lines 508–538.
+
+**Current code:**
+```python
+# entities/player.py line 211 (inside update()):
+self._regen_resource(0.05 + self._res_regen_bonus)   # Slow passive regen
+```
+
+```python
+# scenes/gameplay.py lines 508-538 (update()):
+if self._npc_dialogue is not None:
+    self._npc_dialogue.update()
+    ...
+    return   # <-- returns before player.update() is called
+if self._boss_intro_active:
+    self._tick_boss_intro()
+    return   # <-- returns before player.update() is called
+```
+
+The regen is called inside `player.update()`. During NPC dialogue and boss intros, `gameplay.py` returns early before calling `player.update()`, so regen is correctly paused in those states. However during the **hitstop** phase (`if not hitstop.is_active(): ... player.update(...)`) the player update — including regen — is frozen for the hitstop frames. This is correct. But during the **upgrade selection screen** (lines 515–518), `gameplay.py` also returns before `player.update()`, correctly freezing regen.
+
+The actual gap is in the **lore overlay** state. When a lore item is collected, `_lore_timer` runs down and `_lore_waiting_dismiss` is True, but `gameplay.py` does NOT return early — it continues into `player.update()` at line 585. This means soul/heat regen continues ticking at full speed while the player is reading a lore inscription that paused their combat. In Hollow Knight, soul regen does not continue during lore tablet reading — the interaction is a full pause. More importantly, the Fleshforged player with an active Overdrive (`_ability_timer` ticking down) continues draining their Overdrive timer while reading lore, which is the sharpest pacing violation: the player is penalized for engaging with the story.
+
+Additionally, `_overdrive` and `_ability_timer` tick down inside `_tick_ability()` which is also inside `player.update()` — so the lore display does not pause ability timers.
+
+**Suggested change:** Add a guard in `gameplay.py` to skip `player.update()` (or at minimum `_tick_ability()` and `_regen_resource()`) while `_lore_waiting_dismiss` is True:
+
+```python
+# scenes/gameplay.py — in the update() block, add before player.update():
+if not self._lore_waiting_dismiss:
+    self.player.update(dt, solid_rects=solid)
+else:
+    # Lore is being read — keep player physics active but freeze resource timers
+    # (allow movement so the player doesn't get stuck, but pause ability/regen)
+    # Simpler alternative: pause everything (return early like boss_intro)
+    pass
+```
+
+The simplest fully-correct fix is to pause `player.update()` entirely while `_lore_waiting_dismiss` is True (enemy updates should also pause — a player should not be killed by an enemy they cannot see while reading a distant lore tablet). This is already the behavior for NPC dialogue (line 509 returns early). Extending it to lore display is a one-line addition at the `_lore_waiting_dismiss` check.
+
+**Justification:** In HK, lore tablets are a full pause — combat, timers, and regen all stop. Steamfall's NPC dialogue already implements this correctly (line 509 returns before entity updates). The lore display pathway is an inconsistency: the player is "paused" in intent (reading text on screen) but not in mechanics (Overdrive drains, regen ticks, enemies walk toward them). This is particularly punishing for Fleshforged players who cannot afford to read lore mid-fight because every second of reading costs Overdrive frames.
+
+---
+
+## Summary Table (2026-05-18)
+
+| Flag | File(s) | Key Issue | Recommended Change |
+|---|---|---|---|
+| HK-P8-A | `entities/player.py` L182–191 | `_pre_land_vy` captured before `apply_gravity` — threshold operates ~0.75 px/frame below stated value | Move capture to after `apply_gravity`, before `move_and_collide` |
+| HK-P8-B | `entities/shield_guard.py` L67 | Attack cooldown hardcoded 75 — bypasses `ENEMY_ATTACK_COOLDOWN` principle from HK-P7-C | Add `SHIELD_GUARD_ATTACK_COOLDOWN = 75` to `settings.py`; reference in `shield_guard.py` |
+| HK-P8-C | `core/camera.py` L38–39; `settings.py` | Vertical axis has no dead zone — minor Y jitter on uneven terrain | Add `CAMERA_DEAD_ZONE_Y = 40` to `settings.py`; mirror the X dead-zone logic for Y |
+| HK-P8-D | `settings.py` L110; `systems/combat.py` L79 | `HITSTOP_FRAMES = 4` defined in settings but combat.py hardcodes `4` — constant is never read | Import `HITSTOP_FRAMES` in `combat.py`; use it in `hitstop.trigger()`; add `HITSTOP_DEATH_FRAMES = 6` |
+| HK-P8-E | `entities/player.py` L367–372; `settings.py` | Overdrive activation emits a one-shot burst but has no persistent trail for the 180-frame duration | Emit 1 heat-shimmer particle every `OVERDRIVE_TRAIL_INTERVAL = 6` frames while `_overdrive` is True |
+| HK-P8-F | `systems/voice_player.py` L46–72; `systems/audio.py` | Voice lines bypass SFX volume setting — play at full volume even when SFX is muted | Read `audio._sfx_volume` and apply via `ch.set_volume()` inside `VoicePlayer.play()` |
+| HK-P8-G | `settings.py` L305–306; `entities/player.py` L37, L344 | `SOUL_SURGE_SIZE` is a dead alias for `SOUL_SURGE_RADIUS`; code uses only `SOUL_SURGE_RADIUS` — same class of issue as HK-P5-A | Remove alias; keep only one name; update the single import/usage in `player.py` |
+| HK-P8-H | `entities/player.py` L211; `scenes/gameplay.py` L755–758 | Lore `_lore_waiting_dismiss` state does not pause `player.update()` — Overdrive timer and regen continue during lore reading | Add early-return guard when `_lore_waiting_dismiss` is True, matching the NPC dialogue pause behavior at `gameplay.py` L509 |
