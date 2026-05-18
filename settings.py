@@ -107,7 +107,8 @@ FACTION_MARKED      = "marked"
 FACTION_FLESHFORGED = "fleshforged"
 
 # --- Hitstop ---
-HITSTOP_FRAMES = 4    # Default freeze-frame count when a hit lands
+HITSTOP_FRAMES       = 4    # Default freeze-frame count when a hit lands
+HITSTOP_DEATH_FRAMES = 6    # Freeze-frame count on player death (pre-hook for future use)
 
 # --- Crawler enemy ---
 CRAWLER_SPEED  = 1.8

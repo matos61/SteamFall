@@ -20,6 +20,7 @@
 
 import os
 import pygame
+from systems.audio import audio as _audio
 
 # Reserved mixer channel index — kept well above SFX channels (0–5).
 _VOICE_CHANNEL = 7
@@ -64,6 +65,7 @@ class VoicePlayer:
 
             snd = self._cache[path]
             ch.stop()
+            ch.set_volume(_audio._sfx_volume)
             ch.play(snd)
             self._current = snd
 

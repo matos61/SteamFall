@@ -512,6 +512,12 @@ class GameplayScene(BaseScene):
                 npc._show_hint = False
             return
 
+        # --- Lore text waiting for dismiss freezes game logic ---
+        if getattr(self, '_lore_waiting_dismiss', False):
+            if self._transition_phase is not None:
+                self._tick_transition()
+            return
+
         # --- Upgrade selection screen freezes game logic ---
         if self._upgrade_active:
             return

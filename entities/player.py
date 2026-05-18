@@ -377,7 +377,7 @@ class Player(Entity):
 
     def _update_animation(self) -> None:
         # BUG-047: latch "hurt" state for full clip; clear latch when iframes expire.
-        if self.iframes == PLAYER_IFRAMES:
+        if self.iframes == PLAYER_IFRAMES - 1:
             self._hurt_latched = True
         elif self.iframes == 0:
             self._hurt_latched = False
