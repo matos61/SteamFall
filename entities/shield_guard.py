@@ -8,7 +8,7 @@ import pygame
 from entities.enemy import Enemy
 from settings import (SHIELD_GUARD_HP, SHIELD_GUARD_SPEED, SHIELD_GUARD_DAMAGE,
                       SHIELD_GUARD_DEFENSE, SHIELD_GUARD_COLOR,
-                      SHIELD_GUARD_KNOCKBACK_Y,
+                      SHIELD_GUARD_KNOCKBACK_Y, SHIELD_GUARD_ATTACK_COOLDOWN,
                       ENEMY_ATTACK_RANGE, ENEMY_SIGHT_RANGE, ENEMY_IFRAMES,
                       FACTION_FLESHFORGED)
 
@@ -64,7 +64,7 @@ class ShieldGuard(Enemy):
         self.vx = 0
         if self._attack_cooldown > 0:
             return
-        self._attack_cooldown = 75
+        self._attack_cooldown = SHIELD_GUARD_ATTACK_COOLDOWN
         direction = 1 if player.rect.centerx > self.rect.centerx else -1
         hx = (self.rect.right if direction == 1 else self.rect.left - ENEMY_ATTACK_RANGE)
         hrect = pygame.Rect(hx, self.rect.top + 10,

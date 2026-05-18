@@ -9,7 +9,7 @@
 
 import pygame
 from settings import (SCREEN_WIDTH, SCREEN_HEIGHT,
-                      CAMERA_DEAD_ZONE_X, CAMERA_LOOK_AHEAD_X)
+                      CAMERA_DEAD_ZONE_X, CAMERA_DEAD_ZONE_Y, CAMERA_LOOK_AHEAD_X)
 
 
 class Camera:
@@ -34,8 +34,11 @@ class Camera:
             move = dx - CAMERA_DEAD_ZONE_X * (1 if dx > 0 else -1)
             self.offset.x += move * self.lerp_speed
 
-        # Y follows without a dead zone
-        self.offset.y += (target_y - self.offset.y) * self.lerp_speed
+        # Dead zone on Y: only lerp when target is outside the dead-zone band
+        dy = target_y - self.offset.y
+        if abs(dy) > CAMERA_DEAD_ZONE_Y:
+            move_y = dy - CAMERA_DEAD_ZONE_Y * (1 if dy > 0 else -1)
+            self.offset.y += move_y * self.lerp_speed
 
         # Don't scroll past world edges
         self.offset.x = max(0, min(self.offset.x, self.world_w - SCREEN_WIDTH))

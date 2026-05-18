@@ -34,8 +34,9 @@ from settings import (
     ABILITY_SLOTS_DEFAULT,
     SPRITE_DIR_PLAYER,
     ABILITY_COST,
-    SOUL_SURGE_COOLDOWN, SOUL_SURGE_DAMAGE, SOUL_SURGE_RADIUS, SOUL_SURGE_SIZE,
+    SOUL_SURGE_COOLDOWN, SOUL_SURGE_DAMAGE, SOUL_SURGE_RADIUS,
     OVERDRIVE_DURATION,  OVERDRIVE_COOLDOWN,
+    OVERDRIVE_PARTICLE_COLOR, OVERDRIVE_TRAIL_INTERVAL,
     LANDING_VY_THRESHOLD,
 )
 
@@ -179,8 +180,8 @@ class Player(Entity):
         was_on_ground = self.on_ground
 
         from systems.physics import apply_gravity, move_and_collide
-        _pre_land_vy = self.vy
         apply_gravity(self)
+        _pre_land_vy = self.vy
         if solid_rects:
             move_and_collide(self, solid_rects)
 
@@ -367,6 +368,12 @@ class Player(Entity):
     def _tick_ability(self) -> None:
         if self._ability_active:
             self._ability_timer -= 1
+            # Overdrive trail: emit 1 heat-shimmer particle every OVERDRIVE_TRAIL_INTERVAL frames
+            if self._overdrive and self._ability_timer > 0 and self._ability_timer % OVERDRIVE_TRAIL_INTERVAL == 0:
+                from systems.particles import particles
+                particles.emit(self.rect.centerx, self.rect.centery,
+                               count=1, speed=1.5,
+                               color=OVERDRIVE_PARTICLE_COLOR, life=10, spread=60)
             if self._ability_timer <= 0:
                 self._ability_active = False
                 self._overdrive      = False

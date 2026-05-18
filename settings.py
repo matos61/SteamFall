@@ -149,8 +149,9 @@ SHIELD_GUARD_HP          = 65      # was 80 — lower HP compensates for full fr
 SHIELD_GUARD_SPEED       = 1.6     # was 1.2 — faster chase punishes kiting
 SHIELD_GUARD_DAMAGE      = 20
 SHIELD_GUARD_DEFENSE     = 0.0     # was 0.35 — full frontal block; player must flank
-SHIELD_GUARD_KNOCKBACK_Y = -3.5    # Heavy upward bash (extracted from hardcode)
-SHIELD_GUARD_COLOR       = (50, 80, 140)   # Steel blue
+SHIELD_GUARD_KNOCKBACK_Y      = -3.5    # Heavy upward bash (extracted from hardcode)
+SHIELD_GUARD_ATTACK_COOLDOWN  = 75     # Frames between Shield Guard attacks
+SHIELD_GUARD_COLOR            = (50, 80, 140)   # Steel blue
 
 # --- Ranged enemy ---
 RANGED_HP              = 40
@@ -278,6 +279,7 @@ SOUL_SURGE_PARTICLE_COLOR = (140, 80, 220)   # ink-purple
 # Overdrive ability (Fleshforged faction)
 OVERDRIVE_PARTICLE_COUNT  = 8      # heat shimmer on Overdrive activation
 OVERDRIVE_PARTICLE_COLOR  = (220, 120, 20)   # fire-orange
+OVERDRIVE_TRAIL_INTERVAL  = 6      # emit 1 trail particle every N frames while Overdrive active
 
 # Checkpoint activation
 CHECKPOINT_PARTICLE_COUNT = 12     # golden embers on checkpoint activation (spec; was 14)
@@ -304,7 +306,6 @@ ABILITY_COST         = 30    # Resource cost per ability use
 SOUL_SURGE_COOLDOWN  = 90    # Frames between Soul Surge uses
 SOUL_SURGE_DAMAGE    = 35    # Damage dealt by each Soul Surge hitbox
 SOUL_SURGE_RADIUS    = 80    # Half-width of each Soul Surge hitbox
-SOUL_SURGE_SIZE      = SOUL_SURGE_RADIUS   # AOE hitbox side length (alias for spec compliance)
 OVERDRIVE_DURATION   = 180   # Frames Overdrive speed+damage boost lasts (3 s at 60 fps)
 OVERDRIVE_COOLDOWN   = 240   # Frames between Overdrive uses
 
@@ -346,6 +347,7 @@ TILE_SHEET_LEVEL_9_10 = "assets/tiles/sanctum.png"    # convergence / final appr
 ENEMY_ATTACK_COOLDOWN      = 50     # was hardcoded 60 in enemy.py — ~0.83 s between swings
 BOSS_PROJ_SPREAD_CD        = 120    # was hardcoded 160 in boss.py — tighter phase-3 pressure
 CAMERA_DEAD_ZONE_X         = 80     # px horizontal dead zone before camera starts tracking
+CAMERA_DEAD_ZONE_Y         = 40     # px vertical dead zone — suppresses minor terrain jitter
 CAMERA_LOOK_AHEAD_X        = 100    # px camera leads the player in facing direction
 ENEMY_CHASE_SPEED_OVERDRIVE = 3.2   # chase speed when player is in Overdrive (vs normal 2.5)
 WALL_SPARK_COUNT           = 4              # sparks emitted when attack nail clips a solid tile
