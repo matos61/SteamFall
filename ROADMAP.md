@@ -2175,16 +2175,16 @@ _Evaluated by hk-agent 2026-05-16; see `REVIEW_HK.md` for full analysis. HK-P6-A
 
 ---
 
-## Phase 8 — Feel Polish Sprint ⏳ IN PROGRESS
+## Phase 8 — Feel Polish Sprint ✅ COMPLETE (2026-05-18)
 
-_Launched by orchestrator 2026-05-18. Addresses all outstanding HK-P7 feel improvements from the Phase 7 review pass (2026-05-16). Pre-phase review runs in parallel with the implementation sprint._
+_Launched and completed 2026-05-18. Addressed all HK-P7 feel improvements, ran a full P8-0b review pass, and implemented all 8 HK-P8 feel gaps._
 
 **Priority order for build-agent** (tackle in this order):
 
 1. ~~**P8-0b (pre-phase review)**~~ ✅ **DONE (2026-05-18)** — BUG-052/053 confirmed fixed; BUG-054 found (🔴); HK-P8-A through HK-P8-H documented.
 2. ~~**P8-0c (critical bug-fix sprint)**~~ ✅ **DONE (2026-05-18)** — BUG-054 fixed; HK-P8-D/F/H done; HK-P8-G deferred (SOUL_SURGE_SIZE still imported by player.py).
 3. ~~**P8-1 (HK feel sprint)**~~ ✅ **DONE (2026-05-16)** — HK-P7-A through HK-P7-H all implemented in commit `4b4488d` (confirmed by orchestrator code inspection 2026-05-18).
-4. **P8-2 (HK feel sprint — camera / Overdrive / lore)** ⏳ PENDING — implement HK-P8-A, B, C, E after P8-0c.
+4. ~~**P8-2 (HK feel sprint — camera / Overdrive / lore)**~~ ✅ **DONE (2026-05-18)** — HK-P8-A/B/C/E done; HK-P8-G cleanup done.
 
 ---
 
@@ -2291,9 +2291,9 @@ _BUG-054 fixed; HK-P8-D/F/H done. HK-P8-G deferred: `SOUL_SURGE_SIZE` is still i
 
 ---
 
-### Task P8-2: HK Feel Sprint — Camera / Overdrive / Lore ⏳ PENDING
+### Task P8-2: HK Feel Sprint — Camera / Overdrive / Lore ✅ DONE (2026-05-18)
 
-_Blocked until P8-0c complete. Implements HK-P8-A, B, C, E._
+_All 5 items implemented in commit `0cb9e2b`._
 
 **Files to touch:**
 - `entities/player.py` (HK-P8-A)
@@ -2327,14 +2327,16 @@ _Evaluated by hk-agent 2026-05-18; see `REVIEW_HK.md` for full analysis. HK-P7-A
 
 | # | Improvement | Status | Effort | Files |
 |---|---|---|---|---|
-| HK-P8-A | `player.py`: `_pre_land_vy` captured before `apply_gravity` — threshold off by one gravity tick; move capture to after gravity, before collision | ⏳ P8-2 | Trivial | `entities/player.py` |
-| HK-P8-B | `shield_guard.py`: attack cooldown 75 hardcoded; extract `SHIELD_GUARD_ATTACK_COOLDOWN = 75` to settings | ⏳ P8-2 | Trivial | `entities/shield_guard.py`, `settings.py` |
-| HK-P8-C | `camera.py`: Y axis has no dead zone; add `CAMERA_DEAD_ZONE_Y = 40` mirroring the X dead-zone logic | ⏳ P8-2 | Minor | `core/camera.py`, `settings.py` |
+| HK-P8-A | `player.py`: `_pre_land_vy` captured before `apply_gravity` — threshold off by one gravity tick; move capture to after gravity, before collision | ✅ P8-2 (2026-05-18) | Trivial | `entities/player.py` |
+| HK-P8-B | `shield_guard.py`: attack cooldown 75 hardcoded; extract `SHIELD_GUARD_ATTACK_COOLDOWN = 75` to settings | ✅ P8-2 (2026-05-18) | Trivial | `entities/shield_guard.py`, `settings.py` |
+| HK-P8-C | `camera.py`: Y axis has no dead zone; add `CAMERA_DEAD_ZONE_Y = 40` mirroring the X dead-zone logic | ✅ P8-2 (2026-05-18) | Minor | `core/camera.py`, `settings.py` |
 | HK-P8-D | `combat.py` L79: `hitstop.trigger(4)` ignores `HITSTOP_FRAMES` constant; use it + add `HITSTOP_DEATH_FRAMES = 6` | ✅ P8-0c (2026-05-18) | Trivial | `systems/combat.py`, `settings.py` |
-| HK-P8-E | No Overdrive particle trail for 180-frame duration — only activation burst; emit 1 shimmer every `OVERDRIVE_TRAIL_INTERVAL = 6` frames | ⏳ P8-2 | Minor | `entities/player.py`, `settings.py` |
+| HK-P8-E | No Overdrive particle trail for 180-frame duration — only activation burst; emit 1 shimmer every `OVERDRIVE_TRAIL_INTERVAL = 6` frames | ✅ P8-2 (2026-05-18) | Minor | `entities/player.py`, `settings.py` |
 | HK-P8-F | `voice_player.py`: ignores `AUDIO_SFX_VOLUME`; full-volume voice plays even when SFX is muted | ✅ P8-0c (2026-05-18) | Minor | `systems/voice_player.py` |
-| HK-P8-G | `settings.py` + `player.py`: `SOUL_SURGE_SIZE` imported but unused in `player.py`; remove from both files | ⏳ P8-2 | Trivial | `settings.py`, `entities/player.py` |
+| HK-P8-G | `settings.py` + `player.py`: `SOUL_SURGE_SIZE` imported but unused in `player.py`; remove from both files | ✅ P8-2 (2026-05-18) | Trivial | `settings.py`, `entities/player.py` |
 | HK-P8-H | `gameplay.py`: `_lore_waiting_dismiss` does not pause `player.update()` — Overdrive/regen tick during lore reading | ✅ P8-0c (2026-05-18) | Minor | `scenes/gameplay.py` |
+
+**All HK-P8 items confirmed done (2026-05-18).** D/F/H in P8-0c; A/B/C/E/G in P8-2.
 
 ---
 
