@@ -92,7 +92,7 @@ ENEMY_ATTACK_DAMAGE = 15
 TILE_SIZE = 32
 
 # --- Dialogue ---
-TEXT_SCROLL_SPEED  = 2     # Characters revealed per frame
+TEXT_SCROLL_SPEED  = 1     # Characters revealed per frame (was 2 — too fast for short lines)
 DIALOGUE_FONT_SIZE = 22
 
 # --- Scene Names (use these strings to switch scenes) ---
@@ -164,6 +164,7 @@ RANGED_PREFERRED_DIST  = 240       # was hardcoded 220 in ranged.py
 RANGED_COLOR           = (100, 60, 30)   # Rust brown
 
 # --- Jumper enemy ---
+JUMPER_ATTACK_COOLDOWN  = 50    # Frames between Jumper attacks
 JUMPER_HP               = 35
 JUMPER_SPEED            = 2.4      # was 2.0 — faster horizontal component
 JUMPER_DAMAGE           = 12
@@ -176,6 +177,11 @@ JUMPER_KNOCKBACK_Y_AERIAL =  2.0   # Downward spike when Jumper attacks from abo
 JUMPER_COLOR            = (50, 140, 80)   # Sickly green
 
 # --- P2-3: Warden scripting ---
+# Boss phase-2 escalation constants
+BOSS_PHASE2_CHASE_SPEED  = 4.0    # chase speed in phase 2 (was hardcoded 4.0)
+BOSS_PHASE2_ATTACK_CD    = 35     # attack cooldown in phase 2 (was hardcoded 35)
+BOSS_PHASE2_ATTACK_RANGE = 60     # attack reach in phase 2 (was hardcoded 60)
+
 # Boss scripted intro cutscene
 BOSS_INTRO_TRIGGER_DIST    = 520   # px — proximity that starts the pre-fight cutscene
 

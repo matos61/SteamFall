@@ -25,7 +25,9 @@ from settings        import (BOSS_MAX_HEALTH, BOSS_PHASE2_THRESH,
                               ENEMY_ATTACK_RANGE,
                               BOSS_DASH_SPEED, BOSS_DASH_FRAMES,
                               BOSS_DASH_COOLDOWN, BOSS_PROJ_SPREAD_VY,
-                              BOSS_PROJ_SPREAD_CD)
+                              BOSS_PROJ_SPREAD_CD,
+                              BOSS_PHASE2_CHASE_SPEED, BOSS_PHASE2_ATTACK_CD,
+                              BOSS_PHASE2_ATTACK_RANGE)
 
 _MAX_RAGE_FLASH = 60   # Normalise alpha against this cap
 
@@ -127,9 +129,9 @@ class Boss(Enemy):
 
         # Phase-scaled stats
         if self.phase >= 2:
-            chase_speed  = 4.0
-            attack_cd    = 35
-            attack_range = 60
+            chase_speed  = BOSS_PHASE2_CHASE_SPEED
+            attack_cd    = BOSS_PHASE2_ATTACK_CD
+            attack_range = BOSS_PHASE2_ATTACK_RANGE
         else:
             chase_speed  = 2.5
             attack_cd    = 60

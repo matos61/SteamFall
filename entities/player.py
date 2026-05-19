@@ -169,6 +169,7 @@ class Player(Entity):
         super().update(dt)
 
         if not self.alive:
+            self._update_animation()   # BUG-057: run death animation on first dead frame
             return
 
         keys = pygame.key.get_pressed()
@@ -369,9 +370,10 @@ class Player(Entity):
         if self._ability_active:
             self._ability_timer -= 1
             # Overdrive trail: emit 1 heat-shimmer particle every OVERDRIVE_TRAIL_INTERVAL frames
+            # HK-P9-C: trail rises from feet (rect.bottom) so it appears behind footsteps
             if self._overdrive and self._ability_timer > 0 and self._ability_timer % OVERDRIVE_TRAIL_INTERVAL == 0:
                 from systems.particles import particles
-                particles.emit(self.rect.centerx, self.rect.centery,
+                particles.emit(self.rect.centerx, self.rect.bottom,
                                count=1, speed=1.5,
                                color=OVERDRIVE_PARTICLE_COLOR, life=10, spread=60)
             if self._ability_timer <= 0:

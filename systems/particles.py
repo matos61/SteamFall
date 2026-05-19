@@ -89,9 +89,9 @@ class ParticleSystem:
         Uses spec constants: HIT_PARTICLE_COUNT sparks, HIT_PARTICLE_LIFE frames.
         """
         for _ in range(HIT_PARTICLE_COUNT):
-            # Arc facing the attacker's direction, spread ±90° around forward
+            # HK-P9-H: forward cone ±90° (was ±126°) so sparks don't fly backward
             base  = 0.0 if facing == 1 else math.pi
-            angle = base + random.uniform(-math.pi * 0.7, math.pi * 0.7)
+            angle = base + random.uniform(-math.pi * 0.5, math.pi * 0.5)
             # HK-P6-I: use HIT_PARTICLE_SPEED constant instead of hardcoded range
             speed = random.uniform(HIT_PARTICLE_SPEED * 0.6, HIT_PARTICLE_SPEED * 1.4)
             vx    = math.cos(angle) * speed
@@ -126,7 +126,8 @@ class ParticleSystem:
             direction = -1 if i < half else 1
             vx   = direction * random.uniform(0.5, 2.0)
             vy   = random.uniform(-2.5, -0.5)
-            lt   = LANDING_PARTICLE_LIFE
+            # HK-P9-F: ±10% lifetime variance so particles don't vanish simultaneously
+            lt   = int(LANDING_PARTICLE_LIFE * random.uniform(0.9, 1.1))
             size = random.randint(2, 4)
             self._particles.append(
                 Particle(x, y, vx, vy, LANDING_PARTICLE_COLOR, lt, size, gravity=False))

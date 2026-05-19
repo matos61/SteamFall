@@ -10,6 +10,7 @@ from settings import (JUMPER_HP, JUMPER_SPEED, JUMPER_DAMAGE,
                       JUMPER_JUMP_FORCE, JUMPER_JUMP_COOLDOWN,
                       JUMPER_BURST_COUNT, JUMPER_BURST_PAUSE,
                       JUMPER_KNOCKBACK_Y_GROUND, JUMPER_KNOCKBACK_Y_AERIAL,
+                      JUMPER_ATTACK_COOLDOWN,
                       JUMPER_COLOR, ENEMY_SIGHT_RANGE, ENEMY_ATTACK_RANGE,
                       ENEMY_IFRAMES, FACTION_MARKED)
 
@@ -90,7 +91,7 @@ class Jumper(Enemy):
         # Bounce away after contact attack
         if self._attack_cooldown > 0:
             return
-        self._attack_cooldown = 50
+        self._attack_cooldown = JUMPER_ATTACK_COOLDOWN
         direction = 1 if player.rect.centerx > self.rect.centerx else -1
         self.facing = direction
         hx = (self.rect.right if direction == 1 else

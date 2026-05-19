@@ -514,8 +514,6 @@ class GameplayScene(BaseScene):
 
         # --- Lore text waiting for dismiss freezes game logic ---
         if getattr(self, '_lore_waiting_dismiss', False):
-            if self._transition_phase is not None:
-                self._tick_transition()
             return
 
         # --- Upgrade selection screen freezes game logic ---
@@ -961,7 +959,7 @@ class GameplayScene(BaseScene):
                                color=_death_color,
                                life=25,
                                spread=360)
-                hitstop.trigger(6)
+                hitstop.trigger(HITSTOP_DEATH_FRAMES)
                 audio.play_sfx("death")
             if self._death_timer >= 150:
                 save = self.game.save_data
@@ -1204,7 +1202,7 @@ class GameplayScene(BaseScene):
             surface.blit(ht, (20, SCREEN_HEIGHT - 36 + i * 16))
 
     def _draw_cooldown_pips(self, surface, faction, res_color, x, y):
-        max_cd  = 90 if faction == FACTION_MARKED else 240
+        max_cd  = SOUL_SURGE_COOLDOWN if faction == FACTION_MARKED else OVERDRIVE_COOLDOWN
         cd      = self.player._ability_cooldown
         pip_w, pip_h, gap = 12, 6, 3
         for i in range(5):
