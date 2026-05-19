@@ -385,8 +385,11 @@ class Player(Entity):
     # ------------------------------------------------------------------
 
     def _update_animation(self) -> None:
-        # BUG-047: latch "hurt" state for full clip; clear latch when iframes expire.
-        if self.iframes == PLAYER_IFRAMES - 1:
+        # BUG-047 / HK-P9-E: latch "hurt" state for full clip; clear latch when iframes expire.
+        # super().update() decrements iframes before _update_animation() runs, so the first
+        # visible frame has iframes == PLAYER_IFRAMES - 1.  Subtracting one more (- 2) ensures
+        # the latch fires on the same frame the player is first visibly in iframes.
+        if self.iframes == PLAYER_IFRAMES - 2:
             self._hurt_latched = True
         elif self.iframes == 0:
             self._hurt_latched = False
