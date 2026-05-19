@@ -2095,6 +2095,14 @@ _Review-agent 2026-05-07 pass (P6-0b):_
 
 56. ✅ **BUG-051** `entities/crawler.py`: Crawler calling Entity-level super, bypassing enemy animation and faction-tint — fixed in P6-0c (2026-05-15). Now calls Enemy-level `super()` in both `update()` and `draw()`.
 
+_Review-agent 2026-05-19 pass (P9-0b):_
+
+60. ⚠️ **BUG-055** `settings.py` line ~111 / `gameplay.py` line ~964: `HITSTOP_DEATH_FRAMES = 6` is defined but never imported or used; gameplay.py uses the magic literal `6` at the player-death hitstop call. Fix: import the constant in `gameplay.py` and replace the literal. Assign to build-agent in P9-0c.
+
+61. ⚠️ **BUG-056** `gameplay.py` lines ~517–518: Dead code inside the lore-dismiss early-return block — the duplicate `_tick_transition()` call is unreachable because the transition guard at line ~500 already returns. Misleading; remove the dead branch. Assign to build-agent in P9-0c.
+
+62. ⚠️ **BUG-057** `entities/player.py` lines ~171–172, ~392–393: Player `"death"` animation state is never entered. `Player.update()` returns early at `if not self.alive` before `_update_animation()` is called, so the death clip never plays. Fix: call `_update_animation()` before the early return. Assign to build-agent in P9-0c.
+
 _Review-agent 2026-05-18 pass (P8-0b):_
 
 59. ✅ **BUG-054** `entities/player.py` line 380: `_hurt_latched` was never set True because `super().update(dt)` decrements `iframes` 45 → 44 before `_update_animation()` runs; check `iframes == PLAYER_IFRAMES` (45) was permanently False. Fixed in P8-0c (2026-05-18): changed to `iframes == PLAYER_IFRAMES - 1`.
@@ -2337,6 +2345,126 @@ _Evaluated by hk-agent 2026-05-18; see `REVIEW_HK.md` for full analysis. HK-P7-A
 | HK-P8-H | `gameplay.py`: `_lore_waiting_dismiss` does not pause `player.update()` — Overdrive/regen tick during lore reading | ✅ P8-0c (2026-05-18) | Minor | `scenes/gameplay.py` |
 
 **All HK-P8 items confirmed done (2026-05-18).** D/F/H in P8-0c; A/B/C/E/G in P8-2.
+
+---
+
+## Phase 9 — Minor Fixes & Feel Tuning
+
+_P9-0b review passes completed 2026-05-19 (orchestrator launched review-agent and hk-agent in parallel). No 🔴 critical bugs found. Three ⚠️ minor bugs and eight HK feel gaps identified._
+
+**Priority order for build-agent** (tackle in this order):
+
+1. **P9-0c (minor bug-fix sprint)** — BUG-055, BUG-056, BUG-057. No critical blockers; can be combined with the HK feel sprint into a single commit.
+2. **P9-1 (HK feel sprint)** — HK-P9-A through HK-P9-H. Mostly constant extractions and one-line fixes; low risk.
+
+---
+
+### Task P9-0b: Pre-Phase Review ✅ DONE (2026-05-19)
+
+**review-agent:** Found BUG-055 through BUG-057 (all ⚠️ minor); all P8-0c and P8-2 changes confirmed correct. Results appended to `REVIEW_BUGS.md`.
+
+**hk-agent:** Found HK-P9-A through HK-P9-H (eight feel gaps); all HK-P8 items confirmed implemented. Results appended to `REVIEW_HK.md`.
+
+**Acceptance criteria — done when:**
+- `REVIEW_BUGS.md` updated with BUG-055–057. ✅
+- `REVIEW_HK.md` updated with HK-P9-A–H. ✅
+
+---
+
+### Task P9-0c: Minor Bug-Fix Sprint
+
+_No critical bugs this pass; all three are ⚠️ minor. May be combined with P9-1 into a single commit._
+
+**Files to touch:**
+- `settings.py` + `scenes/gameplay.py` (BUG-055)
+- `scenes/gameplay.py` (BUG-056)
+- `entities/player.py` (BUG-057)
+
+**Fixes required:**
+
+- ⚠️ **BUG-055** `settings.py` line ~111 / `gameplay.py` line ~964: `HITSTOP_DEATH_FRAMES = 6` is defined in `settings.py` but never imported or used — `gameplay.py` uses the magic literal `6` directly at the player-death hitstop call. Fix: import `HITSTOP_DEATH_FRAMES` in `gameplay.py` and replace the literal `6` with it.
+
+- ⚠️ **BUG-056** `gameplay.py` lines ~517–518: Dead code inside the lore-dismiss early-return block — `if self._transition_phase is not None: self._tick_transition()` is unreachable because the transition guard at line ~500 already returns before this block executes. Fix: remove the duplicate `_tick_transition()` call from inside the lore-dismiss block (the line-500 path handles it correctly).
+
+- ⚠️ **BUG-057** `entities/player.py` lines ~171–172, ~392–393: The `"death"` animation state is never entered. `Player.update()` returns early at `if not self.alive` before calling `_update_animation()`, so the death animation branch inside `_update_animation` is dead — the player renders in their last living frame throughout the death screen. Fix: call `self._update_animation()` before the `if not self.alive: return` early exit so the death state is set on the first dead frame.
+
+**Acceptance criteria — done when:**
+- `HITSTOP_DEATH_FRAMES` is imported and used at the player-death hitstop call in `gameplay.py`.
+- Duplicate `_tick_transition()` call removed from inside the lore-dismiss block.
+- Player "death" animation state is entered on the first dead frame; sprite renders death clip during death screen.
+- `python main.py` launches without ImportError.
+
+---
+
+### Task P9-1: HK Feel Sprint — Constants & Micro-Tuning
+
+_Low-risk: mostly constant extractions and one-line value changes. Can be combined with P9-0c._
+
+**Files to touch:**
+- `settings.py` (HK-P9-A, HK-P9-B, HK-P9-D, HK-P9-F, HK-P9-G, HK-P9-H)
+- `entities/jumper.py` (HK-P9-A)
+- `entities/boss.py` (HK-P9-B)
+- `entities/player.py` (HK-P9-C, HK-P9-D, HK-P9-E)
+- `systems/particles.py` (HK-P9-F, HK-P9-H)
+
+**What to build:**
+
+**HK-P9-A** `entities/jumper.py` line ~93: Hardcoded attack cooldown `50` should be a tunable constant. Add `JUMPER_ATTACK_COOLDOWN = 50` to `settings.py`; import and use it in `jumper.py`.
+
+**HK-P9-B** `entities/boss.py` lines ~129–136: Warden phase-2 escalation values are magic numbers. Add to `settings.py`:
+```python
+BOSS_PHASE2_CHASE_SPEED  = 4.0
+BOSS_PHASE2_ATTACK_CD    = 35
+BOSS_PHASE2_ATTACK_RANGE = 60
+BOSS_PHASE3_PROJ_CD      = 180   # existing value, make explicit
+```
+Replace the four hardcoded values in `boss.py` with these constants.
+
+**HK-P9-C** `entities/player.py` line ~374: Overdrive trail particle emits from `rect.centery` (mid-chest). Per HK-P8-E spec, shimmer should rise from `rect.bottom` (feet) so it appears to trail behind the player's footstep. Fix: change `cy = self.rect.centery` to `cy = self.rect.bottom` at the trail emit site.
+
+**HK-P9-D** `scenes/gameplay.py` line ~1207: `_draw_cooldown_pips` hardcodes the values `90` and `240` (the Soul Surge and Overdrive cooldowns) to compute pip fill ratios. These will silently desync if `SOUL_SURGE_COOLDOWN` or `OVERDRIVE_COOLDOWN` are retuned. Fix: import `SOUL_SURGE_COOLDOWN` and `OVERDRIVE_COOLDOWN` from `settings` and use them in place of the literals.
+
+**HK-P9-E** `entities/player.py` line ~387: `_hurt_latched` is set when `self.iframes == PLAYER_IFRAMES - 1` (44). However, `super().update(dt)` decrements `iframes` by 1 each frame, and `_update_animation()` then reads the already-decremented value — making the latch fire one frame late, on the second frame of damage rather than the first. Fix: change the check to `self.iframes == PLAYER_IFRAMES - 2` (43) so `_hurt_latched` is set on the correct "just-damaged" frame visible to `_update_animation`.
+
+_(Note: The exact correct value depends on the order of operations in `player.update()`. Build-agent should verify by tracing the call stack: if `super().update()` decrements before `_update_animation()` runs, subtract 1 more. The goal is for `_hurt_latched` to be `True` on the first frame the player is visibly in iframes.)_
+
+**HK-P9-F** `systems/particles.py` line ~129: All 6 landing-dust particles share the same fixed `LANDING_PARTICLE_LIFE` lifetime, so they vanish simultaneously — an unnatural synchronized pop. Add a `±10%` random variance:
+```python
+life = int(LANDING_PARTICLE_LIFE * uniform(0.9, 1.1))
+```
+Apply per-particle inside the `emit_landing` spawn loop.
+
+**HK-P9-G** `settings.py` line ~95: `TEXT_SCROLL_SPEED = 2` scrolls dialogue at ~120 characters/second — too fast for short lines to feel like voiced text. Reduce to `TEXT_SCROLL_SPEED = 1` (~60 chars/s) to match Hollow Knight's deliberate typewriter pacing.
+
+**HK-P9-H** `systems/particles.py` line ~94: `emit_hit` uses a spread of `±0.7π` radians (~252° arc), which causes ~35% of sparks to fly backward into the attacker. Tighten to `±0.5π` (180° forward cone) so all sparks exit in the direction of the hit.
+
+**Acceptance criteria — done when:**
+- `JUMPER_ATTACK_COOLDOWN = 50` in `settings.py` used in `jumper.py`.
+- Four Warden phase-2/3 constants extracted to `settings.py` and used in `boss.py`.
+- Overdrive trail emits from player feet (`rect.bottom`), not chest.
+- Cooldown pip HUD uses `SOUL_SURGE_COOLDOWN` and `OVERDRIVE_COOLDOWN` constants.
+- Hurt animation latches on the correct "just-damaged" frame (verify visually).
+- Landing dust particles have varied lifetimes (no synchronized vanish).
+- Dialogue typewriter scrolls at `TEXT_SCROLL_SPEED = 1`.
+- Hit sparks use `±0.5π` spread (no backward sparks).
+- `python main.py` launches without ImportError.
+
+---
+
+## HK Feel Improvements — Phase 9 (reviewed 2026-05-19)
+
+_Evaluated by hk-agent 2026-05-19; see `REVIEW_HK.md` for full analysis. HK-P8-A through HK-P8-H all confirmed done._
+
+| # | Improvement | Status | Effort | Files |
+|---|---|---|---|---|
+| HK-P9-A | `jumper.py` L93: attack cooldown 50 hardcoded; extract `JUMPER_ATTACK_COOLDOWN = 50` to settings | ⏳ P9-1 | Trivial | `entities/jumper.py`, `settings.py` |
+| HK-P9-B | `boss.py` L129–136: Warden phase-2 magic numbers — extract 4 constants (`BOSS_PHASE2_CHASE_SPEED`, `BOSS_PHASE2_ATTACK_CD`, `BOSS_PHASE2_ATTACK_RANGE`, `BOSS_PHASE3_PROJ_CD`) | ⏳ P9-1 | Trivial | `entities/boss.py`, `settings.py` |
+| HK-P9-C | `player.py` L374: Overdrive trail emits from `rect.centery` (chest) — should be `rect.bottom` (feet) per spec | ⏳ P9-1 | Trivial | `entities/player.py` |
+| HK-P9-D | `gameplay.py` L1207: `_draw_cooldown_pips` hardcodes cooldown values 90/240 — desync risk if constants retuned | ⏳ P9-1 | Minor | `scenes/gameplay.py`, `settings.py` |
+| HK-P9-E | `player.py` L387: `_hurt_latched` fires one frame late (`PLAYER_IFRAMES - 1`) — hurt animation delayed by 1 frame | ⏳ P9-1 | Minor | `entities/player.py` |
+| HK-P9-F | `particles.py` L129: `LANDING_PARTICLE_LIFE` fixed — all 6 particles vanish simultaneously; add `±10%` variance per particle | ⏳ P9-1 | Trivial | `systems/particles.py` |
+| HK-P9-G | `settings.py` L95: `TEXT_SCROLL_SPEED = 2` too fast for short lines; reduce to `1` for HK-paced typewriter | ⏳ P9-1 | Trivial | `settings.py` |
+| HK-P9-H | `particles.py` L94: `emit_hit` spread `±0.7π` sends ~35% of sparks backward; tighten to `±0.5π` (forward cone) | ⏳ P9-1 | Trivial | `systems/particles.py` |
 
 ---
 

@@ -1839,3 +1839,282 @@ The simplest fully-correct fix is to pause `player.update()` entirely while `_lo
 | HK-P8-F | `systems/voice_player.py` L46–72; `systems/audio.py` | Voice lines bypass SFX volume setting — play at full volume even when SFX is muted | Read `audio._sfx_volume` and apply via `ch.set_volume()` inside `VoicePlayer.play()` |
 | HK-P8-G | `settings.py` L305–306; `entities/player.py` L37, L344 | `SOUL_SURGE_SIZE` is a dead alias for `SOUL_SURGE_RADIUS`; code uses only `SOUL_SURGE_RADIUS` — same class of issue as HK-P5-A | Remove alias; keep only one name; update the single import/usage in `player.py` |
 | HK-P8-H | `entities/player.py` L211; `scenes/gameplay.py` L755–758 | Lore `_lore_waiting_dismiss` state does not pause `player.update()` — Overdrive timer and regen continue during lore reading | Add early-return guard when `_lore_waiting_dismiss` is True, matching the NPC dialogue pause behavior at `gameplay.py` L509 |
+
+---
+
+# HK Feel Review — Phase 9 (2026-05-19)
+
+**Scope:** Full re-read of all .py files. P8-0c and P8-2 changes verified. HK-P8-A through HK-P8-H all confirmed implemented. This pass starts at HK-P9-A.
+
+---
+
+## HK-P8 Confirmation (2026-05-19)
+
+All eight HK-P8 items are confirmed present in live code:
+
+| Flag | Evidence |
+|---|---|
+| HK-P8-A: `_pre_land_vy` after gravity | `entities/player.py` L183–184: `apply_gravity(self)` then `_pre_land_vy = self.vy` — gravity runs first, capture is second |
+| HK-P8-B: `SHIELD_GUARD_ATTACK_COOLDOWN` | `settings.py` L153: `SHIELD_GUARD_ATTACK_COOLDOWN = 75`; `entities/shield_guard.py` L11 imports it; L67 uses `SHIELD_GUARD_ATTACK_COOLDOWN` |
+| HK-P8-C: Camera Y dead zone | `settings.py` L350: `CAMERA_DEAD_ZONE_Y = 40`; `core/camera.py` L12 imports it; L39–41 apply the dead-zone logic symmetrically with X |
+| HK-P8-D: `HITSTOP_FRAMES` wired | `settings.py` L110: `HITSTOP_FRAMES = 4`, `HITSTOP_DEATH_FRAMES = 6`; `systems/combat.py` L14 imports `HITSTOP_FRAMES`; L79 calls `hitstop.trigger(HITSTOP_FRAMES)` |
+| HK-P8-E: Overdrive trail | `settings.py` L282: `OVERDRIVE_TRAIL_INTERVAL = 6`; `entities/player.py` L372–376 emits 1 particle every 6 frames via `_ability_timer % OVERDRIVE_TRAIL_INTERVAL == 0` |
+| HK-P8-F: Voice volume follows SFX | `systems/voice_player.py` L68: `ch.set_volume(_audio._sfx_volume)` called inside `play()` before `ch.play(snd)` |
+| HK-P8-G: `SOUL_SURGE_SIZE` alias removed | `settings.py` has only `SOUL_SURGE_RADIUS = 80`; no `SOUL_SURGE_SIZE` alias exists; `entities/player.py` L37 imports `SOUL_SURGE_RADIUS` only |
+| HK-P8-H: Lore pause guards player update | `scenes/gameplay.py` L515–519: `if getattr(self, '_lore_waiting_dismiss', False):` returns early before `player.update()` and enemy updates |
+
+---
+
+## New Feel Gaps
+
+### HK-P9-A — `Jumper._do_attack` hardcodes attack cooldown 50 — bypasses constants principle
+
+**File:** `entities/jumper.py` line 93.
+
+**Current code:**
+```python
+def _do_attack(self, player) -> None:
+    if self._attack_cooldown > 0:
+        return
+    self._attack_cooldown = 50   # hardcoded
+```
+
+HK-P8-B extracted `SHIELD_GUARD_ATTACK_COOLDOWN = 75` to `settings.py` to fix the identical pattern in `shield_guard.py`. The Jumper's `_do_attack` was not updated in the same pass. `self._attack_cooldown = 50` is a magic number invisible to `settings.py` tuning. At 50 frames (~0.83 s between Jumper melee attacks) the Jumper attack cadence matches `ENEMY_ATTACK_COOLDOWN = 50` coincidentally — but only because they happen to be the same value at this moment. If `ENEMY_ATTACK_COOLDOWN` is raised or lowered to tune base enemy aggression, the Jumper will silently diverge. The Jumper is designed to be more erratic and aggressive than standard enemies (its burst-jump cadence is already faster at `JUMPER_JUMP_COOLDOWN = 32` frames) so its attack cooldown deserves its own named constant.
+
+**Suggested change:**
+```python
+# settings.py — add alongside other JUMPER_ constants (around line 173)
+JUMPER_ATTACK_COOLDOWN = 50   # Frames between Jumper melee contact attacks (was hardcoded in jumper.py L93)
+```
+
+```python
+# entities/jumper.py line 93 — replace hardcode:
+# was: self._attack_cooldown = 50
+self._attack_cooldown = JUMPER_ATTACK_COOLDOWN   # import from settings
+```
+
+**Justification:** Every other Jumper timing constant is already in `settings.py` (`JUMPER_JUMP_COOLDOWN`, `JUMPER_BURST_COUNT`, `JUMPER_BURST_PAUSE`). The attack cooldown is the one remaining hardcode in the Jumper — the same asymmetry that HK-P8-B fixed for ShieldGuard.
+
+---
+
+### HK-P9-B — `Boss._update_ai` hardcodes phase-2 speed and cooldown escalation values
+
+**File:** `entities/boss.py` lines 129–136.
+
+**Current code:**
+```python
+if self.phase >= 2:
+    chase_speed  = 4.0
+    attack_cd    = 35
+    attack_range = 60
+else:
+    chase_speed  = 2.5
+    attack_cd    = 60
+    attack_range = ENEMY_ATTACK_RANGE
+```
+
+The Warden boss's phase escalation — `chase_speed = 4.0`, `attack_cd = 35`, `attack_range = 60` in phase 2 — is implemented with magic numbers that have no corresponding constants in `settings.py`. Compare this to the Warden's other combat parameters which are fully extracted: `BOSS_DASH_SPEED = 9`, `BOSS_DASH_FRAMES = 22`, `BOSS_DASH_COOLDOWN = 110`, `BOSS_PROJ_SPREAD_VY = 3`, `BOSS_PROJ_SPREAD_CD = 120`. The phase-1 and phase-2 baseline melee stats are the only remaining hardcodes. A designer tuning boss difficulty from `settings.py` would correctly find and adjust the dash and spread constants, but would not see the core chase speed or attack cadence — the primary feel of each phase — because they are buried in the AI method.
+
+**Suggested change:**
+```python
+# settings.py — add alongside BOSS_DASH_* constants (around line 186)
+BOSS_PHASE1_CHASE_SPEED  = 2.5    # Warden chase speed in phase 1
+BOSS_PHASE2_CHASE_SPEED  = 4.0    # was hardcoded — raised in phase 2 for aggression
+BOSS_PHASE2_ATTACK_CD    = 35     # was hardcoded — tighter attack cadence from phase 2
+BOSS_PHASE2_ATTACK_RANGE = 60     # was hardcoded — extended melee reach in phase 2
+```
+
+```python
+# entities/boss.py lines 129–136 — replace magic numbers:
+if self.phase >= 2:
+    chase_speed  = BOSS_PHASE2_CHASE_SPEED
+    attack_cd    = BOSS_PHASE2_ATTACK_CD
+    attack_range = BOSS_PHASE2_ATTACK_RANGE
+else:
+    chase_speed  = BOSS_PHASE1_CHASE_SPEED
+    attack_cd    = 60   # phase 1 can remain as ENEMY_ATTACK_COOLDOWN fallback or new constant
+    attack_range = ENEMY_ATTACK_RANGE
+```
+
+**Justification:** The phase-2 escalation is the single most important feel variable for the Warden fight — it determines how much harder phase 2 feels compared to phase 1. Keeping it in hardcode while every other boss stat is in `settings.py` creates an invisible difficulty lever that will confuse future tuning passes.
+
+---
+
+### HK-P9-C — Overdrive trail emits from `rect.centery` (chest) rather than `rect.bottom` (feet)
+
+**File:** `entities/player.py` lines 373–376.
+
+**Current code:**
+```python
+particles.emit(self.rect.centerx, self.rect.centery,
+               count=1, speed=1.5,
+               color=OVERDRIVE_PARTICLE_COLOR, life=10, spread=60)
+```
+
+The HK-P8-E recommendation specified `self.rect.bottom` as the Y origin so heat-shimmer particles rise from the player's feet — the natural source of ground-contact heat and the visual position where movement force originates. The implementation uses `self.rect.centery` (the player's vertical center, approximately at chest height). With a `spread=60` upward cone, particles emitting from chest height will appear to float out of the player's torso rather than rise from under their feet. In Hollow Knight, Shade Soul's trail particles originate from the Knight's center of mass, but Fragile Strength's ground-shimmer effect radiates from the foot level. For Overdrive — a speed and power boost — the feet are the more intuitive origin because the visual grammar reads as "propulsion from the ground" rather than "aura emanating from the body."
+
+**Suggested change:**
+```python
+# entities/player.py _tick_ability() — change Y origin from centery to bottom:
+particles.emit(self.rect.centerx, self.rect.bottom,
+               count=1, speed=1.5,
+               color=OVERDRIVE_PARTICLE_COLOR, life=10, spread=60)
+```
+
+No constant change needed — only the Y argument changes from `self.rect.centery` to `self.rect.bottom`. This is a single-character/word change in one line.
+
+**Justification:** Particle emission origin is the primary cue the player uses to interpret what the particle effect is "attached to." Foot-level emission reads as "this character is moving fast" (heat-shimmer from the ground); chest-level emission reads as "this character is glowing" (an aura effect). Overdrive is a movement ability, not an aura — the origin should match that semantic.
+
+---
+
+### HK-P9-D — `_draw_cooldown_pips` duplicates `SOUL_SURGE_COOLDOWN` and `OVERDRIVE_COOLDOWN` as magic numbers
+
+**File:** `scenes/gameplay.py` line 1207.
+
+**Current code:**
+```python
+def _draw_cooldown_pips(self, surface, faction, res_color, x, y):
+    max_cd = 90 if faction == FACTION_MARKED else 240
+```
+
+The values `90` and `240` are hardcoded copies of `SOUL_SURGE_COOLDOWN = 90` and `OVERDRIVE_COOLDOWN = 240` (both defined in `settings.py` lines 307 and 311). The pip bar display shows how close the ability is to being ready — it divides the remaining cooldown against `max_cd` to compute fill fraction. If `SOUL_SURGE_COOLDOWN` or `OVERDRIVE_COOLDOWN` is changed in `settings.py` (e.g., raising Overdrive cooldown from 240 to 300 for balance), the pip bar will silently show an incorrect fill — it will still divide against 240, causing the pips to read "ready" 60 frames before the ability actually becomes available. This creates a false-ready signal that teaches the player incorrect timing and is a direct feel gap: the HUD is lying about the ability state.
+
+**Suggested change:**
+```python
+# scenes/gameplay.py line 1207 — replace magic numbers:
+# was: max_cd = 90 if faction == FACTION_MARKED else 240
+max_cd = SOUL_SURGE_COOLDOWN if faction == FACTION_MARKED else OVERDRIVE_COOLDOWN
+```
+
+`SOUL_SURGE_COOLDOWN` and `OVERDRIVE_COOLDOWN` are already imported via `from settings import *` at `gameplay.py` line 19. No additional import is needed — this is a one-line change that makes the HUD display automatically correct whenever the cooldown constants are tuned.
+
+**Justification:** In Hollow Knight, the Focus/spell cooldown visual always reflects the true cooldown state. A pip bar that lies about ability readiness breaks the player's trust in the HUD and trains them to ignore it — the opposite of the responsive feedback HK is known for.
+
+---
+
+### HK-P9-E — `_hurt_latched` triggers on `iframes == PLAYER_IFRAMES - 1` — off-by-one misses the first iframe frame
+
+**File:** `entities/player.py` line 387.
+
+**Current code:**
+```python
+if self.iframes == PLAYER_IFRAMES - 1:
+    self._hurt_latched = True
+elif self.iframes == 0:
+    self._hurt_latched = False
+```
+
+When `take_damage` fires, `self.iframes` is set to `PLAYER_IFRAMES = 45`. On the immediately following `_update_animation()` call (same frame), `iframes == 45`. The condition `iframes == PLAYER_IFRAMES - 1 == 44` is False on that frame — the latch does not set. On the next game frame, `entity.update()` decrements `iframes` to `44`, and `_update_animation()` now sees `iframes == 44` — the latch sets. The "hurt" animation state therefore fires one frame late.
+
+For the colored-rect placeholder (current assets), this is invisible because the white iframe outline in `draw()` fires immediately on `iframes > 0`. Under real sprites, this one-frame delay means the first frame of damage still shows the locomotion sprite before the "hurt" clip begins — a single-frame flash of the wrong state. In HK, the hurt animation begins on the same frame as the hit.
+
+**Suggested change:**
+```python
+# entities/player.py line 387 — fix off-by-one:
+# was: if self.iframes == PLAYER_IFRAMES - 1:
+if self.iframes == PLAYER_IFRAMES:   # first frame of iframe window
+    self._hurt_latched = True
+elif self.iframes == 0:
+    self._hurt_latched = False
+```
+
+No constant change needed. The prior HK-P5-D recommendation (`iframes == PLAYER_IFRAMES` as the trigger) was the correct specification — the implementation used `PLAYER_IFRAMES - 1` rather than `PLAYER_IFRAMES`, creating the one-frame miss.
+
+**Justification:** Hollow Knight's hurt animation begins on the exact frame of impact. A one-frame delay is beneath perceptibility under colored rects but will become visible under sprite assets. Correcting the trigger condition now prevents a sprite-era regression.
+
+---
+
+### HK-P9-F — Landing dust particles use a fixed lifetime — no variance produces mechanical uniformity
+
+**File:** `systems/particles.py` line 129; `settings.py` line 291.
+
+**Current code:**
+```python
+# particles.py emit_landing() line 129
+lt = LANDING_PARTICLE_LIFE   # = 20, fixed value
+```
+
+`LANDING_PARTICLE_LIFE = 20` produces landing dust that always lives exactly 20 frames. All 6 particles simultaneously expire at the same moment, creating a synchronized disappearance. In Hollow Knight, landing dust particles have natural variation — some puffs linger 25–30% longer than others, creating the organic fade of actual disturbed dust. The original HK-P5-B recommendation specified `random.randint(16, 22)` rather than a fixed value, precisely to produce this natural spread. The constant `LANDING_PARTICLE_LIFE` was added (correctly) to provide a tuning anchor, but the random-range pattern from the spec was lost in implementation — the constant became a fixed value instead of a range midpoint.
+
+**Suggested change:**
+```python
+# systems/particles.py emit_landing() — add variance around the constant:
+# was: lt = LANDING_PARTICLE_LIFE
+lt = random.randint(
+    int(LANDING_PARTICLE_LIFE * 0.8),   # 16 at default value of 20
+    int(LANDING_PARTICLE_LIFE * 1.1))   # 22 at default value of 20
+```
+
+No settings.py constant change needed — `LANDING_PARTICLE_LIFE = 20` remains the anchor and the range scales proportionally if the constant is tuned.
+
+**Justification:** Simultaneously-expiring particles are a perceptual artifact that marks an effect as procedural. In HK, no burst of particles vanishes in a single synchronized frame — there is always a staggered fade that reads as natural dissipation. The fix requires one line change in `particles.py`.
+
+---
+
+### HK-P9-G — `TEXT_SCROLL_SPEED = 2` reveals text too fast for narrative immersion
+
+**File:** `settings.py` line 95; `systems/dialogue.py` line 83.
+
+**Current value:** `TEXT_SCROLL_SPEED = 2` characters per frame = 120 characters per second at 60 FPS.
+
+At this speed, a 60-character line (typical boss dialogue: "You carry the stench of the unfinished rite.") is fully revealed in 0.5 seconds. The text-scroll typewriter effect — the primary mechanism in HK-style games for pacing the player's reading speed and creating the sensation of a character "speaking" — provides almost no pacing at this rate. Players who read quickly will see the full line appear almost instantly; the `_HINT_DELAY = 22` frames before the advance cursor appears becomes the dominant pacing factor rather than the scroll itself.
+
+In Hollow Knight, text reveals at approximately 1 character per 2 frames (30 chars/second), giving an 80-character line 2.7 seconds of scroll time. This matches the perceived cadence of the voice line or inner monologue. At `TEXT_SCROLL_SPEED = 2`, the prologue and boss intro text is effectively not "typewriter-scrolling" — it appears near-instantaneously and the scroll is not perceptible for anything under ~100 characters.
+
+**Suggested change:**
+```python
+# settings.py line 95
+TEXT_SCROLL_SPEED = 1   # was 2 — 1 char/frame = 60 chars/s; makes scroll perceptible on all lines
+```
+
+Alternatively, for players who prefer fast text, a setting of `1.5` (rounded down in dialogue.py's `min()` call) produces approximately 45 chars/second — still noticeably faster than HK but perceptibly slower than the current value. A value of `1` most closely matches HK's "voiced" pacing. No change to `dialogue.py` is needed — the existing `min(self._char_pos + TEXT_SCROLL_SPEED, len(current_text))` clamp handles non-integer values correctly via float accumulation.
+
+**Justification:** In HK, the typewriter scroll is a core part of the narrative contract — the player waits for the text to finish, experiencing the words at the pace the game intends. Steamfall's dialogue is narrative-heavy (boss intro, prologue, defeat lines) and deserves the same pacing. At `TEXT_SCROLL_SPEED = 2` the player cannot read the text slowly enough to feel the weight of lines like "I will unmake what I made."
+
+---
+
+### HK-P9-H — `emit_hit` particle direction bias always assumes attacker faces right — spark spread is asymmetric
+
+**File:** `systems/particles.py` lines 91–101.
+
+**Current code:**
+```python
+def emit_hit(self, x: float, y: float, color: tuple, facing: int = 1) -> None:
+    for _ in range(HIT_PARTICLE_COUNT):
+        base  = 0.0 if facing == 1 else math.pi
+        angle = base + random.uniform(-math.pi * 0.7, math.pi * 0.7)
+        speed = random.uniform(HIT_PARTICLE_SPEED * 0.6, HIT_PARTICLE_SPEED * 1.4)
+        vx    = math.cos(angle) * speed
+        vy    = math.sin(angle) * speed - 1.0   # slight upward bias
+```
+
+The angle spread is `±0.7π` (~126°) around the attacker's facing direction. When `facing == 1` (attacking right), `base = 0.0` and particles fan forward-right. When `facing == -1` (attacking left), `base = π` and particles fan backward-left. The spread of `±0.7π` is `252°` out of `360°` — almost the full circle. This wide spread means that for both facing directions, particles appear on the "wrong" side of the hit point (behind the attacker) about 35% of the time. In Hollow Knight, nail-connect sparks spray in the forward-facing arc only — the sparks exit from the contact surface in the direction of the swing, like sparks off a grinder. Backward-facing sparks from a rightward swing read as physically incorrect.
+
+The `vy -= 1.0` upward bias is correct and matches HK's sparks having a slight vertical component. However the wide `±0.7π` spread includes the full downward half-circle, so some sparks dive steeply downward immediately rather than arcing outward.
+
+**Suggested change:** Tighten the angular spread from `±0.7π` to `±0.5π` (a 90° half-cone centered on the facing direction) so all sparks exit into the forward-facing quadrant:
+
+```python
+# systems/particles.py emit_hit() — tighten spread:
+# was: angle = base + random.uniform(-math.pi * 0.7, math.pi * 0.7)
+angle = base + random.uniform(-math.pi * 0.5, math.pi * 0.5)
+```
+
+No constant change needed. At `±0.5π` the spread covers the full forward hemisphere (no backward sparks) while still allowing variation from straight-forward to straight up and straight down — a natural arc for contact sparks.
+
+**Justification:** In HK, nail sparks are one of the primary spatial cues that confirm the player is attacking in the right direction. Sparks flying backward from a rightward swing create visual noise that contradicts the attack direction. Tightening the spread ensures sparks always reinforce rather than undermine the directional grammar of the attack.
+
+---
+
+## Summary Table (2026-05-19)
+
+| Flag | File(s) | Key Issue | Recommended Change |
+|---|---|---|---|
+| HK-P9-A | `entities/jumper.py` L93 | Jumper attack cooldown hardcoded 50 — same pattern as HK-P8-B ShieldGuard | Add `JUMPER_ATTACK_COOLDOWN = 50` to `settings.py`; reference in `jumper.py` |
+| HK-P9-B | `entities/boss.py` L129–136 | Phase-2 `chase_speed = 4.0`, `attack_cd = 35`, `attack_range = 60` hardcoded — invisible to settings tuning | Add `BOSS_PHASE1_CHASE_SPEED`, `BOSS_PHASE2_CHASE_SPEED`, `BOSS_PHASE2_ATTACK_CD`, `BOSS_PHASE2_ATTACK_RANGE` to `settings.py` |
+| HK-P9-C | `entities/player.py` L374 | Overdrive trail emits from `rect.centery` (chest) — HK-P8-E spec said `rect.bottom` (feet) | Change Y argument from `self.rect.centery` to `self.rect.bottom` |
+| HK-P9-D | `scenes/gameplay.py` L1207 | `_draw_cooldown_pips` hardcodes `90` / `240` — duplicates `SOUL_SURGE_COOLDOWN` / `OVERDRIVE_COOLDOWN`; HUD will lie if cooldowns are retuned | Replace with `SOUL_SURGE_COOLDOWN if faction == FACTION_MARKED else OVERDRIVE_COOLDOWN` |
+| HK-P9-E | `entities/player.py` L387 | `_hurt_latched` triggers on `iframes == PLAYER_IFRAMES - 1` — one frame late; hurt animation misses the first iframe frame | Change to `iframes == PLAYER_IFRAMES` (the correct value from HK-P5-D spec) |
+| HK-P9-F | `systems/particles.py` L129 | `LANDING_PARTICLE_LIFE = 20` used as a fixed value — all 6 dust particles expire simultaneously, mechanical uniformity | Change to `random.randint(int(LANDING_PARTICLE_LIFE*0.8), int(LANDING_PARTICLE_LIFE*1.1))` |
+| HK-P9-G | `settings.py` L95; `systems/dialogue.py` L83 | `TEXT_SCROLL_SPEED = 2` chars/frame — 120 chars/s makes typewriter scroll imperceptible on lines under 80 chars | Reduce to `1` (60 chars/s) to match HK's voiced-text pacing |
+| HK-P9-H | `systems/particles.py` L94 | `emit_hit` uses `±0.7π` spread — includes backward-facing sparks ~35% of the time, contradicting attack direction grammar | Tighten to `±0.5π` so all sparks exit into the forward hemisphere |
