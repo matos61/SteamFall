@@ -852,3 +852,55 @@ The following are not bugs in existing code but are pre-conditions that could ca
   ```
   Alternative fix: move the `_hurt_latched = True` assignment into `take_damage()` (before `super().update()` ever runs) so it is set at the moment of impact rather than detected one frame later.
 
+---
+
+# Bug Review — 2026-05-19
+
+**Scope:** All .py files re-read. Focus on P8-0c and P8-2 patch changes:
+- P8-0c: `entities/player.py` (`_hurt_latched` fix: `iframes == PLAYER_IFRAMES - 1`); `systems/combat.py` (`hitstop.trigger(HITSTOP_FRAMES)` + `HITSTOP_DEATH_FRAMES = 6`); `systems/voice_player.py` (SFX volume); `settings.py` (`SOUL_SURGE_SIZE` removed); `scenes/gameplay.py` (lore-pause guard).
+- P8-2: `entities/player.py` (`_pre_land_vy` moved to after `apply_gravity`, before `move_and_collide`; `SOUL_SURGE_SIZE` import removed); `settings.py` (`SHIELD_GUARD_ATTACK_COOLDOWN = 75`, `CAMERA_DEAD_ZONE_Y = 40`, `OVERDRIVE_TRAIL_INTERVAL = 6`); `entities/shield_guard.py` (`SHIELD_GUARD_ATTACK_COOLDOWN` used); `core/camera.py` (Y dead zone added); Overdrive trail particles in player.
+
+BUG-054 confirmed fixed: `entities/player.py` line 387 now correctly checks `self.iframes == PLAYER_IFRAMES - 1`. This pass starts at BUG-055.
+
+---
+
+## Verification: P8-0c and P8-2 Changes
+
+**BUG-054 (`_hurt_latched` off-by-one):** CONFIRMED FIXED. `entities/player.py` line 387 reads `if self.iframes == PLAYER_IFRAMES - 1:` (i.e., 44 == 44 on the first post-decrement frame). `_hurt_latched` is now set correctly and the hurt animation plays for the full clip.
+
+**P8-0c `hitstop.trigger(HITSTOP_FRAMES)` in combat.py:** CONFIRMED. `systems/combat.py` line 79 calls `hitstop.trigger(HITSTOP_FRAMES)` using the constant correctly.
+
+**P8-0c voice_player SFX volume:** CONFIRMED. `systems/voice_player.py` line 68 calls `ch.set_volume(_audio._sfx_volume)` respecting the live SFX volume setting.
+
+**P8-2 `_pre_land_vy` placement:** CONFIRMED CORRECT. `entities/player.py` lines 183–184: `apply_gravity(self)` followed immediately by `_pre_land_vy = self.vy` before `move_and_collide`. Capturing after gravity (which adds ~0.85 px/frame) but before collision (which zeros `vy` on landing) correctly preserves the pre-landing fall speed. The `>= LANDING_VY_THRESHOLD` (4.0) check remains valid.
+
+**P8-2 `SHIELD_GUARD_ATTACK_COOLDOWN = 75`:** CONFIRMED. `entities/shield_guard.py` line 67 uses `SHIELD_GUARD_ATTACK_COOLDOWN` from settings.
+
+**P8-2 `CAMERA_DEAD_ZONE_Y = 40`:** CONFIRMED. `core/camera.py` lines 39–41 implement Y-axis dead zone using `CAMERA_DEAD_ZONE_Y`.
+
+**P8-2 `OVERDRIVE_TRAIL_INTERVAL = 6`:** CONFIRMED. `entities/player.py` line 372 uses `OVERDRIVE_TRAIL_INTERVAL` in the modulo check for trail particle emission.
+
+---
+
+## New Bugs
+
+---
+
+- [ ] **BUG-055** ⚠️ `settings.py` line 111 / `scenes/gameplay.py` line 964: `HITSTOP_DEATH_FRAMES = 6` is defined in `settings.py` but never imported or used anywhere in the codebase. `gameplay.py` line 964 triggers death hitstop with a magic literal `6` (`hitstop.trigger(6)`) rather than the constant. The constant is dead code; any future designer tuning `HITSTOP_DEATH_FRAMES` in settings will see no effect in the game.
+  - **File:** `settings.py` line 111; `scenes/gameplay.py` line 964
+  - **Minimal fix:** In `gameplay.py`, import `HITSTOP_DEATH_FRAMES` from settings (it is already imported via `from settings import *`) and replace `hitstop.trigger(6)` at line 964 with `hitstop.trigger(HITSTOP_DEATH_FRAMES)`. No change to `settings.py` needed.
+
+---
+
+- [ ] **BUG-056** ⚠️ `scenes/gameplay.py` lines 517–518: The lore-pause guard contains a dead inner branch — `if self._transition_phase is not None: self._tick_transition()` — that can never execute.
+  - **Root cause:** `update()` checks `if self._transition_phase is not None: ... return` at lines 500–502 and returns unconditionally before reaching the lore-dismiss block at line 516. Any frame where `_transition_phase is not None` has already exited `update()`. The nested `if self._transition_phase is not None` check inside the lore block is therefore unreachable and the `_tick_transition()` call inside it is dead code.
+  - **Effect:** No crash — the transition always ticks correctly on the line 500–502 path. But the dead branch is confusing and may mask a real intent: if the developer wanted transitions to proceed while lore is displayed (e.g., after a fade-out triggered mid-lore), the logic is wrong and transitions are silently suppressed while lore is waiting for dismiss.
+  - **Minimal fix:** Remove lines 517–518 (the inner `if self._transition_phase is not None: self._tick_transition()` block). The surrounding `if getattr(self, '_lore_waiting_dismiss', False): ... return` at lines 516–519 remains unchanged.
+
+---
+
+- [ ] **BUG-057** ⚠️ `entities/player.py` lines 171–172 and 392–393: The player's `"death"` animation state is never entered because `_update_animation()` is only called when the player is alive.
+  - **Root cause:** `Player.update()` guards with `if not self.alive: return` at line 171–172, returning before `_update_animation()` is called at line 213. Inside `_update_animation()` (line 392), `if not self.alive: self._anim.set_state("death")` — this branch is dead because the method is never reached when `self.alive` is False.
+  - **Effect:** On the frame the player dies (and on all subsequent frames while the death screen is shown), the `AnimationController` remains in whatever state it was in before death (typically `"hurt"` or `"fall"`). `player.draw()` is called unconditionally by `gameplay.py` regardless of `alive`, so the animation renders — but it shows the last live-state frame (e.g., a "fall" frame frozen mid-air) instead of the death animation clip. The intended "death" pose/animation never plays.
+  - **Minimal fix:** Move the death-animation set call out of `_update_animation` and into `draw()` or into a dedicated path. Simplest: in `Player.update()`, before the `if not self.alive: return` guard, add `if not self.alive: self._update_animation(); return` so the animation state machine ticks once on the death frame. Alternatively, call `self._anim.set_state("death")` directly inside `Entity.die()` or `Player.take_damage` when health reaches zero.
+
